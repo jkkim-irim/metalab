@@ -32,7 +32,7 @@ class TelemetryServer:
     Never opens a browser: the Launchpad embeds this URL in its telemetry tab (it scrapes the printed
     "live dashboard →" line), and that is the ONLY viewer — no process here pops a window of its own."""
 
-    def __init__(self, describe: dict, host: str = "127.0.0.1", port: int = 8770):
+    def __init__(self, describe: dict, host: str = "127.0.0.1", port: int = 8782):
         self.describe = describe
         self.latest: dict | None = None
         self.clients = 0                       # active /stream connections (env_driver skips work when 0)

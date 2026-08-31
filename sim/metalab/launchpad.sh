@@ -36,9 +36,13 @@ DESKTOP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 # WM class, browser profile, port) alongside a main "MetaLab Launchpad" install. Override any via env.
 # Patterns are suffix globs so renaming a worktree's prefix does not silently drop it to the default
 # branding — which would collide with the main install's .desktop, WM class and port.
+#
+# PORTS ARE 878x ON PURPOSE. An unrelated checkout on this machine can ship its own launchpad with its
+# own defaults; sharing a port means clicking this icon opens THAT console (see _hub_probe). Keep every
+# MetaLab port inside 878x, and give a new worktree its own number here rather than reusing one.
 case "$(basename "$REPO")" in
-  *motor-to-joint-control) _NAME="M2J Launchpad"; _DSLUG="m2j-launchpad"; _WM="m2j-hub"; _PORT=8790 ;;
-  *)                       _NAME="MetaLab Launchpad"; _DSLUG="metalab-launchpad"; _WM="metalab-hub"; _PORT=8770 ;;
+  *motor-to-joint-control) _NAME="M2J Launchpad"; _DSLUG="m2j-launchpad"; _WM="m2j-hub"; _PORT=8781 ;;
+  *)                       _NAME="MetaLab Launchpad"; _DSLUG="metalab-launchpad"; _WM="metalab-hub"; _PORT=8780 ;;
 esac
 LAUNCHPAD_NAME="${LAUNCHPAD_NAME:-$_NAME}"
 LAUNCHPAD_DESKTOP_SLUG="${LAUNCHPAD_DESKTOP_SLUG:-$_DSLUG}"
@@ -100,10 +104,22 @@ _open_url(){
   esac
 }
 
-_hub_up(){ timeout 0.3 bash -c "exec 3<>/dev/tcp/127.0.0.1/$PORT" 2>/dev/null; }   # something listening?
-
-_running(){   # a detached Hub already alive (live pidfile) or the port is answering
-  { [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null; } || _hub_up
+# Who is on $PORT?  0 = OUR hub · 1 = nobody · 2 = someone else's server.
+# "Something is listening" is NOT enough to call it ours: another checkout's launchpad can default to
+# the same port, and attaching to it opens THAT repo's console under this icon — you then launch runs
+# against the wrong tree without noticing. /api/discover reports the repo a hub serves, so only a
+# matching repo counts as ours.
+_hub_probe(){
+  "$PY" - "$PORT" "$REPO" <<'PYEOF' 2>/dev/null
+import json, sys, urllib.request
+port, repo = sys.argv[1], sys.argv[2]
+try:
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/discover", timeout=1.0) as r:
+        served = json.load(r).get("repo", "")
+except Exception:
+    sys.exit(1)                                  # nothing there (or not an HTTP hub)
+sys.exit(0 if served == repo else 2)
+PYEOF
 }
 
 # Write (or overwrite) the per-user desktop entry with absolute paths, then refresh the
@@ -171,8 +187,10 @@ stop_server(){
 # Foreground (dev/terminal): block on the server, logs on screen, Ctrl-C to stop.
 run_hub_fg(){
   command -v "$PY" >/dev/null 2>&1 || { log "python3 없음 — Hub 는 stdlib-only(conda 불필요)"; exit 1; }
-  log "Hub 서버 시작 (foreground, Ctrl-C 종료)…"
-  exec "$PY" "$SERVER" ${PASS[@]+"${PASS[@]}"}
+  # --port explicitly, or this path silently falls back to server.py's own default instead of this
+  # checkout's branded port. A --port the caller passed through wins (it lands in PASS after ours).
+  log "Hub 서버 시작 (foreground, port $PORT, Ctrl-C 종료)…"
+  exec "$PY" "$SERVER" --port "$PORT" ${PASS[@]+"${PASS[@]}"}
 }
 
 # Detached (icon/--bg): reuse a running server if present, else start one in the background
@@ -180,7 +198,16 @@ run_hub_fg(){
 run_hub_bg(){
   command -v "$PY" >/dev/null 2>&1 || { log "python3 없음 — Hub 는 stdlib-only(conda 불필요)"; exit 1; }
   mkdir -p "$(dirname "$PIDFILE")"
-  if _running; then
+  # `|| _st=$?`, not a bare call: this script runs under `set -e`, where a non-zero return outside a
+  # condition context kills it — a free port (1) would exit silently instead of starting the Hub.
+  _st=0; _hub_probe || _st=$?
+  if [ "$_st" = 2 ]; then
+    log "포트 $PORT 에 다른 런치패드가 떠 있습니다 — 그 콘솔을 이 아이콘으로 여는 것을 막기 위해 중단합니다."
+    log "  다른 포트로 띄우려면:  HUB_PORT=<빈 포트> $SCRIPT_PATH"
+    log "  또는 그 프로세스를 먼저 종료하세요:  ss -ltnp | grep :$PORT"
+    exit 1
+  fi
+  if [ "$_st" = 0 ]; then
     log "Hub 가 이미 실행 중 — 브라우저만 엽니다 (http://127.0.0.1:$PORT)"
     _open_url "http://127.0.0.1:$PORT"; exit 0
   fi
