@@ -27,7 +27,7 @@ SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SO
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SERVER="$SCRIPT_DIR/launchpad/server.py"
-ICON_PATH="$SCRIPT_DIR/launchpad/assets/metalab_hub.png"
+ICON_PATH="$SCRIPT_DIR/launchpad/assets/metalab_logo.png"
 DESKTOP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 
 # Branding — distinct per checkout so multiple worktrees install as SEPARATE app icons instead of

@@ -1,106 +1,58 @@
-# Newton sim-service — node/deploy toolkit (learning-side)
+# learning/scripts/aws — GPU 노드에서 MetaLab 학습
 
-Launch + set up a GPU node with the Newton / Isaac Lab env from a prebuilt **S3 snapshot**; the eval
-(`rl_eval.sh`) then deploys + runs the sim service over **SSH-over-SSM** — no inbound ports, no shared
-keys, and **no project code on S3**. (Training deploy `rl_train.sh` lands with the trainer, #18.) Node
-provisioning is learning-driven; the sim (`sim/isaaclab/`) only owns its **env definition** (deps build).
+`metalab_train.sh` 는 AWS GPU 노드에서 MetaLab 정책을 학습시킨다. 방식은
+[`../local/metalab_train.sh`](../local/metalab_train.sh) 가 워크스테이션에서 하는 것과 같다 — 노드에서
+바로 그 스크립트를 실행한다. 노드에는 **SSM** 으로 붙는다: SSH 키도, 인바운드 포트도 없다. 코드는 S3
+tarball 로 올리고, 엔진 환경은 노드에서 커밋된 `uv.lock` 으로 `uv` 가 만든다(`../local/setup_env.sh` —
+핀 고정된 sim 소스 clone + `uv sync`, conda 없음). 그래서 한 번 뜨고 나면 네 워크스테이션에 아무것도
+의존하지 않는다.
 
-```
-learning/scripts/aws/       # node provisioning + deploy — runs LOCALLY (your machine)
-  lib.sh       # shared config + helpers: AWS, SSH-over-SSM tunnel + rsync deploy (deploy_sim_and_learning). Sourced; override via env.
-  setup_sim_node.sh     # node lifecycle:  up | launch | provision | sync | status | ssh | logs | stop | start | down
-  rl_eval.sh        # provision (idempotent) -> deploy -> eval over the boundary
-  remote/           # run ON the node (shipped there by setup_sim_node.sh)
-    provision.sh    #   apt deps + restore the S3 env snapshot (conda env + IsaacLab fork)
+## 노드 수명주기는 스크립트가 아니라 사용자의 몫
 
-sim/isaaclab/scripts/       # the SIM's env build (deps installation) — the sim owns its dependencies
-  rebuild_env.sh    #   build the kitless IsaacLab(release/3.0.0-beta2)+Newton env from scratch (on a node)
-  snapshot_env.sh   #   snapshot that built env -> S3 (the artifact provision.sh restores)
-```
+`--node <instance-id>` 는 **필수**다 — 이 스크립트는 인스턴스를 만들지도, 없애지도 않는다. GPU 를 띄우는
+것은 이 스크립트가 할 수 있는 가장 비싼 일이라 절대 암묵적으로 일어나지 않는다: `--node` 가 없으면 지금
+보이는 running GPU 인스턴스 목록을 출력하고 종료한다. 노드 생성은 이 리포 밖에 있는 gpu-launchers 킷으로
+한다.
 
-`setup_sim_node.sh` only manages the **node + its env** (launch → restore snapshot → lifecycle). The **eval run
-script lives in [`learning/scripts/aws/`](../../../../learning/scripts/aws)** — driven by `learning/`
-(which owns the experiment), it rsyncs **both** `sim/isaaclab/` and `learning/` to the node and runs the
-eval through the service boundary:
+사전 준비(1회):
+- **gpu-launchers** 그룹에 속한 `AWS_PROFILE` (미지정 시 `default` 프로파일)
+- 노드가 이미 본인 전용 롤 `node-<your-IAM-username>`(SSM + 공용 prefix 읽기 + 본인 S3 prefix 읽기/쓰기)을
+  달고 있고 `Owner=<your IAM username>` 로 태깅되어 있을 것 — 정책이 노드 제어를 본인 Owner 태그에
+  묶으므로, 남의 태그가 붙은 노드에서는 학습을 돌릴 수 없다. 롤은 노드 **생성 시점**에 정해지므로 이
+  스크립트가 붙여줄 수 없다.
 
-- `learning/scripts/aws/rl_eval.sh` — deploy + eval a checkpoint over the client (`learning.eval.eval_service`).
-
-(The training deploy — `rl_train.sh` — lands with the trainer in the follow-up PR.)
-
-## Prerequisites (per teammate, one time)
-
-1. **AWS CLI v2** + **session-manager-plugin**
-   (`brew install awscli && brew install --cask session-manager-plugin`).
-2. An **AWS profile** whose IAM allows, on `ManagedBy=gpu-launcher` instances:
-   `ec2 Run/Start/Stop/Terminate/Describe*`, `ssm:StartSession` (document `AWS-StartSSHSession`),
-   `ssm:Describe*`, and `iam:PassRole` for the SSM instance profile. The launched node needs an instance
-   profile with **`AmazonSSMManagedInstanceCore`** (default `IAM_INSTANCE_PROFILE=project-x-ssm-profile`).
-3. An **SSH keypair** (`ssh-keygen -t ed25519`, default `~/.ssh/id_ed25519`). Your *public* key is injected
-   into the node via EC2 user-data — only you can log in.
-4. The node's IAM role must have **S3 read** on `ENV_SNAPSHOT_S3` (the env snapshot restored at provision).
-
-## Reproduce the eval on a bare node
-
-Everything restores from the S3 env snapshot — no hand-built venv, no project code on S3:
+## 실행
 
 ```bash
-export AWS_PROFILE=<your-gpu-launcher-profile>        # only if not your default profile
+AWS_PROFILE=default bash learning/scripts/aws/metalab_train.sh \
+    --node <id> --sim genesis --task hammer-lift-teacher --recipe privileged
 
-# from the repo root:
-learning/scripts/aws/setup_sim_node.sh up                   # launch an L40S + restore the env snapshot (~10 min)
-NODE=<instance-id> learning/scripts/aws/rl_eval.sh    # deploy sim+learning, pull the ref ckpt, eval over the boundary
-learning/scripts/aws/setup_sim_node.sh stop                 # BILLABLE until stopped (EBS + checkpoints persist)
+… --node <id> --num-envs 8192 --max-iterations 5000 --record   # 실제 런 (detached; 노드는 계속 살아 있음)
+… --node <id> --num-envs 512  --max-iterations 3    --smoke    # 짧은 테스트 (완료까지 대기)
 ```
 
-`setup_sim_node.sh up` prints the instance id (also saved to `~/.allex-node`). `rl_eval.sh` pulls the reference
-checkpoint (`REF_CKPT_S3`, a run-name path `…/ckpts/<run_name>/model_<iter>.pt`; override with
-`CHECKPOINT=<node path>` + `CHECKPOINT_S3=<s3 source>` for a node-local one) and prints
-`EVAL_OVER_SERVICE_OK ... SR=...`.
-
-### Env snapshot image
-
-`ENV_SNAPSHOT_S3=s3://wirobotics-internal/chrisryu/sim_rl/envsnap` holds two tarballs, restored by
-`remote/provision.sh` with the node's own IAM role. They are a **coupled pair** — the conda env
-editable-installs the fork, so its site-packages point into `~/IsaacLab`; restore both or neither. The
-prefix carries its own `README.md` (source: `sim/isaaclab/scripts/ENVSNAP_README.md`, re-uploaded by
-`snapshot_env.sh`) so a future S3 browser doesn't need this repo to understand it:
-
-| object | ~size | restores to | contents |
-|---|---|---|---|
-| `env_isaaclab.tar` | 5.2 GB | `~/miniconda3/envs/isaaclab` | the conda env: kitless Isaac Lab `release/3.0.0-beta2` + Newton + mujoco-warp, py3.12, **torch / tensordict / wandb** — a superset, so the Isaac-free trainer + eval run here too |
-| `isaaclab.tar` | 109 MB | `~/IsaacLab` | the Isaac Lab fork source (+ `allex_description` baked in) |
-
-The Newton stack is **kitless** (no Isaac Sim / Omniverse) and not cleanly pip-installable, so provisioning
-restores this snapshot rather than building from scratch. Rebuild it from a known-good node with
-`sim/isaaclab/scripts/snapshot_env.sh s3://.../envsnap`.
-
-## Common overrides (all via env)
-
-| var | default | meaning |
+| 플래그 | 기본값 | 의미 |
 |---|---|---|
-| `AWS_PROFILE` / `AWS_REGION` | _default chain_ / `us-east-1` | AWS creds + region |
-| `INSTANCE_TYPES` | `g6e.4xlarge g6e.2xlarge g5.4xlarge g5.2xlarge` | capacity-first list (L40S / A10G — **need RT cores** for Newton) |
-| `ROOT_GB` | `300` | gp3 root EBS (snapshot ~12 GB + assets + checkpoints) |
-| `ENV_SNAPSHOT_S3` | `s3://wirobotics-internal/chrisryu/sim_rl/envsnap` | env snapshot (`env_isaaclab.tar` + `isaaclab.tar`) |
-| `SSH_PUBKEY` | `~/.ssh/id_ed25519.pub` | key injected into the node |
-| `NODE_ID` | _state file_ | target a specific instance |
+| `--node <id>` | — (**필수**) | 학습을 돌릴, 이미 running 인 노드 |
+| `--sim {genesis\|newton}` | `genesis` | 엔진 스포크 |
+| `--task <t>` / `--recipe <r>` | — (**task 필수**) | 계약서. task family 는 recipe 가 필요하며, 노드를 건드리기 전에 로컬에서 먼저 검증한다 |
+| `--num-envs` / `--max-iterations` | `4096` / 스크립트 기본값 | 병렬 env 수 · 이터레이션 상한 |
+| `--run-label <x>` | task 이름 | 런 이름의 label 구간 |
+| `--record` | off | 체크포인트별 롤아웃 녹화 + 리포트 |
+| `--smoke` | off | detach 하지 않고 런이 끝날 때까지 대기 |
 
-## How it fits together
+환경변수 오버라이드: `AWS_PROFILE`, `AWS_REGION`(`us-east-1`), `AWS_USER`(본인 S3 prefix — 미지정 시 IAM
+신원에서 해석), `METALAB_DEPLOY_S3`(repo tarball 스테이징 prefix), `RUN_NAME`, `SSM_TIMEOUT`.
 
-- **Transport:** nodes have no inbound ports. `lib.sh` writes a tiny ssh wrapper that tunnels through
-  `aws ssm start-session` (`AWS-StartSSHSession`); `ssh`, `rsync`, and `scp` all ride it. No bastion, no public SSH.
-- **Provisioning (self-contained):** `setup_sim_node.sh provision` runs `remote/provision.sh`, which restores the
-  S3 env snapshot with the node's own IAM role — no clone, no `isaacsim`, no reference to any running box.
-- **Code + assets:** `rl_eval.sh` rsyncs `sim/isaaclab/` → `/home/ubuntu/sim/isaaclab` and
-  `learning/` → `/home/ubuntu/learning_repo/learning`, then editable-reinstall the sim packages in the
-  isaaclab env. Task assets (~600 MB) transfer once; later runs send only deltas.
-- **One env:** the isaaclab snapshot env is a **superset** (torch / tensordict / wandb), so both
-  `server.py` and the Isaac-free trainer / eval run in it — nothing else to build on a fresh node.
+## 결과물
 
-## Notes / gotchas
+- **체크포인트**는 런 도중 S3 로 미러링된다(`…/sim_rl/ckpts/<run_name>/model_*.pt`) — 노드를 terminate 해도
+  남는다.
+- **런 이름**은 로컬에서 만들어 노드로 export 한다 —
+  `{yymmdd-HHMM}_{envs}_{engine}_{recipe}_{label}_{sha}_aws` — 그래서 실제 repo SHA 를 달고 있어 정확한
+  코드로 추적된다.
+- **wandb**: 로컬 `~/.netrc` 의 키를 SSM 으로 노드에 심는다(출력하지 않음). 키가 없으면 런은 offline 으로
+  기록되고 스크립트가 그렇게 알려준다.
+- 스크립트는 wandb URL 을 출력하고 노드 로그를 tail 한다.
 
-- **Newton needs RT cores** — A100 / H100 / V100 cannot render it. Stick to L40S (g6e) / A10G (g5).
-- Checkpoints persist on the node's EBS while **stopped**; `setup_sim_node.sh down` destroys them — fetch first.
-- Capacity: GPU types are scarce; `setup_sim_node.sh launch` retries across the type list. If all fail, try later
-  or widen `INSTANCE_TYPES`.
-- Rebuild the env snapshot from a known-good node with `sim/isaaclab/scripts/snapshot_env.sh s3://.../envsnap`.
+**다 쓰면 노드를 stop 한다** — stop 전까지 계속 과금되고, 이 스크립트는 대신 꺼주지 않는다.

@@ -1,149 +1,93 @@
-# learning/scripts/local — workstation (local-GPU) sim-service runs
+# learning/scripts/local — 워크스테이션(로컬 GPU) 실행
 
-The **local** peer of [`../aws`](../aws). The trainer and the MetaLab engine's sim-service
-(`sim/<engine>/server.py`, `<engine>` ∈ {genesis, newton}) run as **two processes over an RPC localhost
-socket** — both in the engine's **uv venv** (`~/.metalab/venvs/<engine>`), on this machine's GPU. No AWS
-node, no SSM, no conda. Use these when you train/eval on your own workstation; use `../aws` for a GPU node
-(which just runs this same `metalab_train.sh` on the node over SSM).
+[`../aws`](../aws) 의 로컬 짝. 트레이너와 엔진 sim-service(`sim/metalab/backends/<engine>/server.py`,
+`<engine>` ∈ {genesis, newton})가 **RPC localhost 소켓 위의 두 프로세스**로, 둘 다 엔진의 uv venv 안에서
+이 머신 GPU 로 돈다. AWS 노드도 SSM 도 conda 도 없다.
 
-| local | aws counterpart | what it does |
-|---|---|---|
-| `lib.sh` | `aws/lib.sh` | shared config — uv venv layout (`METALAB_VENV_ROOT`, `engine_venv`), `RL_LOG_ROOT`, `log`. Sourced by both scripts. |
-| `metalab_train.sh` | `aws/metalab_train.sh` | train on the local GPU (`learning.train --trainer rl`, RPC). Checkpoints mirror to S3 by default; optional per-checkpoint eval recording + synced HTML report (`--record`). |
-| `metalab_eval.sh` | (node runs this too) | eval/watch a **local** checkpoint over RPC — SR + per-episode S/F json; optional rerun `.rrd` + report recording (kept local). |
-
-## Layout (override from the env; defaults in `lib.sh`)
+| 스크립트 | 하는 일 |
+|---|---|
+| `lib.sh` | 공용 설정 — venv 레이아웃(`METALAB_VENV_ROOT`, `engine_venv`), `RL_LOG_ROOT`, task·recipe 탐색. `aws/metalab_train.sh` 도 탐색 헬퍼 때문에 source 한다. |
+| `setup_env.sh` | 커밋된 uv 프로젝트(`sim/metalab/setup/<engine>/`)를 venv 로 `uv sync`. 아래 둘이 자동 호출(lock 과 맞으면 no-op). |
+| `metalab_train.sh` | 로컬 GPU 학습(`learning.train --trainer rl`). 체크포인트 S3 미러링 기본 ON. |
+| `metalab_eval.sh` | 로컬 체크포인트 검증/관전 — SR + 에피소드별 S/F json. |
 
 ```
-METALAB_VENV_ROOT  $HOME/.metalab/venvs        # uv engine venvs: <root>/genesis, <root>/newton
-RL_LOG_ROOT         <repo>/logs/rl               # checkpoints: <exp>/<run_name>/model_*.pt
+METALAB_VENV_ROOT  $HOME/.metalab/venvs/<repo-dir>   # worktree 별 격리: <root>/genesis, <root>/newton
+RL_LOG_ROOT         <repo>/logs/rl                     # 체크포인트: <exp>/<run_name>/model_*.pt
 ```
 
-The engine venvs are built from the committed uv projects (`sim/_setup/<engine>/{pyproject.toml,uv.lock}`)
-by `setup_env.sh` (`uv sync` — clones the pinned sim source as a sibling repo, no conda, no S3 snapshot).
-`metalab_train.sh`/`metalab_eval.sh` call `setup_env.sh` automatically (no-op if the venv already matches the lock).
+## 학습
 
-## Train
-
-`--sim {genesis|newton}` **and** `--task <t>` are **REQUIRED** (no defaults — fail-loud; a missing `--task`
-lists the tasks for that backend). Headless by default; add `--viz gl` to open that backend's GUI + a live
-web dashboard on this machine.
+`--sim {genesis|newton}` 과 `--task <t>` 는 **필수**(fail-loud — 빠지면 목록을 출력한다). task 가
+family(`sim/metalab/contract/tasks/<task>/`)면 `--recipe <r>` 도 필요하다. 기본 headless, `--viz gl` 이면
+백엔드 GUI + 라이브 웹 대시보드가 뜬다. wandb 는 기본 ON (`--no_wandb` 로 끔).
 
 ```bash
-learning/scripts/local/metalab_train.sh --sim newton  --task hammer-lift --num_envs 4096 --max_iterations 30000
-learning/scripts/local/metalab_train.sh --sim genesis --task hammer-lift --num_envs 4 --viz gl   # live GUI, 4 envs
-learning/scripts/local/metalab_train.sh --sim newton  --task hammer-lift --device cuda:1         # engine on physical GPU 1
-nohup learning/scripts/local/metalab_train.sh --sim newton --task hammer-lift --num_envs 4096 > train.log 2>&1 &
+T="--task hammer-lift-teacher --recipe privileged"
+learning/scripts/local/metalab_train.sh --sim newton  $T --num_envs 4096 --max_iterations 30000
+learning/scripts/local/metalab_train.sh --sim genesis $T --num_envs 4 --viz gl    # 라이브 GUI, env 4개
+learning/scripts/local/metalab_train.sh --sim newton  $T --device cuda:1          # 엔진을 물리 GPU 1 에
 ```
 
-All run knobs (rewards, curriculum, PPO, action scales, DR) live in `learning/rl/dexblind/<task>/experiment.py`
-— edit that, not the script. `--task` selects both the experiment and the sim env package.
+런 노브(보상·커리큘럼·PPO·action scale·DR)는 `learning/rl/dexblind/<task>/experiment.py` 에 있다 —
+스크립트가 아니라 그 파일을 고친다.
 
-RPC: `metalab_train.sh` activates the engine's uv venv and runs `learning.train`, which spawns
-`sim/<engine>/server.py` as a second process in the SAME venv and drives it over `127.0.0.1` (single-venv
-RPC — the team-required path). `wandb` (scalar curves: loss/SR) is ON by default; `--no_wandb` disables it.
+### 체크포인트 → S3 (기본 ON)
 
-### Checkpoints → S3 (ON by default)
-
-**S3 is the checkpoint store** — a workstation run publishes to the same place, and in the same layout, as a
-node run, so a checkpoint is findable without knowing which machine trained it:
+워크스테이션 런도 노드 런과 같은 위치·레이아웃으로 올라가므로, 어느 머신이 돌렸는지 몰라도 찾을 수 있다:
 
 ```
 s3://wirobotics-internal/jkkim/sim_rl/ckpts/<run_name>/model_*.pt
 ```
 
 ```bash
-learning/scripts/local/metalab_train.sh --sim newton --task hammer-lift --num_envs 4096   # S3 mirror is already on
-SYNC_INTERVAL=120 ...                    # sync every 2 min (default 300 s)
-CKPT_S3_ROOT=s3://.../my/ckpts ...       # publish somewhere else
-KEEP_LOCAL_CKPTS=1 ...                   # keep every local copy (see pruning below)
---no-s3-sync                             # keep this run off S3 entirely (local only, nothing pruned)
+SYNC_INTERVAL=120 ...                    # 미러 주기 (기본 300초)
+CKPT_S3_ROOT=s3://.../my/ckpts ...       # 다른 곳에 올리기
+KEEP_LOCAL_CKPTS=1 ...                   # 로컬 사본 전부 보존
+--no-s3-sync                             # S3 에 안 올림 (로컬 전용, pruning 없음)
 ```
 
-Each checkpoint goes up the moment it is written (`OnPolicyRunner._upload_ckpt_s3`), plus a mirror sweep
-every `SYNC_INTERVAL`s and a final one on exit. S3 is never pruned (no `--delete`).
+업로드가 성공하면 로컬 `model_*.pt` 는 **최신 하나만** 남기고 정리된다(최신 것은 eval·리포트 훅이 쓰므로
+남긴다). 예전 것은 `aws s3 cp` 로 먼저 받아온다. S3 쪽은 절대 지우지 않는다.
 
-**Local retention — same on a workstation as on a node**: after a *successful* upload the local `model_*.pt`
-are pruned to the **newest one**. The newest is kept deliberately: it may still be mid-write, the
-per-checkpoint video/report hook loads it, and `metalab_eval.sh` picks it up — so re-evaluating the LATEST
-checkpoint needs no S3 pull. An older one is fetched first:
+로컬 자격증명(`aws login`)이 필요하다. 없으면 — S3 가 기본값이었을 땐 WARN 후 로컬 전용으로 계속(정리
+안 함), 명시적으로 요청했을 땐(`--s3-sync`) hard error.
 
-```bash
-aws s3 cp s3://wirobotics-internal/jkkim/sim_rl/ckpts/<run_name>/model_400.pt /tmp/
-learning/scripts/local/metalab_eval.sh --sim newton --task <task> --checkpoint /tmp/model_400.pt
-```
+### 학습 중 녹화 + 리포트 (`--record`, 기본 OFF)
 
-A workstation has no instance role, so this needs local creds (`aws login`). With creds **missing**: if S3 was
-merely the default the run WARNS loudly and continues local-only (nothing is pruned); if you asked for it
-explicitly (`--s3-sync` / `S3_SYNC=1`) that is a hard error instead.
-
-### Training-time eval recording + report (`--record`)
-
-`--record` (OFF by default) records a progress rollout **by itself** — no second terminal, no eval script.
-After each checkpoint the trainer itself (`rl_trainer._make_record_callback`) spins up a short-lived
-sim-service and rolls that checkpoint out. The rollout is saved as a **rerun `.rrd`** (not MP4), together with
-the per-step series, and the checkpoint is never touched.
-
-Both halves go into one **synced report** (`report.html`: an embedded rerun viewer on the left — orbit, zoom
-and scrub the actual scene — with time-synced obs/reward/action/joint-state plots on the right, one top-level
-tab per recorded env; see `sim/metalab/runtime/rollout_report.py`). It is published **next to that run's
-checkpoints**, one subdir per checkpoint, and only its LINK is logged to W&B (`val/report`) on that
-checkpoint's training step:
+체크포인트마다 트레이너가 직접 짧은 sim-service 를 띄워 롤아웃을 rerun `.rrd` + 스텝별 시리즈로 녹화하고,
+둘을 합친 `report.html`(왼쪽 rerun 뷰어 / 오른쪽 시간 동기화 플롯)을 체크포인트 옆에 올린다. W&B 에는
+링크만(`val/report`) 기록된다 — **CloudFront** 로 연다.
 
 ```
 s3://wirobotics-internal/jkkim/sim_rl/ckpts/<run_name>/report_<iter>/{report.html,rollout.rrd,data.json}
-    → https://d1iitptfxhu64e.cloudfront.net/jkkim/sim_rl/ckpts/<run_name>/report_<iter>/report.html
 ```
-
-Open it through **CloudFront** — the link W&B logs. A *presigned* S3 URL signs ONE key, so the page's
-relative `rollout.rrd` fetch comes back `403`: the plots render (the series are inlined) and the 3D pane
-degrades to a message.
-
-Without an S3 destination (`--no-s3-sync`, or no creds) the report is kept at
-`<log_dir>/report_<iter>/` instead. Measured against the old MP4 path at 4 envs: the recording rollout went
-from **118 s to 41 s** per checkpoint (no offscreen render, and the CUDA graph is no longer disabled by a
-viewer), at ~13 MB of `.rrd` per checkpoint.
 
 ```bash
-learning/scripts/local/metalab_train.sh --sim newton --task hammer-lift --num_envs 4096 --record   # + per-checkpoint report link
-RECORD_ENVS=6 ... --record      # envs given a series + a report tab (default 4)
-RECORD_STEPS=0 ... --record     # policy steps per recording (0 = full episode; default 600)
+RECORD_ENVS=6 ... --record      # 시리즈 + 리포트 탭을 받을 env 수 (기본 4)
+RECORD_STEPS=0 ... --record     # 녹화당 정책 스텝 (0 = 에피소드 전체; 기본 600)
 ```
 
-- The link goes to the **same W&B run** as the scalars (no sibling run), so a curve and its replay share one
-  step axis. A failed record/publish logs a WARN and training continues (best-effort).
-- One panel: `val/report`, this checkpoint's link as media, so it streams into the panel LIVE (no page
-  reload; drag its step slider for the earlier checkpoints). A `val/reports` TABLE of all checkpoints was
-  tried and reverted — its cell is a client-artifact reference the table panel serves from cache, so rows
-  only appeared after a page reload.
-- **BLOCKING**: the recording runs on the training thread, so the loop pauses at each checkpoint. Its few
-  envs share the training GPU.
-- Mobile: the rerun viewer is desktop-only (`Mobile OSes are not yet supported`); the plots still work.
-- On a **display-less node** the offscreen render needs no X server: the newton parser routes pyglet to EGL
-  when `DISPLAY` is unset (`backends/newton/parser.py`), the same switch Isaac Lab's video capture uses.
+- S3 목적지가 없으면 리포트는 `<log_dir>/report_<iter>/` 에 남는다.
+- **BLOCKING**: 녹화는 학습 스레드에서 돌아 체크포인트마다 루프가 멈추고, 녹화용 env 가 학습 GPU 를 같이
+  쓴다. 실패해도 WARN 만 남기고 학습은 계속된다.
 
-## Eval / watch a local checkpoint (`metalab_eval.sh`)
+## 검증/관전 (`metalab_eval.sh`)
 
-Evals a checkpoint over the RPC sim-service (RPC-only) → SR + a per-episode S/F json. Headless by default it
-records the rollout as a rerun `.rrd` + `report.html` **next to that json (local — S3 publishing was
-removed)**; `--viz` instead opens the backend's live viewer (no recording).
+RPC 로 체크포인트를 검증한다 → SR + 에피소드별 S/F json. 기본(headless)은 `.rrd` + `report.html` 을 그
+json 옆에 **로컬로** 녹화하고, `--viz` 는 라이브 뷰어를 열며 녹화하지 않는다.
 
 ```bash
-learning/scripts/local/metalab_eval.sh --sim newton --task hammer-lift --viz                 # live watch (∞, Ctrl-C) — no recording
-learning/scripts/local/metalab_eval.sh --sim newton --task hammer-lift                        # headless: SR + .rrd/report (local)
-RECORD=0 EPISODES=64 learning/scripts/local/metalab_eval.sh --sim newton --task hammer-lift --num_envs 16   # 64-ep SR, no recording
-CHECKPOINT=logs/rl/.../model_800.pt learning/scripts/local/metalab_eval.sh --sim newton --task hammer-lift  # a specific local ckpt
-GPU=1 learning/scripts/local/metalab_eval.sh --sim newton --task hammer-lift                  # on physical GPU 1 while training holds GPU 0
+T="--task hammer-lift-teacher --recipe privileged"
+learning/scripts/local/metalab_eval.sh --sim newton $T --viz                 # 라이브 관전 (∞, Ctrl-C)
+learning/scripts/local/metalab_eval.sh --sim newton $T                       # headless: SR + .rrd/리포트
+RECORD=0 EPISODES=64 learning/scripts/local/metalab_eval.sh --sim newton $T --num_envs 16   # 64 에피소드 SR
+CHECKPOINT=logs/rl/.../model_800.pt learning/scripts/local/metalab_eval.sh --sim newton $T
+GPU=1 learning/scripts/local/metalab_eval.sh --sim newton $T                 # 학습이 GPU 0 을 쓰는 동안
 ```
 
-- **Checkpoint**: default = newest **local** `model_*.pt` for the task under `RL_LOG_ROOT`. `CHECKPOINT=<path>`
-  picks one. To eval an S3-only checkpoint, `aws s3 cp` it under `logs/rl/.../` first (this tool never pulls S3).
-- **Recording** (default, headless): the server writes `rollout.rrd` + `data.json` + `report.html` into the
-  run's output dir beside the meta json — **kept local**, no S3 upload. `RECORD_ENVS` (3) sets how many envs
-  get a series + a report tab. `RECORD=0` skips it, `RRD=0` keeps the SR run without a recording.
-- **`EPISODES`**: `-1` (default) = infinite watch (Ctrl-C → prints SR + writes the meta json) · `>0` = stop
-  after N episodes · `0` = a fixed `STEPS`.
-- **`GPU=N`** sets `CUDA_VISIBLE_DEVICES=N` (seen as `cuda:0` in-process). Use `GPU=1` to eval while a training
-  run holds GPU 0.
-- **`--viz`** opens the `--sim` backend's live GL viewer (needs a display) and disables recording. SR is judged at the
-  curriculum-END criteria on every path (over RPC via `SimServiceVecEnv.apply_curriculum_end`).
+- **체크포인트**: 기본 = `RL_LOG_ROOT` 아래 그 task 의 최신 로컬 `model_*.pt`. S3 전용 체크포인트는 먼저
+  `aws s3 cp` 해야 한다(이 도구는 S3 를 받아오지 않는다).
+- **`EPISODES`**: `-1`(기본) 무한 관전 · `>0` N 에피소드 후 종료 · `0` 고정 `STEPS`.
+- **`RECORD=0`** 녹화 생략, **`RECORD_ENVS`**(3) 탭 받을 env 수, **`GPU=N`** `CUDA_VISIBLE_DEVICES=N`.
+- SR 은 모든 경로에서 커리큘럼 **END** 기준으로 판정한다.

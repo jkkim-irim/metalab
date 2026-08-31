@@ -207,6 +207,29 @@ def standalone_preview_describe() -> dict:
     return {**d, "preview": True}
 
 
+def creds() -> dict:
+    """What this machine is actually connected to — the UI disables the controls that need it.
+
+    ``aws``   — the aws CLI is on PATH and its credentials resolve (``sts get-caller-identity``).
+    ``wandb`` — the SAME test learning/scripts/local/metalab_train.sh makes before a run (WANDB_MODE /
+                WANDB_API_KEY / the ``api.wandb.ai`` entry ``wandb login`` writes to ~/.netrc), so the
+                page and the script never disagree about whether a run can log.
+
+    Probed per request (its own endpoint, not /api/discover, which the launch path also calls) — the
+    page reads it once on load, so connect first or reload after ``aws login`` / ``wandb login``.
+    """
+    try:
+        out = subprocess.run(["aws", "sts", "get-caller-identity", "--output", "text"],
+                             capture_output=True, text=True, timeout=15)
+        aws_ok = out.returncode == 0
+    except Exception:                       # aws not installed / hung — same answer either way: no AWS
+        aws_ok = False
+    netrc = Path.home() / ".netrc"
+    wandb_ok = bool(os.environ.get("WANDB_MODE") or os.environ.get("WANDB_API_KEY")) or (
+        netrc.is_file() and "api.wandb.ai" in netrc.read_text(errors="ignore"))
+    return {"aws": aws_ok, "wandb": wandb_ok}
+
+
 def list_ec2() -> dict:
     """Live EC2 GPU instances (running/stopped) for the AWS launch combo. The Hub is stdlib-only, so it
     shells the aws CLI (creds/login done by the user). GPU-filtered (g*/p* families) to cut account noise;
@@ -1131,6 +1154,8 @@ def _make_handler():
                 self._json(standalone_preview_describe())
             elif u.path == "/api/discover":
                 self._json(discover())
+            elif u.path == "/api/creds":
+                self._json(creds())
             elif u.path == "/api/ec2":
                 self._json(list_ec2())
             elif u.path == "/api/gpus":
@@ -1507,6 +1532,9 @@ let DESC=null;
 // ctrl = robot drive mode: "motor" (motor-space coupled PD, the robot YAML's control_mode) or "joint"
 // (native per-joint diagonal PD) — carried to every run as METALAB_MOTOR_COUPLING=1|0.
 const state={engine:null,task:null,recipe:"",mode:"train",target:"local",algo:"ppo",ctrl:"motor",knob:{},adv:{}};
+// What this machine is connected to (/api/creds). Optimistic until the probe answers — a failed probe
+// must never lock a working setup out; the launched script still fails loudly if it was wrong.
+let CREDS={aws:true,wandb:true};
 
 // mode-dependent knob + advanced specs (matched to the maintained local scripts)
 const SPEC={
@@ -1617,8 +1645,16 @@ function loadEc2(){
 }
 function renderAdv(){
   const sp=curSpec();
-  $("adv").innerHTML=sp.adv.map(([k,fl,lab])=>
-    `<label><input type="checkbox" id="a_${k}" ${state.adv[k]?"checked":""}> ${esc(lab)}</label>`).join("");
+  // wandb not connected: the run can only go with --no_wandb (the script refuses otherwise), so the
+  // box is forced on and locked instead of letting the launch die at the script's login check.
+  const wlock=!CREDS.wandb;
+  if(wlock&&sp.adv.some(([k])=>k==="no_wandb")) state.adv.no_wandb=true;
+  $("adv").innerHTML=sp.adv.map(([k,fl,lab])=>{
+    const lock=wlock&&k==="no_wandb";
+    return `<label${lock?' title="wandb 미연동 — wandb login 후 새로고침하면 해제됩니다"':""}>`+
+           `<input type="checkbox" id="a_${k}" ${state.adv[k]?"checked":""}${lock?" disabled":""}>`+
+           ` ${esc(lab)}${lock?" (wandb 미연동 — 고정)":""}</label>`;
+  }).join("");
   sp.adv.forEach(([k])=>{$("a_"+k).onchange=e=>{state.adv[k]=e.target.checked;render();};});
   $("advhint").textContent=sp.advhint||"";
 }
@@ -1694,15 +1730,19 @@ function selectMode(m){state.mode=m;
   [...$("mode").children].forEach(b=>b.classList.toggle("on",b.dataset.v===m));
   const af=$("algofield"); if(af) af.style.display=(m==="train")?"":"none";   // algorithm selector: train mode only
   const rb=$("reset"); if(rb) rb.hidden=(m!=="standalone");   // 'Reset Simulator' button: standalone only
-  // AWS node is train-only; eval & standalone run LOCAL only (eval = in-process, standalone = GUI on the
-  // display GPU). Disable the AWS button and pin the target to local so it can't be selected — mirrors the
-  // server, which has no (eval|standalone, aws) script and rejects that combo.
-  const awsOk=(m==="train");
-  const awsBtn=$("target").querySelector('[data-v="aws"]');
-  if(awsBtn){awsBtn.disabled=!awsOk;
-    awsBtn.title=awsOk?"":"AWS 노드는 train 전용 — eval/standalone 은 로컬에서만 실행됩니다";}
-  if(!awsOk) selectTarget("local");
+  syncAwsBtn();
   populateTasks();renderKnobs();renderAdv();render();}   // switch the task combobox to this mode's list
+// AWS node is train-only (eval = in-process, standalone = GUI on the display GPU — mirrors the server,
+// which has no (eval|standalone, aws) script), and it needs working AWS credentials: without them every
+// aws call in the launcher fails. Either way the button is disabled and the target pinned to local.
+function syncAwsBtn(){
+  const trainOnly=(state.mode==="train"), ok=trainOnly&&CREDS.aws;
+  const awsBtn=$("target").querySelector('[data-v="aws"]');
+  if(awsBtn){awsBtn.disabled=!ok;
+    awsBtn.title=ok?"":(trainOnly?"AWS 미연동 — `aws login` 후 페이지를 새로고침하세요"
+                                 :"AWS 노드는 train 전용 — eval/standalone 은 로컬에서만 실행됩니다");}
+  if(!ok&&state.target!=="local") selectTarget("local");
+}
 function selectTarget(tg){state.target=tg;
   [...$("target").children].forEach(b=>b.classList.toggle("on",b.dataset.v===tg));
   renderKnobs();renderAdv();render();}
@@ -1724,6 +1764,10 @@ fetch("/api/discover").then(r=>r.json()).then(d=>{DESC=d;
   [...$("ctrl").children].forEach(b=>b.onclick=()=>selectCtrl(b.dataset.v));
   renderKnobs();renderAdv();render();
 }).catch(()=>{$("livetxt").textContent="discover 실패";});
+
+// Gate the controls that need an external account: no AWS creds -> no AWS node, no wandb login -> the
+// run is pinned to --no_wandb. Independent of /api/discover (order does not matter — both re-render).
+fetch("/api/creds").then(r=>r.json()).then(d=>{CREDS=d;syncAwsBtn();renderAdv();render();}).catch(()=>{});
 
 $("copy").onclick=()=>{const t=$("cmd").dataset.plain||"";
   navigator.clipboard.writeText(t).then(()=>{$("toast").textContent="복사됨 ✓";

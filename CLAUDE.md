@@ -1,36 +1,19 @@
-# CLAUDE.md — allex
+# CLAUDE.md — metalab
 
-Consolidated ALLEX repo. Add shared code here — don't spin up a new repo. Subsystem-specific notes live in each subdir's own `CLAUDE.md`.
-
-Per-developer prefs (e.g. response language) go in a personal `CLAUDE.md` at the workspace level (dir above this repo, git-ignored) — keep this file team-shared.
+스택 통합 리포: 엔진 무관 sim(`sim/metalab`) + 학습/평가 파이프라인(`learning/`).
 
 ## Conventions
-- **No AI attribution** on commits/PRs (no `Co-Authored-By`, no generated-by footer).
-- **No remote git ops without explicit, per-action approval** — push (incl. force-push), history-rewrite, merge/close PRs. Per-push, not per-task ("update the PR"/"relaunch" don't authorize a push); commit locally, push only when told. Same for AWS admin creds.
-- **Read a PR's live title/description before editing it** — always fetch the current version (`gh pr view <n> --json title,body`) and edit from that, never from memory, so you don't clobber or drop content that's already there. Keep the description in sync with the pushed diff.
-- **Branch names**: `dev/{username}/{branch_name}` — `dev/` prefix + your GitHub login + a short kebab-case description (e.g. `dev/chrisryu0/fk-validation`). Branches predating this convention are grandfathered; use it for all new branches.
-- **Don't modify vendored/upstream code** (Isaac Lab, `allex_groot/Isaac-GR00T`) — wrap/override in our
-  own code. GR00T is internalized under `learning/model/groot` (a faithful, minimally-diverged copy);
-  `allex_groot/Isaac-GR00T` is kept as the pristine **upstream reference** (its `UPSTREAM.md` pins the
-  source SHA) for diffing/re-syncing that copy — it is NOT installed, cloned, or imported at runtime.
-- **Fail loudly, never silently** — no error-swallowing try/except or fallbacks; `assert` invariants and let errors propagate; catch only at system boundaries.
-- **Imports at the top of the file**, never inside functions — explicit deps + fail-fast if one is missing.
-- **`README.md` = user manual** — don't edit without an explicit request.
+- **커밋/PR 에 AI 저작 표기 금지** (`Co-Authored-By`, generated-by 푸터).
+- **원격 git 작업은 그때그때 승인받는다** — push(force 포함)·히스토리 재작성·PR 머지/클로즈. 태스크가 아니라 push 단위다("PR 업데이트해줘"는 push 승인이 아니다). 커밋은 로컬에만, push 는 지시받았을 때만. AWS admin 자격증명도 마찬가지.
+- **vendored/upstream 코드는 고치지 않는다** — 우리 코드에서 감싸거나 오버라이드한다.
+- **조용히 실패하지 않는다** — 에러를 삼키는 try/except·fallback 금지. 불변식은 `assert`, 에러는 전파. 잡는 것은 시스템 경계에서만.
+- **import 는 파일 최상단에**, 함수 안에 넣지 않는다.
+- **`README.md` 는 사용자 매뉴얼** — 요청 없이 건드리지 않는다.
 
 ## Training
-- **Run/deploy via the maintained scripts, not ad-hoc commands.** Use `learning/scripts/` (`train.sh`, `train_groot.sh`, `aws/train_aws.sh`) — don't hand-roll one-off `aws`/`ssm`/`accelerate`/`scp` invocations for a real run. If a script can't do what you need, extend it and commit; don't work around it with a throwaway command (and never stage code through S3 — `train_aws.sh` scp's over SSM).
-- **Smoke-test val/ckpt/sim-eval changes** before any long run — poll at short intervals to confirm one full cycle works end-to-end.
-- **wandb run names `[name]-[datetime]-[SHA]`** (UTC + short git SHA) so runs trace to exact code; scratch/sweep → shared dev project, not one-off projects.
+- **실행은 `learning/scripts/` 의 스크립트로** (`local/metalab_train.sh`, `local/metalab_eval.sh`, `aws/metalab_train.sh`). 스크립트가 안 되면 스크립트를 고쳐 커밋한다 — 일회성 `aws`/`ssm`/`scp` 로 우회하지 않는다.
+- **긴 런 전에 스모크 테스트** — val/ckpt/sim-eval 한 사이클이 끝까지 도는지 먼저 확인한다.
+- **wandb 런 이름 `[name]-[datetime]-[SHA]`** (UTC + short git SHA). 스크래치/스윕은 공용 dev 프로젝트에.
 
 ## Testing
-- **Test the production code path, not a re-implementation** — exercise the real functions; don't paraphrase logic into the test.
-
-## Storage & docs
-- **S3 ⇄ CloudFront**: the bucket `s3://wirobotics-internal/` is fronted by the CloudFront
-  distribution `https://d1iitptfxhu64e.cloudfront.net/` — the object key maps 1:1. So
-  `s3://wirobotics-internal/<key>` ⇄ `https://d1iitptfxhu64e.cloudfront.net/<key>`
-  (e.g. `s3://wirobotics-internal/hansol/docs/foo.html` ⇄ `…cloudfront.net/hansol/docs/foo.html`).
-  CloudFront URLs are **Slack-authed** (browser only); from code/CLI read the `s3://` path instead.
-- Datasets live under `s3://wirobotics-internal/<user>/datasets/allex/...` — **raw captures** under
-  `…/raw/...`, **converted LeRobot datasets** under `…/lerobot/...` (LeRobot datasets do NOT go under
-  `raw/`). Shared docs under `…/<user>/docs/...`.
+- **재구현이 아니라 실제 함수를 테스트한다** — 로직을 테스트 안에 옮겨 적지 않는다.
