@@ -1,0 +1,4 @@
+newmtl material_0
+# shader_type beckmann
+map_Kd ycb_072-d_toy_airplane_texture.png 
+

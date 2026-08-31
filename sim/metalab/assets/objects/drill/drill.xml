@@ -1,0 +1,41 @@
+<mujoco model="drill">
+  <compiler meshdir="meshes" angle="radian"/>
+  <!-- GENERATED from sim/allexlab/assets/objects/drill/drill.obj, scaled x0.09 to real size
+       (the authored mesh is 1/0.09 oversize) and left origin-CENTRED as authored.
+       Visual geometry: every authored triangle, density 0 (mass comes from the hulls alone).
+       Collision geometry: CoACD (<= 8 convex parts, seed 0), got 8,
+       run on a 8000-face decimation of the authored 3560-shell mesh.
+       Contact params are NOT authored here: solref/solimp live in the task contract's
+       contact_params, and friction is left at MuJoCo's own default (1 0.005 0.0001).
+       Mass is not authored either: ObjectSpec.mass is written in by
+       contract/mjcf_prep.prepare_object_mjcf (inertia rescaled with it). -->
+  <default>
+    <default class="visual"><geom contype="0" conaffinity="0" group="2" density="0" rgba="0.93 0.63 0.06 1"/></default>
+    <default class="collision"><geom group="3"/></default>
+  </default>
+  <asset>
+    <mesh name="drill_visual" file="drill_visual.obj"/>
+    <mesh name="drill_hull0" file="drill_hull0.obj"/>
+    <mesh name="drill_hull1" file="drill_hull1.obj"/>
+    <mesh name="drill_hull2" file="drill_hull2.obj"/>
+    <mesh name="drill_hull3" file="drill_hull3.obj"/>
+    <mesh name="drill_hull4" file="drill_hull4.obj"/>
+    <mesh name="drill_hull5" file="drill_hull5.obj"/>
+    <mesh name="drill_hull6" file="drill_hull6.obj"/>
+    <mesh name="drill_hull7" file="drill_hull7.obj"/>
+  </asset>
+  <worldbody>
+    <body name="object" pos="0 0 0">
+      <freejoint name="object_free"/>
+      <geom type="mesh" mesh="drill_visual" class="visual"/>
+      <geom type="mesh" mesh="drill_hull0" class="collision"/>
+      <geom type="mesh" mesh="drill_hull1" class="collision"/>
+      <geom type="mesh" mesh="drill_hull2" class="collision"/>
+      <geom type="mesh" mesh="drill_hull3" class="collision"/>
+      <geom type="mesh" mesh="drill_hull4" class="collision"/>
+      <geom type="mesh" mesh="drill_hull5" class="collision"/>
+      <geom type="mesh" mesh="drill_hull6" class="collision"/>
+      <geom type="mesh" mesh="drill_hull7" class="collision"/>
+    </body>
+  </worldbody>
+</mujoco>

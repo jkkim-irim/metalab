@@ -1,0 +1,4 @@
+newmtl material_0
+# shader_type beckmann
+map_Kd ycb_019_pitcher_base_texture.png 
+

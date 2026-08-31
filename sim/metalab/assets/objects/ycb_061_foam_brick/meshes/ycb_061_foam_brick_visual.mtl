@@ -1,0 +1,4 @@
+newmtl material_0
+# shader_type beckmann
+map_Kd ycb_061_foam_brick_texture.png 
+
