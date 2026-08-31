@@ -36,4 +36,4 @@ sim/metalab/launchpad.sh        # 서버 기동 + 앱 창 열기 (첫 실행 시
 - **다중 사용자 / 인증** — 로컬 개발 도구다. `127.0.0.1` 바인드.
 
 ---
-개요 = **00_project_overview** · 사용법 = **10_metalab_tutorial**
+개요 = **00_project_overview** · 사용법 = 리포 루트 **README.md**

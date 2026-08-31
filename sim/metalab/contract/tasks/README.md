@@ -292,7 +292,7 @@ The contract only *composes* existing pieces. Add the missing piece, then import
   `scene.objects` and point `asset.mjcf` at the file(s).
 - **Per-engine physics** — `overrides={"<engine>": {...}}`, starting from `hammer_lift_student/_base.py`.
 - **PPO/network/wandb** — `learning/rl/dexblind/<task>/experiment.py`. Run/eval via
-  `learning/scripts/local/metalab_train.sh` / `metalab_eval.sh` (`sim/metalab/docs/10_metalab_tutorial.md`).
+  `learning/scripts/local/metalab_train.sh` / `metalab_eval.sh` (사용법은 리포 루트 `README.md`).
 
 **Smoke test:** `learning/scripts/local/metalab_train.sh --sim newton --task <task> --num_envs 4 --viz gl`
 (`--viz` takes a value: `none` | `gl` | `rtx`; the envs are drawn on an `env_spacing` grid and the dashboard's

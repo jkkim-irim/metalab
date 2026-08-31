@@ -1,6 +1,3 @@
-# Local-only asset folder — must never be pushed to the repo.
-/allex_description/
-
 # Teleop episode recordings (apps/teleop_dashboard) — data never enters git.
 /allex_data/
 

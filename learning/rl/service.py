@@ -33,7 +33,7 @@ def ensure_transport_importable() -> None:
     ``from transport import``. Every sim serves over the same sim/service/transport.py.
 
     Resolves under SIM_ROOT (same rule as ``_spawn``): a node deploy ships sim/ under a different root
-    than learning/ (SIM_ROOT=/home/ubuntu -> /home/ubuntu/sim/service), so ``_REPO`` (the learning repo
+    than learning/ (SIM_ROOT=<dir> -> <dir>/sim/service), so ``_REPO`` (the learning repo
     root) would miss it. SIM_ROOT defaults to ``_REPO`` for a co-located checkout."""
     sim_root = os.environ.get("SIM_ROOT", _REPO)
     d = os.path.join(sim_root, "sim", "service")
@@ -44,7 +44,7 @@ def ensure_transport_importable() -> None:
 def _spawn(args, port_file: str):
     """Dispatch to the sim's own launcher (``sim.<SIM>.launch.spawn``). ``sim.<SIM>`` resolves from
     the repo root by default; a node deploy where sim/ lives under a different root than learning/
-    sets SIM_ROOT (e.g. SIM_ROOT=/home/ubuntu)."""
+    sets SIM_ROOT."""
     sim_root = os.environ.get("SIM_ROOT", _REPO)
     if sim_root not in sys.path:
         sys.path.insert(0, sim_root)

@@ -91,4 +91,4 @@ class GATE:                       # 무엇을 성공으로 볼 것인가
 전부 계약서에 인라인으로 적히고, 트레이너의 `experiment.py` 는 RL 설정만 갖는다.
 
 ---
-사용법 = **10_metalab_tutorial** · 엔진 parity = **01_engine_parity** · 런치패드 = **20_launchpad_prd**
+사용법 = 리포 루트 **README.md** · 엔진 parity = **01_engine_parity** · 런치패드 = **20_launchpad_prd**

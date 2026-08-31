@@ -1,7 +1,7 @@
 # learning/
 
 MetaLab 정책의 학습·평가. 실행 방법은 [`scripts/local/README.md`](scripts/local/README.md), 처음
-보는 사람용 안내는 [`sim/metalab/docs/10_metalab_tutorial.md`](../sim/metalab/docs/10_metalab_tutorial.md).
+보는 사람용 안내는 리포 루트 [`README.md`](../README.md).
 
 ## 레이아웃
 

@@ -64,7 +64,7 @@ def main() -> int:
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--play", action=argparse.BooleanOptionalAction, default=True,
                    help="roll out the play (eval) env variant — the successful full-lift regime")
-    p.add_argument("--out_dir", default="/home/ubuntu/sim_trajectories", help="where to write traj_*.npz + meta.json")
+    p.add_argument("--out_dir", default="logs/sim_trajectories", help="where to write traj_*.npz + meta.json")
     # provenance passthrough — recorded verbatim into meta.json
     p.add_argument("--experiment", default="tracking")
     p.add_argument("--train", default="")

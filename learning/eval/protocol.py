@@ -18,7 +18,7 @@ from learning.rl.utils import resolve_obs_groups
 
 def eval_srv_args(num_envs: int, device: str, seed, *, play: bool = True,
                   wbt: bool = False, replay: bool = False, rsi: bool = False,
-                  reference_dir: str = "/home/ubuntu/sim_references",
+                  reference_dir: str = "sim_references",
                   video: bool = False, video_dir: str = "",
                   video_envs: int = 0) -> SimpleNamespace:
     """Sim-service spawn args under the EVAL PROTOCOL. For WBT this pins ``fixed_refs`` — deterministic

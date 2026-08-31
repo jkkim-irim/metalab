@@ -385,7 +385,7 @@ def run(argv=None) -> int:
                    help="how many envs (0..N-1) the recording covers; needs --num_envs >= N")
     p.add_argument("--video_width", type=int, default=512)
     p.add_argument("--video_height", type=int, default=512)
-    p.add_argument("--video_dir", default="/home/ubuntu/sim_eval_videos", help="where the server writes the MP4s")
+    p.add_argument("--video_dir", default="logs/eval_videos", help="where the server writes the MP4s")
     p.add_argument("--rrd", default="", help="record the rollout to this .rrd (rerun) for the report's 3D "
                                             "pane; data.json + report.html land beside it. Both MetaLab spokes")
     p.add_argument("--video_envs", type=int, default=0,

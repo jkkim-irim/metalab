@@ -89,4 +89,4 @@ obs/reward 파이프라인 무게(driver 오버헤드 8%), timing 120 vs 200 Hz,
 작용하는 것으로 보인다. 이 격차를 좁히거나, 멀티-엔진 학습으로 robust 하게 만드는 것이 다음 과제다.
 
 ---
-개요 = **00_project_overview** · 사용법 = **10_metalab_tutorial**
+개요 = **00_project_overview** · 사용법 = 리포 루트 **README.md**

@@ -377,7 +377,7 @@ class RLTrainer:
                     # (single source of truth — the two paths drifted when this was hand-duplicated):
                     # deterministic refs, t=0 starts, hold-tail, latched success tags; fresh actor built
                     # from untouched specs + live weights (never reuse the mid-episode training policy).
-                    vdir = f"/home/ubuntu/sim_val_videos/{run_name}/iter_{it:05d}"
+                    vdir = os.path.join(log_dir, "val_videos", f"iter_{it:05d}")
                     # Fresh dir per fire: iteration-keyed dirs are shared ACROSS runs, and clips are
                     # named by outcome — a leftover envNN_<other-outcome>.mp4 from a previous run
                     # would ride this fire's glob and upload a stale (even different-era) clip.
