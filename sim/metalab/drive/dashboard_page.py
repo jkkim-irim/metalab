@@ -15,7 +15,7 @@ SUB-TABS, which swap the whole body:
 Snapshots keep filling every channel buffer whichever sub-tab is open (the stream is never torn down), so
 returning to Monitor shows an unbroken timeline — only the *drawing* pauses while the chart is unmounted.
 
-Styled to match the Hub console tab (same palette / .seg buttons; light default + dark via
+Styled to match the Launchpad console tab (same palette / .seg buttons; light default + dark via
 prefers-color-scheme). Plotting mirrors sim/_runtime/telemetry.py (canvas, per-series toggles, legend,
 hover crosshair) but over a rolling window — standalone has no fixed episode length.
 

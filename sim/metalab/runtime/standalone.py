@@ -7,7 +7,7 @@ so there is **no termination, no domain randomization, no reward/curriculum, and
 the SIM tab, while the GL viewer renders the physics (gravity / contact / equality).
 
 Control channel: the runner starts a small ``TrajControlServer`` (``drive/control_server.py``) that the
-Hub's SIM tab embeds. Browser → runner commands (``play/pause/resume/stop``) are drained each loop; the
+Launchpad's SIM tab embeds. Browser → runner commands (``play/pause/resume/stop``) are drained each loop; the
 runner publishes a live **monitor-channel** snapshot back over SSE for the plots — one value vector per
 plot tab (joint position / joint torque, its PD+grav components where the backend separates them / palm
 pose), each produced by the very obs term factory the train/eval contracts use (``drive/monitor.py``), so
@@ -22,7 +22,7 @@ sent to the robot), ``joint_torque.csv`` [Nm] — columns = the robot's driven j
 measured on their distal collision links). Both engines (genesis/newton) log identically. Stopping/resetting
 (or switching to Torque) before the end discards the partial recording.
 
-Reset is **on demand only**: SIGUSR1 (Hub's "Reset Simulator") or the SIM tab's Stop → ``backend.reset_idx``
+Reset is **on demand only**: SIGUSR1 (Launchpad's "Reset Simulator") or the SIM tab's Stop → ``backend.reset_idx``
 (contract init pose, NO domain randomization). Ctrl-C exits cleanly. Does NOT import ``learning``.
 Single-env (num_envs=1) on the default GPU with the GL viewer on.
 
@@ -88,14 +88,14 @@ def _build(engine: str, task: str):
     else:
         raise SystemExit(f"engine must be genesis|newton (got {engine!r})")
     # viz="gl" → GL 3D viewer ON; telemetry=False → do NOT start env_driver's RL SSE dashboard. Standalone
-    # has its own control_server; otherwise the Hub would scrape its "[telemetry] live dashboard" line and
+    # has its own control_server; otherwise the Launchpad would scrape its "[telemetry] live dashboard" line and
     # light the RL tab too (this runner never calls EnvDriver.step, so that dashboard would be dead anyway).
     return build_env(task=task.replace("-", "_"), num_envs=1, device="cuda:0", viz="gl", telemetry=False)
 
 
 def _discover_groups() -> list[dict]:
     """Via-point CSV groups (``*_group`` dirs) for the SIM tab combobox — ``[{label, path}]`` with
-    repo-relative POSIX path (mirrors the Hub's ``discover_traj_groups``; served via /describe)."""
+    repo-relative POSIX path (mirrors the Launchpad's ``discover_traj_groups``; served via /describe)."""
     if not _TRAJ_ROOT.is_dir():
         return []
     return [{"label": f"{d.parent.name}/{d.name}", "path": d.relative_to(_REPO).as_posix()}
@@ -194,7 +194,7 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
     Holds the init pose by default. The dashboard's Play/Pause/Stop drive the SIMULATOR: ``pause`` halts the
     physics loop outright (nothing steps; the viewer keeps getting frames via ``backend.render_frame``),
     ``play`` unfreezes and — if a group is selected and nothing is mid-playback — starts that CsvTrajectory,
-    ``stop`` resets to the init pose and leaves the sim frozen. SIGUSR1 (Hub 'Reset Simulator') resets in
+    ``stop`` resets to the init pose and leaves the sim frozen. SIGUSR1 (Launchpad 'Reset Simulator') resets in
     place without touching the frozen/running state. Publishes a live joint snapshot each loop, paused too.
 
     ``joint_target`` (Joint Control tab) hands individual joints to the operator: those columns of the PD
@@ -272,7 +272,7 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
     controls = [{"name": j, **_rom_deg(float(_lo[i]), float(_hi[i])),
                  "init": float(cur[0, i]) * _RAD2DEG} for i, j in enumerate(report)]
 
-    # standalone control + telemetry server (the Hub SIM tab embeds this URL; browser talks to it directly)
+    # standalone control + telemetry server (the Launchpad SIM tab embeds this URL; browser talks to it directly)
     describe = {"engine": engine, "task": task, "joints": report, "channels": monitor.describe(channels),
                 "groups": _discover_groups(), "control_hz": control_hz, "gravcomp": gravcomp0,
                 "controls": controls}
@@ -374,7 +374,7 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
     if trajectory_dir is not None:                 # --trajectory → auto-play on start
         _play(trajectory_dir, control_hz)
 
-    signal.signal(signal.SIGUSR1, _on_sigusr1)     # Hub 'Reset Simulator' → SIGUSR1 → reset on demand
+    signal.signal(signal.SIGUSR1, _on_sigusr1)     # Launchpad 'Reset Simulator' → SIGUSR1 → reset on demand
     print(f"[standalone] {engine} · {task} — env up (num_envs={b.num_envs}, GL viewer). "
           f"SIM tab · Reset=SIGUSR1 · Ctrl-C to stop.", flush=True)
     try:

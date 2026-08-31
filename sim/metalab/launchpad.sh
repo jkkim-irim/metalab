@@ -4,18 +4,18 @@
 #
 # First run from a terminal registers a per-user desktop entry (app icon) at
 #   ~/.local/share/applications/metalab-launchpad.desktop
-# so the Hub appears in the GNOME app grid (Ubuntu 24.04) and can be pinned. The icon
-# launches THIS script with --bg, which starts the Hub server DETACHED (no terminal
+# so the Launchpad appears in the GNOME app grid (Ubuntu 24.04) and can be pinned. The icon
+# launches THIS script with --bg, which starts the Launchpad server DETACHED (no terminal
 # window) and just opens the browser; re-clicking reuses the running server instead of
-# spawning a second one. Stop the detached server with `metalab_hub.sh --stop`.
+# spawning a second one. Stop the detached server with `launchpad.sh --stop`.
 #
 # Run WITHOUT --bg from a terminal to keep the server in the FOREGROUND (logs on screen,
-# Ctrl-C to stop) — the dev path. The Hub is stdlib-only python3 (no conda env needed);
+# Ctrl-C to stop) — the dev path. The Launchpad is stdlib-only python3 (no conda env needed);
 # the launched training scripts activate their own env.
 #
 # Flags:
 #   --bg              start the server detached (no terminal), open the browser, exit
-#   --stop            stop the detached Hub server (via pidfile), then exit
+#   --stop            stop the detached Launchpad server (via pidfile), then exit
 #   --no-icon         skip the desktop-entry step
 #   --reinstall-icon  force-rewrite the desktop entry
 #   --install-only    write/refresh the desktop entry and exit (no launch)
@@ -50,14 +50,14 @@ LAUNCHPAD_WMCLASS="${LAUNCHPAD_WMCLASS:-$_WM}"
 
 DESKTOP_FILE="$DESKTOP_DIR/${LAUNCHPAD_DESKTOP_SLUG}.desktop"
 PORT="${HUB_PORT:-$_PORT}"
-PIDFILE="$REPO/logs/hub/hub.pid"
-LOGFILE="$REPO/logs/hub/hub_server.log"
+PIDFILE="$REPO/logs/launchpad/launchpad.pid"
+LOGFILE="$REPO/logs/launchpad/launchpad_server.log"
 PY="${PYTHON:-python3}"
 
-# Dedicated, isolated Chrome profile for the Hub's app window(s). Giving Chrome its own
+# Dedicated, isolated Chrome profile for the Launchpad's app window(s). Giving Chrome its own
 # --user-data-dir spawns a SEPARATE Chrome instance (own process + taskbar entry), fully
-# decoupled from the user's normal Chrome: closing the Hub never touches their tabs, and
-# quitting their Chrome never closes the Hub. Exported so the in-sim telemetry viewer opens
+# decoupled from the user's normal Chrome: closing the Launchpad never touches their tabs, and
+# quitting their Chrome never closes the Launchpad. Exported so the in-sim telemetry viewer opens
 # its app window in the SAME isolated instance. Override to relocate.
 export METALAB_HUB_BROWSER_PROFILE="${METALAB_HUB_BROWSER_PROFILE:-${XDG_DATA_HOME:-$HOME/.local/share}/${LAUNCHPAD_WMCLASS}/browser}"
 
@@ -73,9 +73,9 @@ for a in "$@"; do
   esac
 done
 
-log(){ printf '[hub] %s\n' "$*"; }
+log(){ printf '[launchpad] %s\n' "$*"; }
 
-# Open the Hub as a standalone Chrome "app window" (--app): no tabs/address bar/toolbar, its own
+# Open the Launchpad as a standalone Chrome "app window" (--app): no tabs/address bar/toolbar, its own
 # taskbar entry, and — via the dedicated --user-data-dir above — its own Chrome instance, so it
 # behaves like a native app decoupled from the user's normal Chrome (the whole point: turn the app
 # on/off without touching their tabs). telemetry (--viz) opens as its own app window in the SAME
@@ -92,7 +92,7 @@ _open_url(){
   case "$bin" in
     *chrom*)
       # --app=$url = standalone app window; own --user-data-dir = own isolated Chrome instance.
-      # --class sets the window WM_CLASS so GNOME groups it under the MetaLab Hub taskbar icon
+      # --class sets the window WM_CLASS so GNOME groups it under the MetaLab Launchpad taskbar icon
       # (matched by StartupWMClass in the .desktop entry) instead of absorbing it into Chrome's icon.
       local flags=("--app=$url" "--class=$LAUNCHPAD_WMCLASS" "--user-data-dir=$METALAB_HUB_BROWSER_PROFILE" --no-first-run --no-default-browser-check) dim=""
       command -v xrandr >/dev/null 2>&1 && dim="$(xrandr 2>/dev/null | awk '/\*/{print $1; exit}')"
@@ -174,32 +174,32 @@ stop_server(){
   if [ -f "$PIDFILE" ]; then
     local pid; pid="$(cat "$PIDFILE" 2>/dev/null || true)"
     if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-      kill "$pid" 2>/dev/null || true; log "Hub 종료 (pid $pid)"
+      kill "$pid" 2>/dev/null || true; log "Launchpad 종료 (pid $pid)"
     else
-      log "실행 중인 Hub 없음 (pidfile stale)"
+      log "실행 중인 Launchpad 없음 (pidfile stale)"
     fi
     rm -f "$PIDFILE"
   else
-    log "실행 중인 Hub 없음 (pidfile 없음)"
+    log "실행 중인 Launchpad 없음 (pidfile 없음)"
   fi
 }
 
 # Foreground (dev/terminal): block on the server, logs on screen, Ctrl-C to stop.
 run_hub_fg(){
-  command -v "$PY" >/dev/null 2>&1 || { log "python3 없음 — Hub 는 stdlib-only(conda 불필요)"; exit 1; }
+  command -v "$PY" >/dev/null 2>&1 || { log "python3 없음 — Launchpad 는 stdlib-only(conda 불필요)"; exit 1; }
   # --port explicitly, or this path silently falls back to server.py's own default instead of this
   # checkout's branded port. A --port the caller passed through wins (it lands in PASS after ours).
-  log "Hub 서버 시작 (foreground, port $PORT, Ctrl-C 종료)…"
+  log "Launchpad 서버 시작 (foreground, port $PORT, Ctrl-C 종료)…"
   exec "$PY" "$SERVER" --port "$PORT" ${PASS[@]+"${PASS[@]}"}
 }
 
 # Detached (icon/--bg): reuse a running server if present, else start one in the background
 # (output → $LOGFILE) and open the browser. No terminal window.
 run_hub_bg(){
-  command -v "$PY" >/dev/null 2>&1 || { log "python3 없음 — Hub 는 stdlib-only(conda 불필요)"; exit 1; }
+  command -v "$PY" >/dev/null 2>&1 || { log "python3 없음 — Launchpad 는 stdlib-only(conda 불필요)"; exit 1; }
   mkdir -p "$(dirname "$PIDFILE")"
   # `|| _st=$?`, not a bare call: this script runs under `set -e`, where a non-zero return outside a
-  # condition context kills it — a free port (1) would exit silently instead of starting the Hub.
+  # condition context kills it — a free port (1) would exit silently instead of starting the Launchpad.
   _st=0; _hub_probe || _st=$?
   if [ "$_st" = 2 ]; then
     log "포트 $PORT 에 다른 런치패드가 떠 있습니다 — 그 콘솔을 이 아이콘으로 여는 것을 막기 위해 중단합니다."
@@ -208,7 +208,7 @@ run_hub_bg(){
     exit 1
   fi
   if [ "$_st" = 0 ]; then
-    log "Hub 가 이미 실행 중 — 브라우저만 엽니다 (http://127.0.0.1:$PORT)"
+    log "Launchpad 가 이미 실행 중 — 브라우저만 엽니다 (http://127.0.0.1:$PORT)"
     _open_url "http://127.0.0.1:$PORT"; exit 0
   fi
   : > "$LOGFILE"
@@ -222,7 +222,7 @@ run_hub_bg(){
     sleep 0.1; i=$((i+1))
   done
   [ -n "$url" ] || url="http://127.0.0.1:$PORT"
-  log "Hub 백그라운드 시작 (pid $(cat "$PIDFILE"), 로그 $LOGFILE) → $url"
+  log "Launchpad 백그라운드 시작 (pid $(cat "$PIDFILE"), 로그 $LOGFILE) → $url"
   log "종료하려면: $SCRIPT_PATH --stop"
   _open_url "$url"
 }

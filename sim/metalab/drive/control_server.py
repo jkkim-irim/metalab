@@ -4,7 +4,7 @@ Runs a small ``ThreadingHTTPServer`` on a background daemon thread INSIDE the st
 process, giving the browser one channel in each direction:
 
 - ``GET  /``         → the trajectory control + live-plot dashboard page (``drive/dashboard_page.PAGE`` —
-                        shared with the Launchpad's offline ``/simui/`` preview; Hub embeds this via iframe)
+                        shared with the Launchpad's offline ``/simui/`` preview; Launchpad embeds this via iframe)
 - ``GET  /describe`` → static run info ``{engine, task, joints, channels, groups, control_hz, gravcomp,
                         controls}`` (once). ``channels`` = the plot tabs (``drive/monitor.describe``): per
                         tab ``{key, title, unit, labels, digits}``. ``controls`` = the Joint Control rows:
@@ -115,7 +115,7 @@ class TrajControlServer:
         self.port = self._httpd.server_address[1]
         threading.Thread(target=self._httpd.serve_forever, daemon=True).start()
         url = f"http://{host}:{self.port}"
-        # Hub scrapes this exact marker from the run log to embed the URL in the Standalone trajectory tab.
+        # Launchpad scrapes this exact marker from the run log to embed the URL in the Standalone trajectory tab.
         print(f"[traj] control dashboard → {url}   (standalone trajectory player)", flush=True)
 
     def has_clients(self) -> bool:

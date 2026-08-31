@@ -225,7 +225,7 @@ def creds() -> dict:
 
 
 def list_gpus() -> dict:
-    """Local GPU list (cuda:0..N-1) for the device combo — shells nvidia-smi (Hub is stdlib-only)."""
+    """Local GPU list (cuda:0..N-1) for the device combo — shells nvidia-smi (Launchpad is stdlib-only)."""
     try:
         out = subprocess.run(["nvidia-smi", "--query-gpu=index,name", "--format=csv,noheader"],
                              capture_output=True, text=True, timeout=8)
@@ -271,10 +271,10 @@ def list_dir(rel: str) -> dict:
 
 
 # ── run launch + registry (P0 Step 3) ────────────────────────────────────────
-RUNS_DIR = REPO / "logs" / "hub"            # under /logs/ (gitignored) — runtime state only
-RUNS_JSONL = RUNS_DIR / "runs.jsonl"        # append-only launch log (persists across Hub restarts)
+RUNS_DIR = REPO / "logs" / "launchpad"      # under /logs/ (gitignored) — runtime state only
+RUNS_JSONL = RUNS_DIR / "runs.jsonl"        # append-only launch log (persists across Launchpad restarts)
 LOGS_DIR = RUNS_DIR / "runs"                # per-run stdout+stderr log files
-PIDFILE = RUNS_DIR / "hub.pid"              # written by metalab_hub.sh --bg; cleared on Exit
+PIDFILE = RUNS_DIR / "launchpad.pid"        # written by launchpad.sh --bg; cleared on Exit
 _SCRIPT = {
     "train":      "learning/scripts/local/metalab_train.sh",
     "eval":       "learning/scripts/local/metalab_eval.sh",
@@ -459,7 +459,7 @@ def launch(params: dict) -> dict:
     with _runs_lock:
         _runs[run_id] = {"proc": proc, "logf": logf, "meta": meta}
     _append_registry(meta)
-    print(f"[hub] launch {run_id} pid={proc.pid}: {meta['cmd']}", flush=True)
+    print(f"[launchpad] launch {run_id} pid={proc.pid}: {meta['cmd']}", flush=True)
     return meta
 
 
@@ -550,7 +550,7 @@ def dismiss_run(run_id: str) -> dict:
 def stop_all() -> dict:
     """Terminate EVERY running launched process (train / eval / any future sim task): SIGINT the whole
     process tree (Ctrl-C, clean → wandb marks the run 'killed'), SIGKILL survivors after the grace. The
-    Hub itself stays up. Pids are captured up front (reparent-safe). Covers runs a previous Hub session
+    Launchpad itself stays up. Pids are captured up front (reparent-safe). Covers runs a previous Launchpad session
     launched too (via the registry, guarded by /proc cmdline)."""
     roots = _run_root_pids()
     threading.Thread(target=lambda: _kill_roots(roots), daemon=True).start()
@@ -748,7 +748,7 @@ def _kill_roots(roots: list, grace: float = 15.0, sweep: bool = True) -> None:
       KeyboardInterrupt, finishes wandb as 'killed', and tears down its OWN sim-server. Re-walk so late
       spawns are caught; return early once the whole tree is gone.
     Phase 2 (after grace): SIGKILL everything left (a stuck server, the shells, an unresponsive trainer);
-      reparent-proof via pid accumulation + process-group kill. The Hub is never in `roots`, so untouched.
+      reparent-proof via pid accumulation + process-group kill. The Launchpad is never in `roots`, so untouched.
     (Previously the WHOLE tree was SIGINT'd at once — the server died before the trainer's next RPC step,
     which then raised RuntimeError instead of KeyboardInterrupt, so the run showed 'crashed'.)"""
     sent_int: set = set()
@@ -782,7 +782,7 @@ def _kill_roots(roots: list, grace: float = 15.0, sweep: bool = True) -> None:
 
 def _run_root_pids() -> list:
     """Root pids of still-alive runs: this session's Popens plus any registry pids still alive and
-    still one of our scripts (covers runs a previous Hub session launched)."""
+    still one of our scripts (covers runs a previous Launchpad session launched)."""
     roots = []
     with _runs_lock:
         procs = [r["proc"] for r in _runs.values()]
@@ -824,7 +824,7 @@ def _bump_poll() -> None:
 
 
 def _closing() -> None:
-    """A tab/window sent the 'closing' beacon (pagehide). Shut the Hub down like Exit — UNLESS
+    """A tab/window sent the 'closing' beacon (pagehide). Shut the Launchpad down like Exit — UNLESS
     the page's polling resumes within the grace window (a refresh reconnects fast, a real close
     does not). This distinguishes closing the window (→ shut down) from a page reload (→ keep)."""
     seq0 = _poll_seq
@@ -840,9 +840,9 @@ def _chrome_bin() -> str | None:
 
 
 def _open_browser(url: str) -> None:
-    """Open the Hub as a standalone, maximized Chrome *app window* (no tabs/address bar) in its
+    """Open the Launchpad as a standalone, maximized Chrome *app window* (no tabs/address bar) in its
     dedicated, isolated profile — its own Chrome instance, decoupled from the user's normal Chrome.
-    This is the terminal/foreground path; the app-icon path (metalab_hub.sh --bg, which passes
+    This is the terminal/foreground path; the app-icon path (launchpad.sh --bg, which passes
     --no-browser here) opens the same kind of window. Falls back to the OS default browser when
     Chrome is absent. Best-effort; never raises — the printed URL is the fallback (e.g. headless)."""
     chrome = _chrome_bin()
@@ -982,15 +982,15 @@ def serve(host: str = "127.0.0.1", port: int = 8780, open_browser: bool = True) 
     bound = _httpd.server_address[1]
     url = f"http://{host}:{bound}"
     d = discover()
-    print(f"[hub] MetaLab Launchpad → {url}", flush=True)
-    print(f"[hub] engines={d['engines']}  tasks={d['tasks']}", flush=True)
-    print("[hub] Ctrl-C 또는 웹의 Exit 버튼으로 종료.", flush=True)
+    print(f"[launchpad] MetaLab Launchpad → {url}", flush=True)
+    print(f"[launchpad] engines={d['engines']}  tasks={d['tasks']}", flush=True)
+    print("[launchpad] Ctrl-C 또는 웹의 Exit 버튼으로 종료.", flush=True)
     if open_browser:
         _open_browser(url)
     try:
         _httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\n[hub] 종료.", flush=True)
+        print("\n[launchpad] 종료.", flush=True)
     finally:
         _httpd.shutdown()
 
@@ -1144,7 +1144,7 @@ details[open] summary::before{content:"▾ "}
   <h1>MetaLab <span>Launchpad</span></h1>
   <span class="live"><span class="dot" id="dot"></span><span id="livetxt">connecting…</span></span>
   <span class="repo" id="repo"></span>
-  <button id="exit" title="Hub 서버 종료">Exit</button>
+  <button id="exit" title="Launchpad 서버 종료">Exit</button>
 </header>
 
 <div class="tabs">
@@ -1582,7 +1582,7 @@ function renderCards(runs){
     const x=(st!=="running")?`<span class="rx" data-x="${esc(m.run_id)}" title="카드 지우기">✕</span>`:"";
     html+=`<div class="rcard${m.run_id===CURRENT?" on":""}" data-rid="${esc(m.run_id)}"><span class="rdot ${esc(st)}"></span>`+
       `<span class="rlabel">${esc(m.engine||"")}·${esc(m.task||"")}${m.task_recipe?"/"+esc(m.task_recipe):""} <b>${esc(m.mode||"")}</b></span>`+
-      node+`<span class="rst">${esc(st)}</span>`+x+`</div>`;
+      `<span class="rst">${esc(st)}</span>`+x+`</div>`;
   }
   el.innerHTML=html;
   el.querySelectorAll(".rcard").forEach(c=>c.onclick=(e)=>{
@@ -1617,7 +1617,7 @@ function showRunInfo(m){
     `<div class="ri-cmd">${esc(m.cmd||"")}</div>`+
     `<div class="ri-grid">`+
       row("engine·task·recipe",`<b>${esc(m.engine||"")}</b> · ${esc(m.task||"")}${m.task_recipe?" · "+esc(m.task_recipe):""}`)+
-      row("mode/target",`${esc(m.mode||"")}/${esc(m.target||"")}${m.node?" · "+esc(m.node):""}`)+
+      row("mode",esc(m.mode||""))+
       row("params", params.length?esc(params.join("  ")):"(기본값)")+
       (envp.length?row("env",esc(envp.join("  "))):"")+
       row("git sha",`<b>${esc(m.git_sha||"?")}</b>`)+

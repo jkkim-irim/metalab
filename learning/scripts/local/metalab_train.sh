@@ -152,7 +152,7 @@ _run_dir(){ grep -oE '\[rl-trainer\] log_dir=\S+' "$TRAIN_LOG" 2>/dev/null | tai
 if [ -z "${WANDB_MODE:-}" ] && [ -z "${WANDB_API_KEY:-}" ] && ! grep -qs 'api.wandb.ai' "$HOME/.netrc" 2>/dev/null; then
   echo "[train] wandb is ON by default but you are not logged in. Pick one:" >&2
   echo "[train]   • log in:  wandb login        (or: export WANDB_API_KEY=...)" >&2
-  echo "[train]   • or skip: add --no_wandb     (Hub: check 'wandb 끄기')" >&2
+  echo "[train]   • or skip: add --no_wandb     (Launchpad: check 'wandb 끄기')" >&2
   exit 1
 fi
 case "$SIMULATOR" in
