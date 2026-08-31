@@ -3,7 +3,7 @@
 # metalab_train.sh — MetaLab RL training on the LOCAL GPU via the RPC sim-service.
 #
 # Task knobs (rewards, curriculum, action scales, DR) live inline in the sim task contract
-# (sim/metalab/contract/tasks/<task>.py); the RL config (PPO, networks) in
+# (sim/metalab/contract/tasks/rl/<task>.py); the RL config (PPO, networks) in
 # learning/rl/<experiment>/<task>/experiment.py — edit those, not this script. Engine selection reaches the trainer as SIM_ENGINE (learning/rl/service.py spawns
 # `python -m sim.metalab.backends.<engine>.server` in the SAME venv).
 #

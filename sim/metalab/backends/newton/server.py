@@ -1,6 +1,6 @@
 """newton sim-service server — builds a Newton env from an EnvSpec contract and serves the VecEnv over RPC.
 
-Newton counterpart of `sim/metalab/backends/genesis/server.py`. Contract (`sim.metalab.contract.tasks.<task>`) → `parser`
+Newton counterpart of `sim/metalab/backends/genesis/server.py`. Contract (`sim.metalab.contract.tasks.rl.<task>`) → `parser`
 (newton.Model + SolverMuJoCo) → `NewtonBackend` → `EnvDriver` (VecEnv) → `RpcServer`. The sim-service is
 **RPC + CUDA-IPC as one set** (`sim/service/transport.py`): a localhost socket carries the control
 channel + one-shot CUDA-IPC handle bootstrap (the team-required RPC boundary), and the hot-path obs/action
@@ -64,7 +64,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", default="hammer-lift-teacher")
     ap.add_argument("--recipe", default="", help="which recipe of --task to run; a task FAMILY "
-                                                "(tasks/<task>/) requires one, a single-file contract takes none.")
+                                                "(tasks/rl/<task>/) requires one, a single-file contract takes none.")
     ap.add_argument("--num_envs", type=int, default=None,
                     help="if unset, uses num_envs from the task contract (.py) = single source.")
     ap.add_argument("--device", default="cuda:0")

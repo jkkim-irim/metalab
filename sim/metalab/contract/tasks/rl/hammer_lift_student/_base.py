@@ -29,7 +29,7 @@ import math
 from sim.metalab.contract.spec import Done, Event, Obs, ObsNoise, TaskSpec, values
 from sim.metalab.terms import events, obs, terminate
 
-from .. import _assets as assets
+from ... import _assets as assets
 
 # The posture the robot must end in — commanded joints only (ABAD is PD-held at 0 and not commandable, so
 # a pose bound on it could not be recovered from). Authored in deg, consumed in rad; ONE variable, handed to

@@ -9,7 +9,7 @@ source of truth — with a run registry, live log tail, and per-run Stop.
 Runs under any python3 (stdlib only) — the Launchpad never needs an engine env; the launched
 training scripts activate their own env. Discovery reflects the CURRENT layout:
   engines = sim/metalab/<name>/ spokes that ship a build_env server.py     -> genesis, newton
-  tasks   = sim/metalab/contract/tasks/*.py contracts (single source of truth) -> hammer-lift-teacher
+  tasks   = sim/metalab/contract/tasks/rl/ contracts (single source of truth) -> hammer-lift-teacher
 """
 from __future__ import annotations
 
@@ -35,6 +35,8 @@ import webbrowser
 SIM = Path(__file__).resolve().parents[2]          # <repo>/sim
 REPO = SIM.parent                                   # <repo>
 TASKS_DIR = SIM / "metalab" / "contract" / "tasks"
+RL_DIR = TASKS_DIR / "rl"                  # Train/Eval contracts
+STANDALONE_DIR = TASKS_DIR / "standalone"  # scene-only contracts (no learning)
 TRAJ_DIR = SIM / "metalab" / "assets" / "data" / "spline"      # via-point CSV groups ('*_group' dirs)
 
 
@@ -55,18 +57,18 @@ def discover_engines() -> list[str]:
 
 
 def _task_families() -> list[Path]:
-    """tasks/<family>/ dirs carrying an __init__.py — one per task family. standalone/ is not one."""
-    return [d for d in sorted(TASKS_DIR.iterdir())
-            if d.is_dir() and d.name != "standalone" and (d / "__init__.py").is_file()]
+    """tasks/rl/<family>/ dirs carrying an __init__.py — one per task family."""
+    return [d for d in sorted(RL_DIR.iterdir())
+            if d.is_dir() and (d / "__init__.py").is_file()] if RL_DIR.is_dir() else []
 
 
 def discover_tasks() -> list[str]:
-    """The Train/Eval TASK list: one entry per task-FAMILY folder (its bare name = the alias task its
-    __init__ builds), plus any top-level sim/metalab/contract/tasks/*.py contract. 'hammer_lift_teacher'
-    -> 'hammer-lift-teacher' (underscores become hyphens). A family's recipes are the SECOND axis — see
-    discover_task_recipes(). The standalone/ subfolder stays out (scene-only tasks never show in
-    Train/Eval), and so does '_*.py' — a shared library like _assets is not a contract."""
-    names = {f.stem for f in TASKS_DIR.glob("*.py") if not f.stem.startswith("_")}
+    """The Train/Eval TASK list: everything under sim/metalab/contract/tasks/rl/ — one entry per
+    task-FAMILY folder (its bare name = the alias task its __init__ builds) plus any single-file
+    rl/*.py contract. 'hammer_lift_teacher' -> 'hammer-lift-teacher' (underscores become hyphens). A
+    family's recipes are the SECOND axis — see discover_task_recipes(). tasks/standalone/ is a separate
+    shelf and never appears here; '_*.py' is a shared library, not a contract."""
+    names = {f.stem for f in RL_DIR.glob("*.py") if not f.stem.startswith("_")} if RL_DIR.is_dir() else set()
     names |= {d.name for d in _task_families()}
     return sorted(n.replace("_", "-") for n in names)
 
@@ -74,7 +76,7 @@ def discover_tasks() -> list[str]:
 def discover_task_recipes() -> dict[str, list[str]]:
     """task -> its recipe names — the Launchpad's recipe combobox, and the value of ``--recipe``.
 
-    A recipe is ``tasks/<family>/<family>_<recipe>.py``; the entry is the SUFFIX ('only-ycb'), since
+    A recipe is ``tasks/rl/<family>/<family>_<recipe>.py``; the entry is the SUFFIX ('only-ycb'), since
     the family prefix is already the task. '_*.py' (the shared _base) is a library, not a recipe. The
     prefix is enforced, not just matched — mirrors sim/metalab/contract/loader.py:task_recipes, and a
     differently named file would otherwise vanish from this list instead of failing."""
@@ -93,7 +95,7 @@ def discover_task_recipes() -> dict[str, list[str]]:
 
 def _standalone_groups() -> list[Path]:
     """tasks/standalone/<group>/ dirs carrying an __init__.py — one per standalone contract group."""
-    d = TASKS_DIR / "standalone"
+    d = STANDALONE_DIR
     return [g for g in sorted(d.iterdir()) if g.is_dir() and (g / "__init__.py").is_file()] if d.is_dir() else []
 
 
@@ -109,7 +111,7 @@ def discover_standalone_tasks() -> list[str]:
 
     Same two axes as Train/Eval: the group is the first, its contracts the second — see
     discover_standalone_recipes(). A flat contract has no second axis, exactly like a single-file task."""
-    d = TASKS_DIR / "standalone"
+    d = STANDALONE_DIR
     return sorted([g.name.replace("_", "-") for g in _standalone_groups()] + (_contracts_in(d) if d.is_dir() else []))
 
 
@@ -121,7 +123,7 @@ def discover_standalone_recipes() -> dict[str, list[str]]:
     resolves a standalone contract by STEM wherever it is shelved, so ``--task hammer-lift`` keeps
     working. That is why the launched command sends the chosen CONTRACT as --task and no --recipe."""
     out = {g.name.replace("_", "-"): _contracts_in(g) for g in _standalone_groups()}
-    d = TASKS_DIR / "standalone"
+    d = STANDALONE_DIR
     return {**out, **{c: [] for c in (_contracts_in(d) if d.is_dir() else [])}}
 
 
@@ -139,16 +141,15 @@ def _task_recipe(task: str, recipe: str, mode: str) -> dict:
     GROUP splits the same way — its ``_base.py`` holds the scene, the contract holds what differs."""
     stem = task.replace("-", "_")
     if mode == "standalone":
-        d = TASKS_DIR / "standalone"
         contract = (recipe or task).replace("-", "_")
-        group = d / stem
+        group = STANDALONE_DIR / stem
         paths = ([group / "_base.py", group / f"{contract}.py"] if group.is_dir()
-                 else [d / f"{contract}.py"])
-    elif (TASKS_DIR / stem).is_dir():
+                 else [STANDALONE_DIR / f"{contract}.py"])
+    elif (RL_DIR / stem).is_dir():
         rec = recipe.replace("-", "_")
-        paths = [TASKS_DIR / stem / "_base.py", TASKS_DIR / stem / f"{stem}_{rec}.py"]
+        paths = [RL_DIR / stem / "_base.py", RL_DIR / stem / f"{stem}_{rec}.py"]
     else:
-        paths = [TASKS_DIR / f"{stem}.py"]
+        paths = [RL_DIR / f"{stem}.py"]
     out: dict = {}
     for path in paths:
         src = path.read_text()
@@ -1167,7 +1168,7 @@ details[open] summary::before{content:"▾ "}
     <button data-v="eval">검증 · Eval</button>
     <button data-v="standalone">시뮬레이션 · Standalone</button>
   </div></div>
-<div class="field"><label>3 · Task · Recipe (자동 탐색: sim/metalab/contract/tasks/ 의 폴더 = task, 그 안의 *.py = recipe)</label>
+<div class="field"><label>3 · Task · Recipe (자동 탐색: sim/metalab/contract/tasks/rl/ 의 폴더 = task, 그 안의 *.py = recipe)</label>
   <div class="selrow">
     <select class="selbox" id="task"></select>
     <select class="selbox" id="recipe"></select>
@@ -1417,7 +1418,7 @@ function selectEngine(e){state.engine=e;
 // motor|joint — mutually exclusive (exactly one 'on'), like the engine/mode/target segments.
 function selectCtrl(c){state.ctrl=c;
   [...$("ctrl").children].forEach(b=>b.classList.toggle("on",b.dataset.v===c));render();}
-// task combobox source: Standalone lists the tasks/standalone/<group>/ folders, Train/Eval the task-family
+// task combobox source: Standalone lists the tasks/standalone/<group>/ folders, Train/Eval the tasks/rl/ family
 // folders. Both modes therefore have the same two axes — pick the group/family, then what is inside it.
 function taskList(){return (state.mode==="standalone"?(DESC&&DESC.standalone_tasks):(DESC&&DESC.tasks))||[];}
 // recipe combobox source: the *.py inside the selected group/family. Empty for a single-file contract.

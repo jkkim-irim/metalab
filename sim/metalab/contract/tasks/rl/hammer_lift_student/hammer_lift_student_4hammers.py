@@ -12,7 +12,7 @@ from __future__ import annotations
 from sim.metalab.contract.spec import Curr, Event, Obs, Rew
 from sim.metalab.terms import curriculum, events, gate, obs, reward
 
-from .. import _assets as assets
+from ... import _assets as assets
 from . import _base as base
 
 

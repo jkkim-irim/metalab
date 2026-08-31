@@ -22,7 +22,7 @@ TASK = base.build_task(
     "master_chef_can",
     objects=[
         {"name": "ycb_002_master_chef_can", "asset": {"mjcf": assets.object_mjcf("ycb_002_master_chef_can")},
-         "mass": 0.4, "init_pos": [0.5, -0.1, base.DESK_TOP]},
+         "mass": 0.4, "init_pos": [0.6, -0.1, base.DESK_TOP]},
     ],
     contact={"ycb_002_master_chef_can": {"solref": [0.01, 1.0], "solimp": [0.9, 0.99, 0.001, 0.5, 2.0], "solmix": 1.0}},
 )

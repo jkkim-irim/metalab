@@ -37,7 +37,7 @@ sim2real 로 갈 때 오차가 어디서 왔는지 짚지 못한다.
 ```
 sim/metalab/
 ├─ contract/          HUB — 계약 (엔진 무관, 단일 출처)
-│  ├─ tasks/<task>/   태스크 family. _base.py = 공유 코어, <task>_<recipe>.py = 튜너블 트리오
+│  ├─ tasks/rl/<task>/ 태스크 family. _base.py = 공유 코어, <task>_<recipe>.py = 튜너블 트리오
 │  ├─ robot/          로봇 계약 (.yaml — 마스크·액션·물리 오버라이드)
 │  ├─ spec.py         Pydantic 스키마 (TaskSpec·RobotSpec·PhysicsSpec …)
 │  ├─ loader.py       계약서 → EnvSpec
@@ -63,7 +63,7 @@ sim/metalab/
 나뉜다:
 
 ```python
-# contract/tasks/hammer_lift_teacher/hammer_lift_teacher_privileged.py — 레시피
+# contract/tasks/rl/hammer_lift_teacher/hammer_lift_teacher_privileged.py — 레시피
 from sim.metalab.contract.spec import Curr, Rew
 from sim.metalab.terms import curriculum, gate, reward
 

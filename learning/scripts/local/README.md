@@ -18,7 +18,7 @@ RL_LOG_ROOT         <repo>/logs/rl                     # 체크포인트: <exp>/
 ## 학습
 
 `--sim {genesis|newton}` 과 `--task <t>` 는 **필수**(fail-loud — 빠지면 목록을 출력한다). task 가
-family(`sim/metalab/contract/tasks/<task>/`)면 `--recipe <r>` 도 필요하다. 기본 headless, `--viz gl` 이면
+family(`sim/metalab/contract/tasks/rl/<task>/`)면 `--recipe <r>` 도 필요하다. 기본 headless, `--viz gl` 이면
 백엔드 GUI + 라이브 웹 대시보드가 뜬다. wandb 는 기본 ON (`--no_wandb` 로 끔).
 
 ```bash

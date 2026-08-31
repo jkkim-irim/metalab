@@ -3,6 +3,6 @@
 
 """Hammer-lift-teacher experiment (MetaLab spoke): the RL config + policy spec the trainer owns
 (see ``experiment.py``). Task knobs are SIM-OWNED — they live inline in the task contract
-``sim/metalab/contract/tasks/hammer_lift_teacher.py``."""
+``sim/metalab/contract/tasks/rl/hammer_lift_teacher/``."""
 
 from learning.rl.dexblind.hammer_lift_teacher.experiment import POLICY  # noqa: F401

@@ -28,7 +28,7 @@ learning/
 
 | 바꿀 것 | 파일 |
 |---|---|
-| 보상·관측·종료·커리큘럼·물리·DR (태스크 노브) | `sim/metalab/contract/tasks/<task>/` |
+| 보상·관측·종료·커리큘럼·물리·DR (태스크 노브) | `sim/metalab/contract/tasks/rl/<task>/` |
 | PPO 하이퍼파라미터·네트워크·obs 라우팅 | `learning/rl/dexblind/<task>/experiment.py` |
 
 스크립트 자체는 편집하지 않는다 — 실행 방법만 담는다.

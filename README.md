@@ -73,7 +73,7 @@ nohup learning/scripts/local/metalab_train.sh --sim newton \
 
 | 바꿀 것 | 파일 |
 |---|---|
-| 물리 타이밍·솔버·접촉·보상·관측·종료·커리큘럼·DR·목표 pose | `sim/metalab/contract/tasks/<task>/` (`_base.py` + 레시피) |
+| 물리 타이밍·솔버·접촉·보상·관측·종료·커리큘럼·DR·목표 pose | `sim/metalab/contract/tasks/rl/<task>/` (`_base.py` + 레시피) |
 | PPO 하이퍼파라미터·네트워크·obs 라우팅·wandb 프로젝트 | `learning/rl/dexblind/<task>/experiment.py` |
 
 **스크립트 자체는 편집하지 않는다** — 스크립트는 실행 방법만 담고, 실험 노브는 위 두 곳에 있다.
@@ -90,7 +90,7 @@ nohup learning/scripts/local/metalab_train.sh --sim newton \
 
 ## 5 · 확장
 
-- **새 태스크** = 계약서만 쓴다. `sim/metalab/contract/tasks/<name>/` 에 `_base.py`(공유 코어)와
+- **새 태스크** = 계약서만 쓴다. `sim/metalab/contract/tasks/rl/<name>/` 에 `_base.py`(공유 코어)와
   `<name>_<recipe>.py`(reward/gate/curriculum 트리오)를 두면 런치패드와 스크립트가 자동으로 인식한다.
   보상·관측·종료 계산식은 `terms/` 의 심볼을 조합한다. 엔진 코드는 손대지 않는다.
   물체 에셋은 `sim/metalab/assets/objects/` 에 88종이 들어 있어 `object_mjcf("<이름>")` 으로 바로 쓴다.

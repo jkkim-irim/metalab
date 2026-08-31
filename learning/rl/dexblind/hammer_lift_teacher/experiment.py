@@ -10,7 +10,7 @@ Holds two things:
 * ``POLICY`` — the actor spec (obs groups + actor net), derived from ``EXP`` for eval/deploy.
 
 Task knobs (reward weights, thresholds, action scales, DR ranges, curriculum) are SIM-OWNED and
-live inline in the task contract (``sim/metalab/contract/tasks/hammer_lift_teacher.py``) — team
+live inline in the task contract (``sim/metalab/contract/tasks/rl/hammer_lift_teacher/``) — team
 decision 2026-07-23; the trainer keeps only the RL config.
 
 Separate from ``learning/rl/dexblind/hammer_lift/experiment.py`` (chris' isaaclab spoke) on purpose:

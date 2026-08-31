@@ -35,17 +35,21 @@ engine_venv(){ echo "$METALAB_VENV_ROOT/$1"; }           # $1 = genesis|newton �
 export RL_LOG_ROOT="${RL_LOG_ROOT:-$ROOT/logs/rl}"
 
 # ── task · recipe (two axes; mirrors sim/metalab/contract/loader.py) ─────────────────────────────
-# A TASK is a family folder tasks/<task>/ (or a single-file tasks/<task>.py); a RECIPE is one
-# tasks/<task>/<task>_<recipe>.py beside the shared _base.py. A family is not runnable by itself, so
-# both axes are required for one — resolved here in bash too, to fail before the venv/engine boot.
+# Contracts live on two shelves: RL ones under tasks/rl/ (what Train/Eval run) and scene-only ones under
+# tasks/standalone/. A TASK is a family folder tasks/rl/<task>/ (or a single-file tasks/rl/<task>.py); a
+# RECIPE is one tasks/rl/<task>/<task>_<recipe>.py beside the shared _base.py. A family is not runnable
+# by itself, so both axes are required for one — resolved here in bash too, to fail before the
+# venv/engine boot.
 _TASKS_DIR="$ROOT/sim/metalab/contract/tasks"
-list_tasks(){                      # every runnable --task: family folders + top-level contracts
+_RL_DIR="$_TASKS_DIR/rl"
+_STANDALONE_DIR="$_TASKS_DIR/standalone"
+list_tasks(){                      # every runnable --task: rl/ family folders + rl/ single-file contracts
   local p n out=()
-  for p in "$_TASKS_DIR"/*/; do
+  for p in "$_RL_DIR"/*/; do
     n="$(basename "$p")"
-    [ "$n" = standalone ] || [ ! -f "$p/__init__.py" ] || out+=("${n//_/-}")
+    [ ! -f "$p/__init__.py" ] || out+=("${n//_/-}")
   done
-  for p in "$_TASKS_DIR"/*.py; do   # '_*.py' is a shared library (_assets), not a contract
+  for p in "$_RL_DIR"/*.py; do      # '_*.py' is a shared library, not a contract
     n="$(basename "$p" .py)"
     [ ! -f "$p" ] || [ "${n#_}" != "$n" ] || out+=("${n//_/-}")
   done
@@ -53,15 +57,15 @@ list_tasks(){                      # every runnable --task: family folders + top
 }
 list_standalone_tasks(){           # tasks/standalone/[<group>/]*.py — the CONTRACT stems --task accepts.
   local p n out=()                 # the group folder is a shelf (the Launchpad's second combobox), not
-  for p in "$_TASKS_DIR"/standalone/*.py "$_TASKS_DIR"/standalone/*/*.py; do   # part of the task name
+  for p in "$_STANDALONE_DIR"/*.py "$_STANDALONE_DIR"/*/*.py; do   # part of the task name
     n="$(basename "$p" .py)"
     [ ! -f "$p" ] || [ "${n#_}" != "$n" ] || out+=("${n//_/-}")
   done
-  [ ${#out[@]} -eq 0 ] || printf '%s\n' "${out[@]}" | sort
+  [ ${#out[@]} -eq 0 ] || printf '%s\n' "${out[@]//_/-}" | sort
 }
 list_recipes(){                    # $1 = task (dash or underscore) → its recipes, empty if single-file
   local t="${1//-/_}" p n out=()
-  for p in "$_TASKS_DIR/$t/${t}_"*.py; do
+  for p in "$_RL_DIR/$t/${t}_"*.py; do
     [ -f "$p" ] || continue
     n="$(basename "$p" .py)"; out+=("${n#"${t}_"}")
   done
@@ -70,8 +74,8 @@ list_recipes(){                    # $1 = task (dash or underscore) → its reci
 require_task_recipe(){             # $1 = tag for the message, $2 = task, $3 = recipe (may be empty)
   local tag="$1" t="${2//-/_}" r="$3" recipes
   recipes="$(list_recipes "$t")"
-  if [ -d "$_TASKS_DIR/$t" ]; then
-    [ -n "$recipes" ] || { echo "[$tag] task '$2' is a family with no recipe — add $_TASKS_DIR/$t/${t}_<recipe>.py" >&2; exit 2; }
+  if [ -d "$_RL_DIR/$t" ]; then
+    [ -n "$recipes" ] || { echo "[$tag] task '$2' is a family with no recipe — add $_RL_DIR/$t/${t}_<recipe>.py" >&2; exit 2; }
     if [ -z "$r" ]; then
       echo "[$tag] --recipe is required for task '$2' (a task family). Available recipes:" >&2
       echo "$recipes" | sed 's/^/  - /' >&2

@@ -5,7 +5,7 @@
 
 ASYMMETRIC actor-critic: the actor reads the compact ``actor`` obs group (history-stacked, real-robot
 producible), the critic reads the ``privileged`` obs group (full state). The split lives in the TASK contract
-(``sim/metalab/contract/tasks/hammer_lift_student/``); ``EXP["obs_groups"]`` below only WIRES the model's
+(``sim/metalab/contract/tasks/rl/hammer_lift_student/``); ``EXP["obs_groups"]`` below only WIRES the model's
 actor/critic to those task groups.
 
 Holds two things:
@@ -15,7 +15,7 @@ Holds two things:
 * ``POLICY`` — the actor spec (obs groups + actor net), derived from ``EXP`` for eval/deploy.
 
 Task knobs (reward weights, thresholds, action scales, DR ranges, curriculum) are SIM-OWNED and live
-inline in the task contract (``sim/metalab/contract/tasks/hammer_lift_student/``) — team decision
+inline in the task contract (``sim/metalab/contract/tasks/rl/hammer_lift_student/``) — team decision
 2026-07-23; the trainer keeps only the RL config.
 
 Separate from ``hammer_lift_teacher``: the teacher's actor sees privileged obs (object realtime pose), so it

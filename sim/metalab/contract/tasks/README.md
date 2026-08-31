@@ -14,13 +14,16 @@ pass the term's *symbol*, never a name string.
 
 | Task | What it is |
 |---|---|
-| `hammer_lift_teacher.py` | privileged-state teacher — the reference contract, minimal comments |
-| `hammer_lift_student/` | asymmetric actor/critic, obs noise, geometry/mass DR, the fullest `overrides` block |
-| `standalone/*.py` | scene-only contracts (no learning) for the Launchpad's Standalone mode |
+| `rl/hammer_lift_teacher/` | privileged-state teacher — the reference contract, minimal comments |
+| `rl/hammer_lift_student/` | asymmetric actor/critic, obs noise, geometry/mass DR, the fullest `overrides` block |
+| `standalone/*/*.py` | scene-only contracts (no learning) for the Launchpad's Standalone mode |
 
-- File `tasks/<task>.py` → the module must define `TASK: TaskSpec`. The trainer arg is its kebab stem
-  (`hammer_lift_teacher.py` → `--task hammer-lift-teacher`; the loader maps `-`→`_` and imports
-  `sim.metalab.contract.tasks.<task>`, falling back to `sim.metalab.contract.tasks.standalone.<task>`).
+TWO SHELVES. `rl/` holds what Train/Eval run, `standalone/` the scene-only contracts; `_assets.py` sits
+above both because they share it. A listing of one therefore never has to filter out the other.
+
+- File `tasks/rl/<task>.py` → the module must define `TASK: TaskSpec`. The trainer arg is its kebab stem
+  (`hammer_lift_teacher` → `--task hammer-lift-teacher`; the loader maps `-`→`_` and imports
+  `sim.metalab.contract.tasks.rl.<task>`, falling back to `sim.metalab.contract.tasks.standalone.<task>`).
   A module may expose `build_task() -> TaskSpec` instead of `TASK`; the loader prefers it. That is the
   escape hatch for a contract that must compute something — a normal contract does not need it.
 - Schema source of truth: `sim/metalab/contract/spec.py` (`TaskSpec`). Loader: `sim/metalab/contract/loader.py`.

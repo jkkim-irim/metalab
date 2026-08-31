@@ -55,6 +55,14 @@ _REPO = _ENVS_DIR.parents[2]                 # <repo> (sim/metalab/contract → 
 T = TypeVar("T", bound=BaseModel)
 
 
+#: The two contract shelves. RL contracts (what Train/Eval run) live under ``tasks/rl/``, scene-only
+#: ones under ``tasks/standalone/`` — separate roots so a listing of one never has to filter out the
+#: other. ``tasks/_assets.py`` sits above both because they share it.
+_TASKS_DIR = Path(__file__).parent / "tasks"
+_RL_DIR = _TASKS_DIR / "rl"
+_STANDALONE_DIR = _TASKS_DIR / "standalone"
+
+
 def load_yaml(path: Path) -> dict[str, Any]:
     """YAML file → dict. Fail loud if the top level is not a mapping."""
     with open(path, encoding="utf-8") as f:
@@ -172,12 +180,12 @@ def _report_ignored_effort(robot) -> None:
 
 
 def task_recipes(name: str) -> list[str]:
-    """The recipe names of task family ``tasks/<name>/``, or [] when it is not a family folder.
+    """The recipe names of task family ``tasks/rl/<name>/``, or [] when it is not a family folder.
 
-    A recipe file is ``tasks/<name>/<name>_<recipe>.py``; ``_*.py`` (the shared ``_base``) is a library,
-    not a recipe. The prefix is enforced, not just matched — a differently named file would otherwise
-    drop out of every list silently and its contract would be unreachable."""
-    d = Path(__file__).parent / "tasks" / name
+    A recipe file is ``tasks/rl/<name>/<name>_<recipe>.py``; ``_*.py`` (the shared ``_base``) is a
+    library, not a recipe. The prefix is enforced, not just matched — a differently named file would
+    otherwise drop out of every list silently and its contract would be unreachable."""
+    d = _RL_DIR / name
     if not (d / "__init__.py").is_file():
         return []
     files = [f for f in sorted(d.glob("*.py")) if not f.stem.startswith("_")]
@@ -194,7 +202,7 @@ def _standalone_module(name: str) -> str:
     flat, but the group is a shelf, not part of the task's identity: ``--task hammer-lift`` names the
     file wherever it is shelved. Two groups holding the same stem would make that ambiguous, so it fails
     here instead of resolving to whichever sorted first."""
-    d = Path(__file__).parent / "tasks" / "standalone"
+    d = _STANDALONE_DIR
     hits = [f for f in sorted(d.glob(f"{name}.py")) + sorted(d.glob(f"*/{name}.py"))
             if not f.stem.startswith("_")]
     assert hits, f"standalone contract '{name}' not found under {d}"
@@ -206,10 +214,10 @@ def _standalone_module(name: str) -> str:
 def load_task(name: str, recipe: str | None = None, num_envs: int | None = None) -> EnvSpec:
     """(task, recipe) → resolved EnvSpec.
 
-    Two axes. ``tasks/<name>/`` is a task FAMILY — a shared ``_base.py`` core plus one file per recipe,
-    and it is NOT runnable by itself, so ``recipe`` is required and names ``<name>_<recipe>.py``. A
-    single-file contract (``tasks/<name>.py``, or ``tasks/standalone/<name>.py`` for the scene-only ones)
-    takes no recipe. Every miss — no recipe given, unknown recipe, a family with none — fails here with
+    Two axes. ``tasks/rl/<name>/`` is a task FAMILY — a shared ``_base.py`` core plus one file per
+    recipe, and it is NOT runnable by itself, so ``recipe`` is required and names ``<name>_<recipe>.py``.
+    A single-file contract (``tasks/rl/<name>.py``, or ``tasks/standalone/<name>.py`` for the scene-only
+    ones) takes no recipe. Every miss — no recipe given, unknown recipe, a family with none — fails here with
     the candidates listed, rather than resolving to whatever the family last defaulted to.
 
     The chosen module exposes ``TASK: TaskSpec`` (the normal form — a contract is declarative, so there is
@@ -218,18 +226,18 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
     wire and the trainer is never imported. num_envs, if given, overrides the contract value (training
     CLI)."""
     avail = task_recipes(name)
-    if (Path(__file__).parent / "tasks" / name / "__init__.py").is_file():
+    if (_RL_DIR / name / "__init__.py").is_file():
         assert avail, f"task family '{name}' has no recipe — add " \
-                      f"sim/metalab/contract/tasks/{name}/{name}_<recipe>.py"
+                      f"sim/metalab/contract/tasks/rl/{name}/{name}_<recipe>.py"
         assert recipe, f"task '{name}' is a family: pick a recipe (--recipe) — {', '.join(avail)}"
         rec = recipe.replace("-", "_")
         assert rec in avail, f"task '{name}': unknown recipe {recipe!r} — have {', '.join(avail)}"
-        mod = importlib.import_module(f"sim.metalab.contract.tasks.{name}.{name}_{rec}")
+        mod = importlib.import_module(f"sim.metalab.contract.tasks.rl.{name}.{name}_{rec}")
     else:
         # Single-file contract. The guard re-raises a REAL import error inside a task module (only
         # "module absent" falls through to tasks/standalone/, which is kept out of the train/eval list).
         assert recipe is None, f"task '{name}' is a single-file contract — it takes no recipe ({recipe!r})"
-        modname = f"sim.metalab.contract.tasks.{name}"
+        modname = f"sim.metalab.contract.tasks.rl.{name}"
         try:
             mod = importlib.import_module(modname)
         except ModuleNotFoundError as e:

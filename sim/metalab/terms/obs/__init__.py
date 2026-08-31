@@ -2,7 +2,7 @@
 
 A term is ``fn(env, <knob>=<default>, ...) -> (N, d)``, called by the driver every policy step with the
 contract's named knobs (``ObsTerm.params``) — the same shape as a reward term. The contract
-(`contract/tasks/<task>.py`) composes these into obs groups. No engine import (env is the backend).
+(`contract/tasks/rl/<task>.py`) composes these into obs groups. No engine import (env is the backend).
 """
 from sim.metalab.terms.obs.common import (
     action_delay,

@@ -6,7 +6,7 @@ Role split:
 - **Logic parts** (obs/reward term, action) reference callables — functions, not values,
   so they aren't Pydantic-validated; the contract .py binds them directly.
 
-A contract (``sim.metalab.contract.tasks.<task>``) composes these into an :class:`EnvSpec`.
+A contract (``sim.metalab.contract.tasks.rl.<task>``) composes these into an :class:`EnvSpec`.
 **This file never imports an engine (gs/isaaclab).** Conventions: :mod:`sim.metalab.conventions`.
 """
 from __future__ import annotations
@@ -802,7 +802,7 @@ class EnvSpec(_Logic):
 
 # ---------------------------------------------------------------------------
 # TaskSpec — the source schema of a task contract (declarative: names, tunables, term refs).
-# A task is a **Python module** ``sim/metalab/contract/tasks/<task>.py`` that builds one ``TASK = TaskSpec(...)``.
+# A task is a **Python module** ``sim/metalab/contract/tasks/rl/<task>.py`` that builds one ``TASK = TaskSpec(...)``.
 # loader.load_task imports that module and resolves parts (robot/object) + term entries into an EnvSpec.
 # A term entry lists an **imported symbol + its knobs** (the symbol is what enables Go-to-Definition):
 # obs/reward are FLAT functions the driver calls as ``fn(env, **params)``, terminate/events/curriculum are
@@ -1014,7 +1014,7 @@ def terms(block: Any, kind: type[_Ref]) -> list[_Ref]:
 
 
 class TaskSpec(_Data):
-    """Task contract — built in ``sim/metalab/contract/tasks/<task>.py`` as ``TASK = TaskSpec(...)``. Loader
+    """Task contract — built in ``sim/metalab/contract/tasks/rl/<task>.py`` as ``TASK = TaskSpec(...)``. Loader
     imports the module and resolves it into an EnvSpec. No engine import."""
 
     name: str
