@@ -1,0 +1,218 @@
+# allex_right — right arm+hand contract derived from allex.yaml (every non-right joint welded).
+# proto_v4 hand: each fingertip PAD is its own collision shell on its own body, so pad and nail are told
+# apart by WHICH BODY a contact was read on — see `fingertips` and `nail_friction` below.
+control_mode: motor
+
+asset:
+  mjcf: sim/metalab/assets/robots/proto_v4/mjcf/ALLEX.xml
+fixed_base: true
+
+joints:                        # 1 = active, 0 = welded at 0 deg. R_ finger IP/DIP: equality followers
+  Waist_Yaw_Joint: 0
+  Waist_Pitch_Dummy_Joint: 0
+  Waist_Lower_Pitch_Joint: 0
+  Waist_Upper_Pitch_Joint: 0
+  Neck_Pitch_Joint: 0
+  Neck_Yaw_Joint: 0
+  R_Shoulder_Pitch_Joint: 1
+  R_Shoulder_Roll_Joint: 1
+  R_Shoulder_Yaw_Joint: 1
+  R_Elbow_Joint: 1
+  R_Wrist_Yaw_Joint: 1
+  R_Wrist_Roll_Joint: 1
+  R_Wrist_Pitch_Joint: 1
+  R_Thumb_Yaw_Joint: 1
+  R_Thumb_CMC_Joint: 1
+  R_Thumb_MCP_Joint: 1
+  R_Thumb_IP_Joint: 1
+  R_Index_ABAD_Joint: 1
+  R_Index_MCP_Joint: 1
+  R_Index_PIP_Joint: 1
+  R_Index_DIP_Joint: 1
+  R_Middle_ABAD_Joint: 1
+  R_Middle_MCP_Joint: 1
+  R_Middle_PIP_Joint: 1
+  R_Middle_DIP_Joint: 1
+  R_Ring_ABAD_Joint: 1
+  R_Ring_MCP_Joint: 1
+  R_Ring_PIP_Joint: 1
+  R_Ring_DIP_Joint: 1
+  R_Little_ABAD_Joint: 1
+  R_Little_MCP_Joint: 1
+  R_Little_PIP_Joint: 1
+  R_Little_DIP_Joint: 1
+  L_Shoulder_Pitch_Joint: 0
+  L_Shoulder_Roll_Joint: 0
+  L_Shoulder_Yaw_Joint: 0
+  L_Elbow_Joint: 0
+  L_Wrist_Yaw_Joint: 0
+  L_Wrist_Roll_Joint: 0
+  L_Wrist_Pitch_Joint: 0
+  L_Thumb_Yaw_Joint: 0
+  L_Thumb_CMC_Joint: 0
+  L_Thumb_MCP_Joint: 0
+  L_Thumb_IP_Joint: 0
+  L_Index_ABAD_Joint: 0
+  L_Index_MCP_Joint: 0
+  L_Index_PIP_Joint: 0
+  L_Index_DIP_Joint: 0
+  L_Middle_ABAD_Joint: 0
+  L_Middle_MCP_Joint: 0
+  L_Middle_PIP_Joint: 0
+  L_Middle_DIP_Joint: 0
+  L_Ring_ABAD_Joint: 0
+  L_Ring_MCP_Joint: 0
+  L_Ring_PIP_Joint: 0
+  L_Ring_DIP_Joint: 0
+  L_Little_ABAD_Joint: 0
+  L_Little_MCP_Joint: 0
+  L_Little_PIP_Joint: 0
+  L_Little_DIP_Joint: 0
+
+collision:                     # 1 = keep collision geom, 0 = drop it (visual kept); unlisted = 1
+  Base_Link: 0
+  Waist_Yaw_Link: 0
+  Waist_Lower_Pitch_Link: 1
+  Waist_Upper_Pitch_Link: 1
+  Neck_Pitch_Link: 0
+  Neck_Yaw_Link: 0
+  # right arm — 0: passes through the table, and the table termination watches only the fingertips
+  R_Shoulder_Pitch_Link: 0
+  R_Shoulder_RollYaw_Link: 0
+  R_Upper_Arm_Link: 1
+  R_Elbow_Link: 0
+  R_Forearm_Link: 1
+  R_Wrist_Roll_Link: 0
+  R_Wrist_Pitch_Link: 0
+  R_Palm_Link: 1
+  # palm shells — a MESH key beats the body key. centroid (x,y,z) mm in the palm frame, extent mm, verts
+  R_Palm_Back_Collision1: 0    # (-38.9,   0.5,  7.5)  35x85x102   900 v
+  R_Palm_Back_Collision2: 0    # (-24.3,  40.7, 11.7)  32x20x 95  1230 v
+  R_Palm_Back_Collision3: 0    # (-27.5, -40.7, 15.4)  32x19x 96  1512 v
+  R_Palm_Frame_Collision1: 1   # (-10.2,  10.2, -0.5)  29x90x 98  1422 v
+  R_Palm_Frame_Collision2: 0   # ( -9.1, -37.0,-24.2)  20x28x 20  3012 v
+  R_Palm_Frame_Collision3: 0   # ( -2.8, -25.9,-24.1)   6x22x 17  2496 v
+  R_Palm_Frame_Collision4: 0   # ( -5.9, -41.1,  8.6)  23x20x 53   516 v
+  R_Palm_Frame_Collision5: 0   # (  7.2, -22.9, 43.6)  44x35x 22  4356 v
+  R_Palm_Frame_Collision6: 0   # (  0.8, -28.6,-21.0)   5x17x 11  1314 v
+  R_Palm_Frame_Collision7: 0   # (  5.8, -28.5,-17.6)   7x12x  8  1638 v
+  R_Palm_Pad_Collision1: 0     # ( -4.1,  -5.4,-22.4)   8x48x 52  1746 v
+  R_Palm_Pad_Collision2: 0     # ( -0.2,  36.3,-10.3)  13x39x 57  6306 v
+  R_Palm_Pad_Collision3: 0     # (  6.0,  20.2, 37.6)  21x56x 45  4836 v
+  R_Thumb_Yaw_Link: 1
+  R_Thumb_Proximal_Link: 1
+  R_Thumb_Middle_Link: 1
+  R_Thumb_Distal_Link: 1
+  R_Index_Roll_Link: 1
+  R_Index_Proximal_Link: 1
+  R_Index_Middle_Link: 1
+  R_Index_Distal_Link: 1
+  R_Middle_Roll_Link: 1
+  R_Middle_Proximal_Link: 1
+  R_Middle_Middle_Link: 1
+  R_Middle_Distal_Link: 1
+  R_Ring_Roll_Link: 1
+  R_Ring_Proximal_Link: 1
+  R_Ring_Middle_Link: 1
+  R_Ring_Distal_Link: 1
+  R_Little_Roll_Link: 1
+  R_Little_Proximal_Link: 1
+  R_Little_Middle_Link: 1
+  R_Little_Distal_Link: 1
+  L_Shoulder_Pitch_Link: 0
+  L_Shoulder_RollYaw_Link: 0
+  L_Upper_Arm_Link: 0
+  L_Elbow_Link: 0
+  L_Forearm_Link: 0
+  L_Wrist_Roll_Link: 0
+  L_Wrist_Pitch_Link: 0
+  L_Palm_Link: 0
+  L_Thumb_Yaw_Link: 0
+  L_Thumb_Proximal_Link: 0
+  L_Thumb_Middle_Link: 0
+  L_Thumb_Distal_Link: 0
+  L_Index_Roll_Link: 0
+  L_Index_Proximal_Link: 0
+  L_Index_Middle_Link: 0
+  L_Index_Distal_Link: 0
+  L_Middle_Roll_Link: 0
+  L_Middle_Proximal_Link: 0
+  L_Middle_Middle_Link: 0
+  L_Middle_Distal_Link: 0
+  L_Ring_Roll_Link: 0
+  L_Ring_Proximal_Link: 0
+  L_Ring_Middle_Link: 0
+  L_Ring_Distal_Link: 0
+  L_Little_Roll_Link: 0
+  L_Little_Proximal_Link: 0
+  L_Little_Middle_Link: 0
+  L_Little_Distal_Link: 0
+  # the left PAD shells — their own bodies since proto_v4, so the *_Distal_Link keys above do not reach them
+  # (a body key covers that body's geoms, not its children's) and the mesh they share with the right hand
+  # cannot single them out either
+  L_Thumb_Fingertip: 0
+  L_Index_Fingertip: 0
+  L_Middle_Fingertip: 0
+  L_Ring_Fingertip: 0
+  L_Little_Fingertip: 0
+
+action_groups:                 # policy action = arm 7 + hand 11 = 18; ABAD 4 and IP/DIP excluded
+  arm:  [R_Shoulder_Pitch_Joint, R_Shoulder_Roll_Joint, R_Shoulder_Yaw_Joint, R_Elbow_Joint, R_Wrist_Yaw_Joint, R_Wrist_Roll_Joint, R_Wrist_Pitch_Joint]
+  hand: [R_Thumb_Yaw_Joint, R_Thumb_CMC_Joint, R_Thumb_MCP_Joint, R_Index_MCP_Joint, R_Index_PIP_Joint, R_Middle_MCP_Joint, R_Middle_PIP_Joint, R_Ring_MCP_Joint, R_Ring_PIP_Joint, R_Little_MCP_Joint, R_Little_PIP_Joint]
+
+joint_groups:                  # observable, never commandable. ABAD: own actuator, PD-held at 0
+  hand_all: [R_Thumb_Yaw_Joint, R_Thumb_CMC_Joint, R_Thumb_MCP_Joint,
+             R_Index_ABAD_Joint, R_Index_MCP_Joint, R_Index_PIP_Joint,
+             R_Middle_ABAD_Joint, R_Middle_MCP_Joint, R_Middle_PIP_Joint,
+             R_Ring_ABAD_Joint, R_Ring_MCP_Joint, R_Ring_PIP_Joint,
+             R_Little_ABAD_Joint, R_Little_MCP_Joint, R_Little_PIP_Joint]   # order = real ROS topic index
+
+frames:
+  chest_origin: Chest_Origin_Link
+  palm: R_Palm_Link
+
+fingertips: [R_Index_Fingertip, R_Middle_Fingertip, R_Ring_Fingertip, R_Little_Fingertip, R_Thumb_Fingertip]
+# closes each fingertip, same order — measured: flexion positive, extension negative
+fingertip_flex_joints: [R_Index_PIP_Joint, R_Middle_PIP_Joint, R_Ring_PIP_Joint, R_Little_PIP_Joint, R_Thumb_MCP_Joint]
+# No fingertip_pad_axes on purpose: the bodies above ARE the pad shells (proto_v4 split the nail onto
+# `*_Distal_Link`), so a force read on them is a pad press by construction and contact_mask counts it by
+# magnitude. The projection exists for hands that carry pad and nail on ONE body.
+
+# The NAIL shells — pinned slick, and OUT of the friction DR's reach: the backend leaves these shapes out of
+# the "robot" set the reset event writes, so this value is written once at build and stays. Named by BODY
+# because a shape carries no name in either engine — exact here, since proto_v4 moved the PAD shell onto
+# `*_Fingertip` and left the nail shell alone on `*_Distal_Link`.
+nail_friction:
+  mu: 0.1
+  bodies: [R_Index_Distal_Link, R_Middle_Distal_Link, R_Ring_Distal_Link, R_Little_Distal_Link,
+           R_Thumb_Distal_Link]
+
+gravcomp:                      # right arm only; folded into the joint_torque readout
+  actuator_joints:
+    [R_Shoulder_Pitch_Joint, R_Shoulder_Roll_Joint, R_Shoulder_Yaw_Joint, R_Elbow_Joint, R_Wrist_Yaw_Joint, R_Wrist_Roll_Joint, R_Wrist_Pitch_Joint]
+  passive_joints: []
+  passive_bodies: []
+
+joint_mode_param:              # kp/kv [N·m/rad], effort [N·m] — effort IGNORED under control_mode: motor
+  R_Shoulder_Pitch_Joint: {kp: 5000, kv: 112.8783, effort: [-120, 120]}
+  R_Shoulder_Roll_Joint:  {kp: 5000, kv: 90.3684,  effort: [-120, 120]}
+  R_Shoulder_Yaw_Joint:   {kp: 5000, kv: 73.3365,  effort: [-120, 120]}
+  R_Elbow_Joint:          {kp: 2000, kv: 41.8896,  effort: [-100, 100]}
+  R_Wrist_Yaw_Joint:      {kp: 750,  kv: 4.5803,   effort: [-60, 60]}
+  R_Wrist_Roll_Joint:     {kp: 600,  kv: 5.8302,   effort: [-20, 20]}
+  R_Wrist_Pitch_Joint:    {kp: 500,  kv: 4.4695,   effort: [-18, 18]}
+  R_Thumb_Yaw_Joint:   {kp: 20, kv: 0.8039, effort: [-1.5, 1.5]}
+  R_Thumb_CMC_Joint:   {kp: 20, kv: 0.5279, effort: [-1.5, 4.5]}
+  R_Thumb_MCP_Joint:   {kp: 10, kv: 0.2492, effort: [-1, 3]}
+  R_Index_ABAD_Joint:  {kp: 10, kv: 0.0969, effort: [-3.5, 3.5]}
+  R_Index_MCP_Joint:   {kp: 20, kv: 0.5638, effort: [-2, 5]}
+  R_Index_PIP_Joint:   {kp: 10, kv: 0.2491, effort: [-1, 3]}
+  R_Middle_ABAD_Joint: {kp: 10, kv: 0.0969, effort: [-3.5, 3.5]}
+  R_Middle_MCP_Joint:  {kp: 20, kv: 0.5638, effort: [-2, 5]}
+  R_Middle_PIP_Joint:  {kp: 10, kv: 0.2491, effort: [-1, 3]}
+  R_Ring_ABAD_Joint:   {kp: 10, kv: 0.0969, effort: [-3.5, 3.5]}
+  R_Ring_MCP_Joint:    {kp: 20, kv: 0.5638, effort: [-2, 5]}
+  R_Ring_PIP_Joint:    {kp: 10, kv: 0.2491, effort: [-1, 3]}
+  R_Little_ABAD_Joint: {kp: 10, kv: 0.0965, effort: [-3.5, 3.5]}
+  R_Little_MCP_Joint:  {kp: 20, kv: 0.5637, effort: [-2, 5]}
+  R_Little_PIP_Joint:  {kp: 10, kv: 0.2491, effort: [-1, 3]}

@@ -1,0 +1,658 @@
+{
+    "arm_r": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.1,
+                    0.1
+                ],
+                "k_vel": [
+                    0.01,
+                    0.01,
+                    0.01,
+                    0.01,
+                    0.01,
+                    0.001,
+                    0.001
+                ],
+                "torque_limit_pos_abs": [
+                    1.8,
+                    1.8,
+                    1.8,
+                    1.8,
+                    1.8,
+                    0.222,
+                    0.222
+                ],
+                "torque_limit_neg_abs": [
+                    1.8,
+                    1.8,
+                    1.8,
+                    1.8,
+                    1.8,
+                    0.222,
+                    0.222
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.6275,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 0.6275,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 0.6275,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 0.6275,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 0.6275,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 0.074,
+                "max_torque": 0.968,
+                "max_speed": 832.522
+            },
+            {
+                "rated_torque": 0.074,
+                "max_torque": 0.968,
+                "max_speed": 832.522
+            }
+        ]
+    },
+    "arm_l": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    3.0,
+                    3.0,
+                    3.0,
+                    3.0,
+                    3.0,
+                    0.3,
+                    0.3
+                ],
+                "k_vel": [
+                    0.005,
+                    0.005,
+                    0.005,
+                    0.005,
+                    0.005,
+                    0.001,
+                    0.001
+                ],
+                "torque_limit_pos_abs": [
+                    1.8,
+                    1.8,
+                    1.8,
+                    1.8,
+                    1.8,
+                    0.222,
+                    0.222
+                ],
+                "torque_limit_neg_abs": [
+                    1.8,
+                    1.8,
+                    1.8,
+                    1.8,
+                    1.8,
+                    0.222,
+                    0.222
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.6275,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 0.6275,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 0.6275,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 0.6275,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 0.6275,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 0.074,
+                "max_torque": 0.968,
+                "max_speed": 832.522
+            },
+            {
+                "rated_torque": 0.074,
+                "max_torque": 0.968,
+                "max_speed": 832.522
+            }
+        ]
+    },
+    "waist": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    3.0,
+                    10.0
+                ],
+                "k_vel": [
+                    0.01,
+                    0.4
+                ],
+                "torque_limit_pos_abs": [
+                    1.53,
+                    1.53
+                ],
+                "torque_limit_neg_abs": [
+                    1.53,
+                    1.53
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 1.53,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 1.53,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            }
+        ]
+    },
+    "neck": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    4.0,
+                    4.0
+                ],
+                "k_vel": [
+                    0.005,
+                    0.005
+                ],
+                "torque_limit_pos_abs": [
+                    1.5,
+                    0.3
+                ],
+                "torque_limit_neg_abs": [
+                    1.5,
+                    0.3
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.5161,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            },
+            {
+                "rated_torque": 0.1,
+                "max_torque": 3.83,
+                "max_speed": 427.257
+            }
+        ]
+    },
+    "thumb_r": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    0.0008,
+                    0.00015,
+                    0.00015
+                ],
+                "k_vel": [
+                    0.00008,
+                    0.000015,
+                    0.000015
+                ],
+                "torque_limit_pos_abs": [
+                    0.005,
+                    0.02,
+                    0.02
+                ],
+                "torque_limit_neg_abs": [
+                    0.005,
+                    0.004,
+                    0.004
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            }
+        ]
+    },
+    "thumb_l": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    0.0018,
+                    0.005,
+                    0.005
+                ],
+                "k_vel": [
+                    0.00008,
+                    0.00005,
+                    0.00005
+                ],
+                "torque_limit_pos_abs": [
+                    0.005,
+                    0.02,
+                    0.02
+                ],
+                "torque_limit_neg_abs": [
+                    0.005,
+                    0.004,
+                    0.004
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            }
+        ]
+    },
+    "index_r": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    0.0002,
+                    0.0002,
+                    0.00015
+                ],
+                "k_vel": [
+                    0.00002,
+                    0.00002,
+                    0.000015
+                ],
+                "torque_limit_pos_abs": [
+                    0.005,
+                    0.005,
+                    0.02
+                ],
+                "torque_limit_neg_abs": [
+                    0.005,
+                    0.005,
+                    0.004
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            }
+        ]
+    },
+    "middle_r": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    0.0002,
+                    0.0002,
+                    0.00015
+                ],
+                "k_vel": [
+                    0.00002,
+                    0.00002,
+                    0.000015
+                ],
+                "torque_limit_pos_abs": [
+                    0.005,
+                    0.005,
+                    0.02
+                ],
+                "torque_limit_neg_abs": [
+                    0.005,
+                    0.005,
+                    0.004
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            }
+        ]
+    },
+    "ring_r": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    0.0002,
+                    0.0002,
+                    0.00015
+                ],
+                "k_vel": [
+                    0.00002,
+                    0.00002,
+                    0.000015
+                ],
+                "torque_limit_pos_abs": [
+                    0.005,
+                    0.005,
+                    0.02
+                ],
+                "torque_limit_neg_abs": [
+                    0.005,
+                    0.005,
+                    0.004
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            }
+        ]
+    },
+    "little_r": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    0.0002,
+                    0.0002,
+                    0.00015
+                ],
+                "k_vel": [
+                    0.00002,
+                    0.00002,
+                    0.000015
+                ],
+                "torque_limit_pos_abs": [
+                    0.005,
+                    0.005,
+                    0.02
+                ],
+                "torque_limit_neg_abs": [
+                    0.005,
+                    0.005,
+                    0.004
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            }
+        ]
+    },
+    "index_l": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    0.0012,
+                    0.0012,
+                    0.005
+                ],
+                "k_vel": [
+                    0.00002,
+                    0.00002,
+                    0.00005
+                ],
+                "torque_limit_pos_abs": [
+                    0.005,
+                    0.005,
+                    0.02
+                ],
+                "torque_limit_neg_abs": [
+                    0.005,
+                    0.005,
+                    0.004
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            }
+        ]
+    },
+    "middle_l": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    0.0012,
+                    0.0012,
+                    0.005
+                ],
+                "k_vel": [
+                    0.00002,
+                    0.00002,
+                    0.00005
+                ],
+                "torque_limit_pos_abs": [
+                    0.005,
+                    0.005,
+                    0.02
+                ],
+                "torque_limit_neg_abs": [
+                    0.005,
+                    0.005,
+                    0.004
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            }
+        ]
+    },
+    "ring_l": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    0.0012,
+                    0.0012,
+                    0.005
+                ],
+                "k_vel": [
+                    0.00002,
+                    0.00002,
+                    0.00005
+                ],
+                "torque_limit_pos_abs": [
+                    0.005,
+                    0.005,
+                    0.02
+                ],
+                "torque_limit_neg_abs": [
+                    0.005,
+                    0.005,
+                    0.004
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            }
+        ]
+    },
+    "little_l": {
+        "motor_control_param": [
+            {
+                "k_pos": [
+                    0.0012,
+                    0.0012,
+                    0.005
+                ],
+                "k_vel": [
+                    0.00002,
+                    0.00002,
+                    0.00005
+                ],
+                "torque_limit_pos_abs": [
+                    0.005,
+                    0.005,
+                    0.02
+                ],
+                "torque_limit_neg_abs": [
+                    0.005,
+                    0.005,
+                    0.004
+                ]
+            }
+        ],
+        "actuators": [
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.00386,
+                "max_torque": 0.0105,
+                "max_speed": 581.2
+            },
+            {
+                "rated_torque": 0.0157,
+                "max_torque": 0.371,
+                "max_speed": 6073
+            }
+        ]
+    }
+}

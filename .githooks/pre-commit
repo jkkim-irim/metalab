@@ -1,0 +1,28 @@
+#!/bin/sh
+# Block commits that fail ruff (import order + lint) on the in-scope learning/ package.
+# The same ruff check run_ci_tests.sh runs before the test suite. Fails loudly.
+# Bypass intentionally (rarely) with: git commit --no-verify
+set -e
+
+# Only run when learning/ has staged changes (the rest of the tree isn't ruff-clean yet).
+git diff --cached --name-only | grep -q '^learning/' || exit 0
+
+if command -v uvx >/dev/null 2>&1; then
+	RUFF="uvx ruff@0.15.17"
+elif command -v ruff >/dev/null 2>&1; then
+	RUFF="ruff"
+else
+	echo "" >&2
+	echo "  ✋  ruff not found — install uv (https://docs.astral.sh/uv) or ruff, then retry." >&2
+	echo "      (If you truly intend this commit, re-run with: git commit --no-verify)" >&2
+	exit 1
+fi
+
+echo "pre-commit: $RUFF check learning"
+if ! $RUFF check learning; then
+	echo "" >&2
+	echo "  ✋  ruff found issues (import order / lint). Fix them — $RUFF check --fix learning — and retry." >&2
+	echo "      (If you truly intend this commit, re-run with: git commit --no-verify)" >&2
+	exit 1
+fi
+exit 0

@@ -1,0 +1,102 @@
+{
+  "meta": {
+    "engine": "genesis",
+    "task": "hammer_lift",
+    "num_envs": 1
+  },
+  "init_state": {
+    "joint_names": [
+      "R_Shoulder_Pitch_Joint",
+      "R_Shoulder_Roll_Joint",
+      "R_Shoulder_Yaw_Joint",
+      "R_Elbow_Joint",
+      "R_Wrist_Yaw_Joint",
+      "R_Wrist_Roll_Joint",
+      "R_Wrist_Pitch_Joint",
+      "R_Thumb_Yaw_Joint",
+      "R_Thumb_CMC_Joint",
+      "R_Thumb_MCP_Joint",
+      "R_Index_MCP_Joint",
+      "R_Index_PIP_Joint",
+      "R_Middle_MCP_Joint",
+      "R_Middle_PIP_Joint",
+      "R_Ring_MCP_Joint",
+      "R_Ring_PIP_Joint",
+      "R_Little_MCP_Joint",
+      "R_Little_PIP_Joint"
+    ],
+    "joint_pos": [
+      0.34906598925590515,
+      -0.34906598925590515,
+      0.05235990136861801,
+      -1.9198600053787231,
+      3.141590118408203,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "joint_vel": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "object_pos": [
+      0.5,
+      -0.10000000149011612,
+      0.8999999761581421
+    ],
+    "object_quat": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "frame_chest_origin_pos": [
+      0.1014999970793724,
+      0.0,
+      1.3380000591278076
+    ],
+    "frame_chest_origin_quat": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "frame_palm_pos": [
+      0.46558260917663574,
+      -0.2683747410774231,
+      1.05575692653656
+    ],
+    "frame_palm_quat": [
+      -0.1422102004289627,
+      -0.6927483081817627,
+      0.08705040067434311,
+      0.701639711856842
+    ]
+  }
+}

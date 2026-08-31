@@ -1,0 +1,42 @@
+{
+  "part": "elbow",
+  "joint_roles": [
+    "Elbow",
+    "Yaw"
+  ],
+  "joint_unit": "rad",
+  "motor_unit": "rad",
+  "source": "firmware arm_{r,l}_mj_map.hpp elbowJoint2M_J_ (differential pulley, constant 2x2): G=[[a,b],[-a,b]], a=1/(n1*n2), b=1/(n1*n2*n3); hw_version v2 (motor_joint_helper.hpp elbow_pulley::v2) n1=13/98, n2=32/81.8, n3=82.38/48.38. Shared by both arms; Yaw fit range = symmetric L/R union.",
+  "q_fit_range_rad": {
+    "lo": [
+      -2.7925268,
+      -4.799655
+    ],
+    "hi": [
+      0.0872665,
+      4.799655
+    ]
+  },
+  "j2m": {
+    "m1": {
+      "model_terms": [
+        [1, 0],
+        [0, 1]
+      ],
+      "coefficients": [
+        19.270192307692305,
+        11.316968971184194
+      ]
+    },
+    "m2": {
+      "model_terms": [
+        [1, 0],
+        [0, 1]
+      ],
+      "coefficients": [
+        -19.270192307692305,
+        11.316968971184194
+      ]
+    }
+  }
+}

@@ -1,0 +1,35 @@
+# Local-only asset folder — must never be pushed to the repo.
+/allex_description/
+
+# Teleop episode recordings (apps/teleop_dashboard) — data never enters git.
+/allex_data/
+
+# Python bytecode — never committed (review #37: stray __pycache__ rode the sim/metalab regroup).
+__pycache__/
+*.py[cod]
+sim/metalab/assets/data/spline/
+
+# Editor / GUI / run artifacts — never committed.
+.vscode/
+imgui.ini
+/logs/
+
+# Generated standalone trajectory exports (zipped recordings).
+sim/metalab/assets/data/trajectory/*.zip
+
+# wandb run cache — local artifacts of whatever ran last on this machine (debug logs + run dirs).
+# Runs are already published to wandb; the local copy is per-machine and must not enter history.
+wandb/
+
+# Build artifact of `pip install -e .` (the allex-learning package metadata).
+allex_learning.egg-info/
+
+# ROOT lock only. The root pyproject is a setuptools package installed with `uv pip install -e`, which
+# neither reads nor writes a lock — nothing in the repo runs `uv sync` here, so a committed root lock would
+# never be refreshed. The ENGINE locks (sim/metalab/**/uv.lock) ARE the sync source and stay tracked.
+/uv.lock
+
+# YCB scan assets (sim/metalab/assets/ycb_to_mjcf.py output) — ~210MB of textured meshes for 79 objects.
+# The generator is tracked, its output is not: it lives in
+# s3://wirobotics-internal/shared/sim_assets/objects/<object>/.
+sim/metalab/assets/objects/ycb/

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>방법1 vs 방법2 — 커플링 토크 계산 비교</title>
+<style>
+  :root{
+    --paper:#eceff4; --card:#ffffff; --sunk:#f4f6f9; --ink:#1a222b; --muted:#59636f; --faint:#8a95a1;
+    --line:#d8dee6; --accent:#0f7d88; --accent-soft:#e2f1f2; --accent-line:#a9d6da;
+    --m1:#7a5cc0; --m1-soft:#ece6f7; --m1-line:#c9baea;     /* 방법1 = 보라(근사) */
+    --m2:#0f7d88; --m2-soft:#e2f1f2; --m2-line:#a9d6da;     /* 방법2 = teal(정확) */
+    --ok:#2e7d4f; --ok-soft:#e4f3e9; --ok-line:#a9d6ba;
+    --bad:#b5482f; --bad-soft:#f8e7e2; --bad-line:#e6b3a5;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+  }
+  @media (prefers-color-scheme:dark){ :root{
+    --paper:#0d1217; --card:#151d25; --sunk:#0f151b; --ink:#e6ecf2; --muted:#9aa6b2; --faint:#69747f;
+    --line:#25303a; --accent:#45b8c2; --accent-soft:#0f2f36; --accent-line:#1d4a52;
+    --m1:#a795e0; --m1-soft:#221a38; --m1-line:#3d3163;
+    --m2:#45b8c2; --m2-soft:#0f2f36; --m2-line:#1d4a52;
+    --ok:#60bf86; --ok-soft:#122f21; --ok-line:#254f38;
+    --bad:#e08265; --bad-soft:#331c15; --bad-line:#5e3225;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#0d1217; --card:#151d25; --sunk:#0f151b; --ink:#e6ecf2; --muted:#9aa6b2; --faint:#69747f;
+    --line:#25303a; --accent:#45b8c2; --accent-soft:#0f2f36; --accent-line:#1d4a52;
+    --m1:#a795e0; --m1-soft:#221a38; --m1-line:#3d3163;
+    --m2:#45b8c2; --m2-soft:#0f2f36; --m2-line:#1d4a52;
+    --ok:#60bf86; --ok-soft:#122f21; --ok-line:#254f38;
+    --bad:#e08265; --bad-soft:#331c15; --bad-line:#5e3225;
+  }
+  :root[data-theme="light"]{
+    --paper:#eceff4; --card:#ffffff; --sunk:#f4f6f9; --ink:#1a222b; --muted:#59636f; --faint:#8a95a1;
+    --line:#d8dee6; --accent:#0f7d88; --accent-soft:#e2f1f2; --accent-line:#a9d6da;
+    --m1:#7a5cc0; --m1-soft:#ece6f7; --m1-line:#c9baea;
+    --m2:#0f7d88; --m2-soft:#e2f1f2; --m2-line:#a9d6da;
+    --ok:#2e7d4f; --ok-soft:#e4f3e9; --ok-line:#a9d6ba;
+    --bad:#b5482f; --bad-soft:#f8e7e2; --bad-line:#e6b3a5;
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0}
+  .wrap{font-family:var(--sans); background:var(--paper); color:var(--ink);
+    min-height:100vh; padding:clamp(20px,4vw,56px); display:flex; justify-content:center; line-height:1.55}
+  .inner{width:100%; max-width:980px}
+  code{font-family:var(--mono); font-size:.86em; background:var(--sunk); border:1px solid var(--line); border-radius:5px; padding:1px 5px}
+  b{font-weight:600}
+
+  .eyebrow{font-size:12px; letter-spacing:.15em; text-transform:uppercase; color:var(--accent); font-weight:600; margin:0 0 10px}
+  h1{font-size:clamp(27px,3.8vw,40px); line-height:1.12; margin:0 0 14px; letter-spacing:-.015em; text-wrap:balance}
+  .lede{font-size:clamp(15px,1.6vw,17px); color:var(--muted); margin:0; max-width:64ch}
+  .lede b{color:var(--ink)}
+  .lede .k1{color:var(--m1); font-weight:600}
+  .lede .k2{color:var(--m2); font-weight:600}
+
+  .sec{margin-top:clamp(32px,5vw,48px)}
+  .sec-head{display:flex; align-items:baseline; gap:12px; margin:0 0 18px; padding-bottom:10px; border-bottom:1px solid var(--line)}
+  .sec-num{font-family:var(--mono); font-size:13px; font-weight:600; color:var(--accent)}
+  .sec-head h2{font-size:clamp(18px,2.4vw,22px); margin:0; letter-spacing:-.01em}
+
+  /* two method cards */
+  .mrow{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+  @media (max-width:720px){ .mrow{grid-template-columns:1fr} }
+  .mcard{border:1px solid var(--line); border-radius:14px; padding:20px; background:var(--card)}
+  .mcard.m1{border-color:var(--m1-line)}
+  .mcard.m2{border-color:var(--m2-line)}
+  .mtop{display:flex; align-items:baseline; gap:9px; margin:0 0 3px}
+  .mtag{font-family:var(--mono); font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px}
+  .m1 .mtag{background:var(--m1-soft); color:var(--m1); border:1px solid var(--m1-line)}
+  .m2 .mtag{background:var(--m2-soft); color:var(--m2); border:1px solid var(--m2-line)}
+  .mtop .mt{font-size:15px; font-weight:700}
+  .mwhere{font-size:12px; color:var(--faint); margin:0 0 14px}
+  .mform{font-family:var(--mono); font-size:13px; background:var(--sunk); border:1px solid var(--line); border-radius:8px;
+    padding:10px 12px; margin:0 0 14px; overflow-x:auto; white-space:nowrap}
+  .m1 .mform{background:var(--m1-soft); border-color:var(--m1-line)}
+  .m2 .mform{background:var(--m2-soft); border-color:var(--m2-line)}
+  .mdesc{margin:0; font-size:13px; color:var(--muted)}
+  .mdesc b{color:var(--ink)}
+  .mkey{margin:12px 0 0; font-size:12.5px; padding:9px 11px; border-radius:8px; background:var(--sunk); border:1px dashed var(--line); color:var(--muted)}
+  .mkey b{color:var(--ink)}
+
+  /* concept sketch */
+  .sketch{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; display:grid; grid-template-columns:auto 1fr; gap:24px; align-items:center}
+  @media (max-width:640px){ .sketch{grid-template-columns:1fr} }
+  .sketch svg{width:300px; max-width:100%; height:auto; display:block}
+  .sk-legend{display:flex; flex-direction:column; gap:12px}
+  .lgi{display:flex; gap:10px; align-items:flex-start; font-size:13.5px; color:var(--muted)}
+  .lgi .sw{flex:0 0 auto; width:26px; height:0; border-top-width:3px; border-top-style:solid; margin-top:9px; border-radius:2px}
+  .lgi.curve .sw{border-color:var(--m2)}
+  .lgi.tan .sw{border-top-style:dashed; border-color:var(--m1)}
+  .lgi b{color:var(--ink)}
+  .lgi .k2{color:var(--m2)} .lgi .k1{color:var(--m1)}
+
+  /* verdict table */
+  .vtbl{width:100%; border-collapse:collapse; font-size:13.5px}
+  .vtbl th,.vtbl td{padding:11px 12px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top}
+  .vtbl thead th{font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); font-weight:600}
+  .vtbl thead th.c1{color:var(--m1)} .vtbl thead th.c2{color:var(--m2)}
+  .vtbl td.lbl{color:var(--faint); white-space:nowrap}
+  .vtbl b{color:var(--ink)}
+
+  /* evidence cases */
+  .cases{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media (max-width:760px){ .cases{grid-template-columns:1fr} }
+  .ccard{border:1px solid var(--line); border-radius:12px; padding:16px 18px; background:var(--card)}
+  .ccard.match{border-left:4px solid var(--ok)}
+  .ccard.miss{border-left:4px solid var(--bad)}
+  .ch{display:flex; align-items:baseline; gap:9px; margin:0 0 10px}
+  .ch .st{font-size:14px; font-weight:700}
+  .chip{font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.04em; padding:3px 8px; border-radius:999px}
+  .match .chip{background:var(--ok-soft); color:var(--ok); border:1px solid var(--ok-line)}
+  .miss .chip{background:var(--bad-soft); color:var(--bad); border:1px solid var(--bad-line)}
+  .cq{font-family:var(--mono); font-size:12px; color:var(--muted); margin:0 0 12px}
+  .ctbl{width:100%; border-collapse:collapse; font-size:12.5px}
+  .ctbl td,.ctbl th{padding:6px 8px; border-bottom:1px solid var(--line); text-align:right; font-variant-numeric:tabular-nums}
+  .ctbl th:first-child,.ctbl td:first-child{text-align:left}
+  .ctbl thead th{font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--faint); font-weight:600}
+  .ctbl td.n{font-family:var(--mono)}
+  .ctbl tr.r1 td.lbl{color:var(--m1)} .ctbl tr.r2 td.lbl{color:var(--m2)}
+  .ctbl tr.r2 td.n{font-weight:700; color:var(--m2)}
+  .cnote{font-size:12px; margin:11px 0 0; color:var(--muted)}
+  .cnote b{color:var(--ink)}
+
+  .takeaway{margin-top:clamp(28px,4vw,40px); background:var(--card); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:12px; padding:18px 22px}
+  .takeaway h3{margin:0 0 10px; font-size:12px; letter-spacing:.07em; text-transform:uppercase; color:var(--accent)}
+  .takeaway ul{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:9px}
+  .takeaway li{font-size:14px; color:var(--muted); padding-left:22px; position:relative}
+  .takeaway li::before{content:"→"; position:absolute; left:0; color:var(--accent); font-family:var(--mono)}
+  .takeaway b{color:var(--ink)} .takeaway .k1{color:var(--m1); font-weight:600} .takeaway .k2{color:var(--m2); font-weight:600}
+  .legend{margin:24px 0 0; font-family:var(--mono); font-size:11.5px; color:var(--faint); text-align:center; line-height:1.9}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="inner">
+
+  <header>
+    <p class="eyebrow">ALLEX Hand · Coupled PD</p>
+    <h1>커플링 토크: 방법1 vs 방법2</h1>
+    <p class="lede">같은 커플링 PD 토크 τ_q를 두 가지로 계산할 수 있다.
+      <span class="k1">방법1</span>은 조인트 강성 k_q로 곱하는 <b>선형 근사(접선)</b>,
+      <span class="k2">방법2</span>는 전동 곡선을 그대로 쓰는 <b>정확식</b>이다 — sim·실기가 실제 적용하는 쪽.</p>
+  </header>
+
+  <!-- 01 두 방법 -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">01</span><h2>두 방법이 하는 일</h2></div>
+    <div class="mrow">
+      <div class="mcard m1">
+        <div class="mtop"><span class="mtag">방법 1</span><span class="mt">k_q · Δq</span></div>
+        <p class="mwhere">조인트 공간 · 선형 근사</p>
+        <p class="mform">τ_q = k_q · (q* − q)</p>
+        <p class="mdesc">현재 자세의 <b>강성 k_q = Gᵀ·diag(kφ)·G</b>를 구해 조인트 오차 Δq에 곱한다.
+          전동의 <b>접선 기울기(현재 1점의 G)</b>만 사용.</p>
+        <p class="mkey">현재 한 점에서 재는 <b>스냅샷 강성</b> — 직관·해석·강성 확인에 좋다.</p>
+      </div>
+      <div class="mcard m2">
+        <div class="mtop"><span class="mtag">방법 2</span><span class="mt">Gᵀ · τ_m</span></div>
+        <p class="mwhere">모터 공간 · 정확 (sim·실기)</p>
+        <p class="mform">τ_q = Gᵀ · kφ · ( J2M(q*) − J2M(q) )</p>
+        <p class="mdesc">현재·목표 조인트각을 각각 <b>실제 모터각으로 변환</b>해 진짜 모터오차 Δφ를 구하고,
+          모터 PD 후 Gᵀ로 되돌린다. 전동 <b>곡선을 그대로</b> 사용.</p>
+        <p class="mkey">전 구간 비선형을 반영하는 <b>정확한 토크</b> — 실제 인가값.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 그림 -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">02</span><h2>핵심 그림 — 접선 vs 곡선</h2></div>
+    <div class="sketch">
+      <svg viewBox="0 0 300 220" role="img" aria-label="J2M 전동 곡선과 접선 근사 비교">
+        <!-- axes -->
+        <line x1="34" y1="188" x2="288" y2="188" stroke="var(--line)" stroke-width="1.5"/>
+        <line x1="34" y1="188" x2="34" y2="16" stroke="var(--line)" stroke-width="1.5"/>
+        <text x="290" y="204" fill="var(--faint)" font-size="11" text-anchor="end" font-family="var(--mono)">조인트각 q</text>
+        <text x="30" y="12" fill="var(--faint)" font-size="11" font-family="var(--mono)">모터각 m</text>
+        <!-- curve J2M (method2) : quadratic-ish upward bend -->
+        <path d="M 62 168 Q 170 150 262 44" fill="none" stroke="var(--m2)" stroke-width="3"/>
+        <!-- tangent at current (method1) : straight line from current point -->
+        <line x1="62" y1="168" x2="262" y2="92" stroke="var(--m1)" stroke-width="2.5" stroke-dasharray="6 5"/>
+        <!-- current point -->
+        <circle cx="62" cy="168" r="5" fill="var(--ink)"/>
+        <text x="52" y="182" fill="var(--ink)" font-size="11" text-anchor="end" font-family="var(--mono)">현재 q</text>
+        <!-- target on curve (method2) -->
+        <circle cx="262" cy="44" r="5" fill="var(--m2)"/>
+        <text x="256" y="40" fill="var(--m2)" font-size="11" text-anchor="end" font-family="var(--mono)">q* (실제)</text>
+        <!-- method1 prediction on tangent -->
+        <circle cx="262" cy="92" r="4.5" fill="none" stroke="var(--m1)" stroke-width="2.5"/>
+        <text x="270" y="96" fill="var(--m1)" font-size="11" font-family="var(--mono)">예측</text>
+        <!-- gap -->
+        <line x1="262" y1="44" x2="262" y2="92" stroke="var(--bad)" stroke-width="2"/>
+        <text x="276" y="72" fill="var(--bad)" font-size="10.5" font-family="var(--mono)">오차</text>
+        <!-- delta q bracket -->
+        <line x1="62" y1="198" x2="262" y2="198" stroke="var(--faint)" stroke-width="1"/>
+        <text x="162" y="212" fill="var(--faint)" font-size="11" text-anchor="middle" font-family="var(--mono)">Δq</text>
+      </svg>
+      <div class="sk-legend">
+        <div class="lgi curve"><span class="sw"></span><span><b class="k2">방법2 = 실제 곡선 J2M</b> — 곡선 위 두 점(현재·목표)의 진짜 값 차이를 쓴다.</span></div>
+        <div class="lgi tan"><span class="sw"></span><span><b class="k1">방법1 = 접선</b> — 현재 점의 기울기(k_q)로 곧게 뻗어 예측한다.</span></div>
+        <div class="lgi"><span class="sw" style="border-color:var(--bad);border-top-style:solid"></span><span><b>Δq가 커질수록</b> 접선이 곡선에서 멀어져 <b style="color:var(--bad)">오차</b>가 벌어진다 (부호까지 뒤집힘).</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 한눈 비교 -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">03</span><h2>한눈 비교</h2></div>
+    <div style="overflow-x:auto">
+    <table class="vtbl">
+      <thead><tr><th></th><th class="c1">방법 1 · k_q·Δq</th><th class="c2">방법 2 · 정확</th></tr></thead>
+      <tbody>
+        <tr><td class="lbl">계산 공간</td><td>조인트 공간</td><td>모터 공간</td></tr>
+        <tr><td class="lbl">전동을</td><td>접선(1차)으로 <b>근사</b></td><td>곡선 그대로 <b>정확</b></td></tr>
+        <tr><td class="lbl">자코비안</td><td>현재 1점의 G만</td><td>현재 G(전치) + 양끝 실제 맵값</td></tr>
+        <tr><td class="lbl">정확도</td><td>작은 Δq만 OK</td><td><b>항상 정확</b></td></tr>
+        <tr><td class="lbl">용도</td><td>직관 · 해석 · 강성 k_q 보기</td><td><b>sim · 실기 실제 적용</b></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- 04 실제 대조 -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">04</span><h2>실제 대조 — 언제 맞고 언제 틀리나</h2></div>
+    <div class="cases">
+      <div class="ccard match">
+        <div class="ch"><span class="st">작은 Δq</span><span class="chip">✓ 일치</span></div>
+        <p class="cq">q=[0, 5.69, 32.29]° → q*=[0, 10, 40]° &nbsp;·&nbsp; Δq≈[+4.3, +7.7]°</p>
+        <table class="ctbl">
+          <thead><tr><th>방식</th><th>τ_q2</th><th>τ_q3</th></tr></thead>
+          <tbody>
+            <tr class="r1"><td class="lbl">방법1 k_q·Δq</td><td class="n">0.263</td><td class="n">0.185</td></tr>
+            <tr class="r2"><td class="lbl">방법2 (sim)</td><td class="n">0.282</td><td class="n">0.201</td></tr>
+          </tbody>
+        </table>
+        <p class="cnote"><b>거의 같다.</b> sim 실측도 0.28 / 0.20 — Δq가 작아 접선 ≈ 곡선.</p>
+      </div>
+      <div class="ccard miss">
+        <div class="ch"><span class="st">큰 Δq</span><span class="chip">✗ 발산</span></div>
+        <p class="cq">q=[0, −10.6, 55.56]° → q*=[0, 20, 20]° &nbsp;·&nbsp; Δq≈[+30.6, −35.6]°</p>
+        <table class="ctbl">
+          <thead><tr><th>방식</th><th>τ_q2</th><th>τ_q3</th></tr></thead>
+          <tbody>
+            <tr class="r1"><td class="lbl">방법1 k_q·Δq</td><td class="n">+0.039</td><td class="n">−0.167</td></tr>
+            <tr class="r2"><td class="lbl">방법2 (sim)</td><td class="n">+0.218</td><td class="n">+0.015</td></tr>
+          </tbody>
+        </table>
+        <p class="cnote"><b>크게 어긋나고 τ_q3는 부호까지 뒤집힘</b> (−0.167 vs +0.015). Δq가 커 접선이 곡선을 못 따라감.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="takeaway">
+    <h3>기억할 것</h3>
+    <ul>
+      <li><b>Δq→0 에서 두 방법은 같아진다</b> — <span class="k1">방법1</span>은 <span class="k2">방법2</span>의 접선(선형화)이다.</li>
+      <li><b>작으면 같고, 크면 방법2가 맞다</b> — 수 도(°) 수준은 둘 다 OK, 수십 도면 방법1은 어긋난다.</li>
+      <li><b class="k2">sim·실기는 항상 방법2</b>를 적용 — 실측 대조는 방법2 값 기준.</li>
+      <li><b class="k1">k_q(방법1)</b>는 "지금 자세가 얼마나 뻣뻣한가"를 보는 스냅샷 강성으로 쓴다.</li>
+    </ul>
+  </div>
+
+  <p class="legend">q 조인트각 · m 모터각 · G = ∂m/∂q (J2M 자코비안) · k_q = Gᵀ·diag(kφ)·G · kφ 모터 P게인 · ᵀ 전치</p>
+
+</div></div>
+</body>
+</html>

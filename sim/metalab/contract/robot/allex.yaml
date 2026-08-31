@@ -1,0 +1,167 @@
+# envs/robot/allex.yaml — ALLEX full-body (both arms) base robot contract.
+# Physics (gains/armature/equality/limits) live in the MJCF and load as-is; this file only adds hub
+# declarations. Base pose + init pose are task-owned (EnvSpec). Derived contracts (allex_right.yaml)
+# copy this and narrow the mask/actions.
+
+# Hand control: "joint" = native diagonal PD on every joint; "motor" = real motor-space coupled PD on
+# all fingers + thumbs (both hands) via the firmware transmission (mj_mapping/{finger,thumb}.json;
+# gains from robot_model.json). Newton only — genesis stays diagonal. METALAB_MOTOR_COUPLING=0 forces "joint".
+control_mode: motor
+
+asset:
+  mjcf: sim/metalab/assets/robots/proto_v4/mjcf/ALLEX.xml
+fixed_base: true
+
+# Joint active mask: 1=active, 0=fixed at 0°. Parser cross-checks vs the MJCF (fail-loud on mismatch).
+joints:
+  Waist_Yaw_Joint: 1
+  Waist_Pitch_Dummy_Joint: 1
+  Waist_Lower_Pitch_Joint: 1
+  Waist_Upper_Pitch_Joint: 1
+  Neck_Pitch_Joint: 1
+  Neck_Yaw_Joint: 1
+  R_Shoulder_Pitch_Joint: 1
+  R_Shoulder_Roll_Joint: 1
+  R_Shoulder_Yaw_Joint: 1
+  R_Elbow_Joint: 1
+  R_Wrist_Yaw_Joint: 1
+  R_Wrist_Roll_Joint: 1
+  R_Wrist_Pitch_Joint: 1
+  R_Thumb_Yaw_Joint: 1
+  R_Thumb_CMC_Joint: 1
+  R_Thumb_MCP_Joint: 1
+  R_Thumb_IP_Joint: 1
+  R_Index_ABAD_Joint: 1
+  R_Index_MCP_Joint: 1
+  R_Index_PIP_Joint: 1
+  R_Index_DIP_Joint: 1
+  R_Middle_ABAD_Joint: 1
+  R_Middle_MCP_Joint: 1
+  R_Middle_PIP_Joint: 1
+  R_Middle_DIP_Joint: 1
+  R_Ring_ABAD_Joint: 1
+  R_Ring_MCP_Joint: 1
+  R_Ring_PIP_Joint: 1
+  R_Ring_DIP_Joint: 1
+  R_Little_ABAD_Joint: 1
+  R_Little_MCP_Joint: 1
+  R_Little_PIP_Joint: 1
+  R_Little_DIP_Joint: 1
+  L_Shoulder_Pitch_Joint: 1
+  L_Shoulder_Roll_Joint: 1
+  L_Shoulder_Yaw_Joint: 1
+  L_Elbow_Joint: 1
+  L_Wrist_Yaw_Joint: 1
+  L_Wrist_Roll_Joint: 1
+  L_Wrist_Pitch_Joint: 1
+  L_Thumb_Yaw_Joint: 1
+  L_Thumb_CMC_Joint: 1
+  L_Thumb_MCP_Joint: 1
+  L_Thumb_IP_Joint: 1
+  L_Index_ABAD_Joint: 1
+  L_Index_MCP_Joint: 1
+  L_Index_PIP_Joint: 1
+  L_Index_DIP_Joint: 1
+  L_Middle_ABAD_Joint: 1
+  L_Middle_MCP_Joint: 1
+  L_Middle_PIP_Joint: 1
+  L_Middle_DIP_Joint: 1
+  L_Ring_ABAD_Joint: 1
+  L_Ring_MCP_Joint: 1
+  L_Ring_PIP_Joint: 1
+  L_Ring_DIP_Joint: 1
+  L_Little_ABAD_Joint: 1
+  L_Little_MCP_Joint: 1
+  L_Little_PIP_Joint: 1
+  L_Little_DIP_Joint: 1
+
+# Policy action groups. Hand = controlled joints only (Thumb Yaw/CMC/MCP + finger ABAD/MCP/PIP);
+# IP/DIP are equality followers (active but not actions).
+action_groups:
+  arm_r:  [R_Shoulder_Pitch_Joint, R_Shoulder_Roll_Joint, R_Shoulder_Yaw_Joint, R_Elbow_Joint, R_Wrist_Yaw_Joint, R_Wrist_Roll_Joint, R_Wrist_Pitch_Joint]
+  hand_r: [R_Thumb_Yaw_Joint, R_Thumb_CMC_Joint, R_Thumb_MCP_Joint, R_Index_ABAD_Joint, R_Index_MCP_Joint, R_Index_PIP_Joint, R_Middle_ABAD_Joint, R_Middle_MCP_Joint, R_Middle_PIP_Joint, R_Ring_ABAD_Joint, R_Ring_MCP_Joint, R_Ring_PIP_Joint, R_Little_ABAD_Joint, R_Little_MCP_Joint, R_Little_PIP_Joint]
+  arm_l:  [L_Shoulder_Pitch_Joint, L_Shoulder_Roll_Joint, L_Shoulder_Yaw_Joint, L_Elbow_Joint, L_Wrist_Yaw_Joint, L_Wrist_Roll_Joint, L_Wrist_Pitch_Joint]
+  hand_l: [L_Thumb_Yaw_Joint, L_Thumb_CMC_Joint, L_Thumb_MCP_Joint, L_Index_ABAD_Joint, L_Index_MCP_Joint, L_Index_PIP_Joint, L_Middle_ABAD_Joint, L_Middle_MCP_Joint, L_Middle_PIP_Joint, L_Ring_ABAD_Joint, L_Ring_MCP_Joint, L_Ring_PIP_Joint, L_Little_ABAD_Joint, L_Little_MCP_Joint, L_Little_PIP_Joint]
+
+# Frames = MJCF native bodies (chest-origin-relative obs, palm proximity, …).
+frames:
+  chest_origin: Chest_Origin_Link
+  palm_r: R_Palm_Link
+  palm_l: L_Palm_Link
+
+# Fingertip bodies — the HW fact "these are what touch the object when a hand closes" (both hands here).
+# A task's GATE says HOW MANY must be gripping for success; it never lists which.
+fingertips: [R_Index_Distal_Link, R_Middle_Distal_Link, R_Ring_Distal_Link, R_Little_Distal_Link, R_Thumb_Distal_Link,
+             L_Index_Distal_Link, L_Middle_Distal_Link, L_Ring_Distal_Link, L_Little_Distal_Link, L_Thumb_Distal_Link]
+
+# Gravity compensation (mirrors real HW, for sim2real).
+#   actuator_joints: both arms — motor gravcomp folded into the joint_torque readout (clamped by effort).
+#   passive_joints:  waist/neck pitch — mechanical springs, external (NOT in the torque readout).
+#   passive_bodies:  mass above the passive pitch joints, made weightless so the pitch doesn't sag.
+#   (hands omitted — their weight loads the wrist and is held by PD.)
+gravcomp:
+  actuator_joints:
+    [R_Shoulder_Pitch_Joint, R_Shoulder_Roll_Joint, R_Shoulder_Yaw_Joint, R_Elbow_Joint, R_Wrist_Yaw_Joint, R_Wrist_Roll_Joint, R_Wrist_Pitch_Joint,
+     L_Shoulder_Pitch_Joint, L_Shoulder_Roll_Joint, L_Shoulder_Yaw_Joint, L_Elbow_Joint, L_Wrist_Yaw_Joint, L_Wrist_Roll_Joint, L_Wrist_Pitch_Joint]
+  passive_joints: [Waist_Lower_Pitch_Joint, Neck_Pitch_Joint]
+  passive_bodies: [Waist_Upper_Pitch_Link, Neck_Yaw_Link, Waist_Pitch_Back_Link]
+
+# Overrides = MJCF baseline for the 48 actuated joints. kp/kv match the MJCF (no-op on load); effort is
+# listed because Genesis doesn't import actuatorfrcrange. effort = [-e, +e] Nm (MJCF is symmetric).
+# Non-actuated joints (Waist_Pitch_Dummy/Upper, Thumb_IP, finger DIP) are equality followers → no entry.
+# joint_mode_param — the per-joint DRIVE contract (kp/kv/armature/effort; frictionloss is MJCF-only).
+# (Named for what it is; the task-level "overrides" key is a different thing: per-engine corrections.)
+joint_mode_param:
+  # Waist + neck
+  Waist_Yaw_Joint:         {kp: 7500, kv: 203.9925, effort: [-130, 130]}
+  Waist_Lower_Pitch_Joint: {kp: 650,  kv: 94.4452,  effort: [-152, 152]}
+  Neck_Pitch_Joint:        {kp: 250,  kv: 5.2541,   effort: [-12, 12]}
+  Neck_Yaw_Joint:          {kp: 400,  kv: 3.3389,   effort: [-6, 6]}
+  # Right arm
+  R_Shoulder_Pitch_Joint: {kp: 5000, kv: 112.8783, effort: [-120, 120]}
+  R_Shoulder_Roll_Joint:  {kp: 5000, kv: 90.3684,  effort: [-120, 120]}
+  R_Shoulder_Yaw_Joint:   {kp: 5000, kv: 73.3365,  effort: [-120, 120]}
+  R_Elbow_Joint:          {kp: 2000, kv: 41.8896,  effort: [-100, 100]}
+  R_Wrist_Yaw_Joint:      {kp: 750,  kv: 4.5803,   effort: [-60, 60]}
+  R_Wrist_Roll_Joint:     {kp: 600,  kv: 5.8302,   effort: [-20, 20]}
+  R_Wrist_Pitch_Joint:    {kp: 500,  kv: 4.4695,   effort: [-18, 18]}
+  # Right hand
+  R_Thumb_Yaw_Joint:   {kp: 40, kv: 0.8039, effort: [-1.5, 1.5]}
+  R_Thumb_CMC_Joint:   {kp: 40, kv: 0.5279, effort: [-4.5, 4.5]}
+  R_Thumb_MCP_Joint:   {kp: 20, kv: 0.2492, effort: [-3, 3]}
+  R_Index_ABAD_Joint:  {kp: 20, kv: 0.0969, effort: [-3.5, 3.5]}
+  R_Index_MCP_Joint:   {kp: 20, kv: 0.5638, effort: [-5, 5]}
+  R_Index_PIP_Joint:   {kp: 10, kv: 0.2491, effort: [-3, 3]}
+  R_Middle_ABAD_Joint: {kp: 20, kv: 0.0969, effort: [-3.5, 3.5]}
+  R_Middle_MCP_Joint:  {kp: 40, kv: 0.5638, effort: [-5, 5]}
+  R_Middle_PIP_Joint:  {kp: 20, kv: 0.2491, effort: [-3, 3]}
+  R_Ring_ABAD_Joint:   {kp: 20, kv: 0.0969, effort: [-3.5, 3.5]}
+  R_Ring_MCP_Joint:    {kp: 40, kv: 0.5638, effort: [-5, 5]}
+  R_Ring_PIP_Joint:    {kp: 20, kv: 0.2491, effort: [-3, 3]}
+  R_Little_ABAD_Joint: {kp: 20, kv: 0.0965, effort: [-3.5, 3.5]}
+  R_Little_MCP_Joint:  {kp: 40, kv: 0.5637, effort: [-5, 5]}
+  R_Little_PIP_Joint:  {kp: 20, kv: 0.2491, effort: [-3, 3]}
+  # Left arm
+  L_Shoulder_Pitch_Joint: {kp: 5000, kv: 112.7847, effort: [-120, 120]}
+  L_Shoulder_Roll_Joint:  {kp: 5000, kv: 90.3685,  effort: [-120, 120]}
+  L_Shoulder_Yaw_Joint:   {kp: 5000, kv: 73.3366,  effort: [-120, 120]}
+  L_Elbow_Joint:          {kp: 2000, kv: 41.8896,  effort: [-100, 100]}
+  L_Wrist_Yaw_Joint:      {kp: 750,  kv: 4.5803,   effort: [-60, 60]}
+  L_Wrist_Roll_Joint:     {kp: 600,  kv: 5.8303,   effort: [-20, 20]}
+  L_Wrist_Pitch_Joint:    {kp: 500,  kv: 4.4695,   effort: [-18, 18]}
+  # Left hand
+  L_Thumb_Yaw_Joint:   {kp: 40, kv: 0.8039, effort: [-1.5, 1.5]}
+  L_Thumb_CMC_Joint:   {kp: 40, kv: 0.5279, effort: [-4.5, 4.5]}
+  L_Thumb_MCP_Joint:   {kp: 20, kv: 0.2492, effort: [-3, 3]}
+  L_Index_ABAD_Joint:  {kp: 20, kv: 0.0969, effort: [-3.5, 3.5]}
+  L_Index_MCP_Joint:   {kp: 40, kv: 0.5638, effort: [-5, 5]}
+  L_Index_PIP_Joint:   {kp: 20, kv: 0.2491, effort: [-3, 3]}
+  L_Middle_ABAD_Joint: {kp: 20, kv: 0.0969, effort: [-3.5, 3.5]}
+  L_Middle_MCP_Joint:  {kp: 40, kv: 0.5638, effort: [-5, 5]}
+  L_Middle_PIP_Joint:  {kp: 20, kv: 0.2491, effort: [-3, 3]}
+  L_Ring_ABAD_Joint:   {kp: 20, kv: 0.0969, effort: [-3.5, 3.5]}
+  L_Ring_MCP_Joint:    {kp: 40, kv: 0.5638, effort: [-5, 5]}
+  L_Ring_PIP_Joint:    {kp: 20, kv: 0.2491, effort: [-3, 3]}
+  L_Little_ABAD_Joint: {kp: 20, kv: 0.0965, effort: [-3.5, 3.5]}
+  L_Little_MCP_Joint:  {kp: 40, kv: 0.5637, effort: [-5, 5]}
+  L_Little_PIP_Joint:  {kp: 20, kv: 0.2491, effort: [-3, 3]}

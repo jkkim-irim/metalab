@@ -1,0 +1,49 @@
+{
+  "part": "shoulder",
+  "joint_roles": [
+    "Pitch",
+    "Roll",
+    "Yaw"
+  ],
+  "joint_unit": "rad",
+  "motor_unit": "rad",
+  "source": "firmware arm_{r,l}_mj_map.hpp shoulder_actu_ratio_ (per-joint scalar reduction, diagonal): m_i = r*q_i, r = 40.23846154. Authored as a degenerate 3-DOF lower-triangular map (hand-kernel layout). Shared by both arms; Roll/Yaw fit ranges = symmetric L/R unions.",
+  "q_fit_range_rad": {
+    "lo": [
+      -3.316126,
+      -3.752458,
+      -3.316126
+    ],
+    "hi": [
+      1.745329,
+      3.752458,
+      3.316126
+    ]
+  },
+  "j2m": {
+    "m1": {
+      "model_terms": [
+        [1]
+      ],
+      "coefficients": [
+        40.23846154
+      ]
+    },
+    "m2": {
+      "model_terms": [
+        [0, 1]
+      ],
+      "coefficients": [
+        40.23846154
+      ]
+    },
+    "m3": {
+      "model_terms": [
+        [0, 0, 1]
+      ],
+      "coefficients": [
+        40.23846154
+      ]
+    }
+  }
+}

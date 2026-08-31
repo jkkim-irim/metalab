@@ -1,0 +1,16 @@
+#!/bin/sh
+# Block direct pushes to main — open a pull request instead. Fails loudly.
+# Bypass intentionally (rarely) with: git push --no-verify
+while read -r local_ref local_sha remote_ref remote_sha; do
+	case "$remote_ref" in
+		refs/heads/main)
+			echo "" >&2
+			echo "  ✋  Direct push to 'main' is blocked." >&2
+			echo "      Push a feature branch and open a pull request for review instead." >&2
+			echo "      (If you truly intend this, re-run with: git push --no-verify)" >&2
+			echo "" >&2
+			exit 1
+			;;
+	esac
+done
+exit 0

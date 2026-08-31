@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>손가락 커플링 PD 제어 흐름</title>
+<style>
+  :root{
+    --paper:#eceff4; --card:#ffffff; --sunk:#f4f6f9; --ink:#1a222b; --muted:#59636f; --faint:#8a95a1;
+    --line:#d8dee6; --accent:#0f7d88; --accent-soft:#e2f1f2; --accent-line:#a9d6da;
+    --amber:#a35d06; --amber-soft:#f9ecd6; --amber-line:#e6c58a;
+    --ok:#2e7d4f; --ok-soft:#e4f3e9; --ok-line:#a9d6ba;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+  }
+  @media (prefers-color-scheme:dark){ :root{
+    --paper:#0d1217; --card:#151d25; --sunk:#0f151b; --ink:#e6ecf2; --muted:#9aa6b2; --faint:#69747f;
+    --line:#25303a; --accent:#45b8c2; --accent-soft:#0f2f36; --accent-line:#1d4a52;
+    --amber:#e3a951; --amber-soft:#2f2510; --amber-line:#57431f;
+    --ok:#60bf86; --ok-soft:#122f21; --ok-line:#254f38;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#0d1217; --card:#151d25; --sunk:#0f151b; --ink:#e6ecf2; --muted:#9aa6b2; --faint:#69747f;
+    --line:#25303a; --accent:#45b8c2; --accent-soft:#0f2f36; --accent-line:#1d4a52;
+    --amber:#e3a951; --amber-soft:#2f2510; --amber-line:#57431f;
+    --ok:#60bf86; --ok-soft:#122f21; --ok-line:#254f38;
+  }
+  :root[data-theme="light"]{
+    --paper:#eceff4; --card:#ffffff; --sunk:#f4f6f9; --ink:#1a222b; --muted:#59636f; --faint:#8a95a1;
+    --line:#d8dee6; --accent:#0f7d88; --accent-soft:#e2f1f2; --accent-line:#a9d6da;
+    --amber:#a35d06; --amber-soft:#f9ecd6; --amber-line:#e6c58a;
+    --ok:#2e7d4f; --ok-soft:#e4f3e9; --ok-line:#a9d6ba;
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0}
+  .wrap{font-family:var(--sans); background:var(--paper); color:var(--ink);
+    min-height:100vh; padding:clamp(20px,4vw,56px); display:flex; justify-content:center; line-height:1.55}
+  .inner{width:100%; max-width:1060px}
+  code{font-family:var(--mono); font-size:.86em; background:var(--sunk); border:1px solid var(--line); border-radius:5px; padding:1px 5px; color:var(--ink)}
+  b{font-weight:600}
+
+  /* hero */
+  .eyebrow{font-size:12px; letter-spacing:.15em; text-transform:uppercase; color:var(--accent); font-weight:600; margin:0 0 10px}
+  h1{font-size:clamp(28px,4vw,42px); line-height:1.1; margin:0 0 14px; letter-spacing:-.015em; text-wrap:balance}
+  .lede{font-size:clamp(15px,1.6vw,17px); color:var(--muted); margin:0; max-width:66ch}
+  .lede b{color:var(--ink)}
+
+  /* section scaffold */
+  .sec{margin-top:clamp(34px,5vw,52px)}
+  .sec-head{display:flex; align-items:baseline; gap:12px; margin:0 0 18px; padding-bottom:10px; border-bottom:1px solid var(--line)}
+  .sec-num{font-family:var(--mono); font-size:13px; font-weight:600; color:var(--accent)}
+  .sec-head h2{font-size:clamp(18px,2.4vw,22px); margin:0; letter-spacing:-.01em}
+  .sec-head .hint{margin-left:auto; font-family:var(--mono); font-size:12.5px; color:var(--faint)}
+  .sec-lede{font-size:14px; color:var(--muted); margin:0 0 18px; max-width:74ch}
+  .sec-lede b{color:var(--ink)}
+
+  /* flow columns */
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+  @media (max-width:720px){ .cols{grid-template-columns:1fr} }
+  .flow{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px}
+  .flow.on{border-color:var(--accent-line)}
+  .flow-h{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:0 0 2px}
+  .flow-h .t{font-size:15px; font-weight:700}
+  .flow-h .tag{font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; font-weight:600; padding:3px 8px; border-radius:999px}
+  .off .flow-h .tag{background:var(--sunk); color:var(--faint); border:1px solid var(--line)}
+  .on  .flow-h .tag{background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-line)}
+  .flow .cap{font-size:12.5px; color:var(--muted); margin:0 0 16px}
+  .step{display:flex; gap:12px; align-items:flex-start}
+  .num{flex:0 0 auto; width:23px; height:23px; margin-top:1px; border-radius:7px; font-family:var(--mono);
+    font-size:12px; font-weight:600; display:grid; place-items:center; background:var(--sunk); color:var(--muted); border:1px solid var(--line)}
+  .on .num{background:var(--accent-soft); color:var(--accent); border-color:var(--accent-line)}
+  .step .lbl{font-size:13px; font-weight:600; margin:0 0 4px}
+  .step .lbl .from{color:var(--faint); font-weight:500}
+  .eq{font-family:var(--mono); font-size:12.5px; background:var(--sunk); border:1px solid var(--line); border-radius:7px;
+    padding:7px 9px; margin:0; overflow-x:auto; white-space:nowrap}
+  .step .eq + .eq{margin-top:5px}
+  .on .eq{background:color-mix(in srgb,var(--accent-soft) 50%,var(--card))}
+  .eq .cm{color:var(--faint)}
+  .eq .hl{color:var(--amber); font-weight:600}
+  .conn{height:14px; margin-left:11px; border-left:2px dotted var(--line)}
+  .on .conn{border-color:var(--accent-line)}
+  .callout{margin-top:16px; padding:12px 14px; border-radius:10px; background:var(--amber-soft); border:1px solid var(--amber-line); font-size:12.5px}
+  .callout .f{font-family:var(--mono); font-size:13px; display:block; margin:5px 0 7px; color:var(--ink)}
+  .callout b{color:var(--amber)}
+  .flow .foot{font-size:12px; color:var(--muted); margin:16px 0 0; padding-top:12px; border-top:1px dashed var(--line)}
+
+  /* why-G cards */
+  .jrow{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:0 0 18px}
+  @media (max-width:620px){ .jrow{grid-template-columns:1fr} }
+  .jcard{border:1px solid var(--line); border-radius:11px; padding:14px 16px; background:var(--card)}
+  .jcard.pick{border-color:var(--accent-line)}
+  .jcard .jh{display:flex; align-items:baseline; gap:8px; margin:0 0 3px}
+  .jcard .name{font-family:var(--mono); font-size:14px; font-weight:700}
+  .jcard.pick .name{color:var(--accent)}
+  .jtag{font-size:10px; letter-spacing:.08em; text-transform:uppercase; font-weight:600; padding:2px 7px; border-radius:999px}
+  .jcard.pick .jtag{background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-line)}
+  .jcard.drop .jtag{background:var(--sunk); color:var(--faint); border:1px solid var(--line)}
+  .jcard .def{font-family:var(--mono); font-size:11.5px; color:var(--muted); margin:0 0 8px}
+  .jcard .desc{font-size:12.5px; color:var(--muted); margin:0}
+  .jcard .desc b{color:var(--ink)}
+  .pts{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:9px}
+  .pts li{font-size:13.5px; color:var(--muted); padding-left:22px; position:relative}
+  .pts li::before{content:"→"; position:absolute; left:0; top:0; color:var(--accent); font-family:var(--mono)}
+  .pts b{color:var(--ink)}
+
+  /* validation */
+  .badge-ok{display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; letter-spacing:.06em;
+    padding:3px 9px; border-radius:999px; background:var(--ok-soft); color:var(--ok); border:1px solid var(--ok-line); margin-left:auto}
+  .badge-ok::before{content:"✓"; font-weight:700}
+  .vcard{background:var(--card); border:1px solid var(--line); border-radius:14px; border-left:4px solid var(--ok); padding:20px 22px}
+  .work-in{font-family:var(--mono); font-size:12.5px; color:var(--muted); margin:0 0 14px; overflow-x:auto; white-space:nowrap}
+  .work-in b{color:var(--ink)}
+  .wsteps{display:flex; flex-direction:column; gap:8px; margin:0 0 18px}
+  .ws{display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--sunk); border:1px solid var(--line); border-radius:8px; padding:8px 12px}
+  .ws .wl{font-family:var(--mono); font-size:12.5px; color:var(--ink); flex:1 1 auto; min-width:200px}
+  .ws .wv{font-family:var(--mono); font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums}
+  .ws.res{background:var(--ok-soft); border-color:var(--ok-line)}
+  .ws.res .wv{color:var(--ok); font-weight:700}
+  .cktbl{width:100%; border-collapse:collapse; font-size:13px; margin-top:2px}
+  .cktbl th,.cktbl td{padding:9px 10px; text-align:right; border-bottom:1px solid var(--line)}
+  .cktbl th:first-child,.cktbl td:first-child{text-align:left}
+  .cktbl thead th{font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); font-weight:600}
+  .cktbl td.n{font-family:var(--mono); font-variant-numeric:tabular-nums}
+  .cktbl tr.faint td{color:var(--faint)}
+  .cktbl tr.sim td{color:var(--ok); font-weight:700; border-bottom:none}
+  .cktbl tr.sim td:first-child{color:var(--ink)}
+  .vnote{font-size:13px; color:var(--muted); margin:16px 0 0}
+  .vnote b{color:var(--ink)}
+
+  /* footer */
+  .foot{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:clamp(30px,4vw,44px)}
+  @media (max-width:620px){ .foot{grid-template-columns:1fr} }
+  .fcard{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px}
+  .fcard h3{margin:0 0 10px; font-size:11.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--accent)}
+  .fcard p{margin:0 0 7px; font-size:13px; color:var(--muted)}
+  .fcard p:last-child{margin:0}
+  .fcard b{color:var(--ink)}
+  .legend{margin:26px 0 0; font-family:var(--mono); font-size:11.5px; color:var(--faint); text-align:center; line-height:1.9}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="inner">
+
+  <header>
+    <p class="eyebrow">ALLEX Hand · Motor–Joint Control</p>
+    <h1>손가락 커플링 PD</h1>
+    <p class="lede">손가락 1개 = 모터 3개 ↔ 조인트 3개(ABAD·MCP·PIP)가 <b>비선형 전동</b>으로 묶여 있다.
+      실기는 <b>모터 공간</b>에서 PD를 돌려 조인트 강성에 커플링(off-diagonal)이 생긴다 — sim도 같은 흐름으로 재현한다.</p>
+  </header>
+
+  <!-- ================= 01 흐름 ================= -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">01</span><h2>제어 흐름</h2><span class="hint">커플링 OFF vs ON</span></div>
+    <div class="cols">
+
+      <div class="flow off">
+        <div class="flow-h"><span class="t">커플링 OFF</span><span class="tag">기존</span></div>
+        <p class="cap">조인트별 독립(대각) PD — 각자 자기 오차만 본다</p>
+        <div class="step"><div class="num">1</div><div><p class="lbl">읽기</p>
+          <p class="eq">q*, q, q̇ &nbsp;<span class="cm">// 조인트 3개</span></p></div></div>
+        <div class="conn"></div>
+        <div class="step"><div class="num">2</div><div><p class="lbl">조인트별 PD <span class="from">(i = ABAD·MCP·PIP)</span></p>
+          <p class="eq">τ_q,ᵢ = kp,ᵢ·(q*ᵢ − qᵢ) − kd,ᵢ·q̇ᵢ</p></div></div>
+        <div class="conn"></div>
+        <div class="step"><div class="num">3</div><div><p class="lbl">sim 인가</p>
+          <p class="eq">τ_q → joint</p></div></div>
+        <p class="foot">off-diagonal 없음 → 한 조인트를 움직여도 다른 조인트엔 토크가 안 생긴다. 전동 커플링 재현 불가.</p>
+      </div>
+
+      <div class="flow on">
+        <div class="flow-h"><span class="t">커플링 ON</span><span class="tag">현재 · 실기 방식</span></div>
+        <p class="cap">joint→motor 변환 → 모터 공간 PD → joint 토크로 환산</p>
+        <div class="step"><div class="num">1</div><div><p class="lbl">읽기</p>
+          <p class="eq">q*, q, q̇</p></div></div>
+        <div class="conn"></div>
+        <div class="step"><div class="num">2</div><div><p class="lbl">joint → motor <span class="from">(J2M 맵 + 자코비안)</span></p>
+          <p class="eq">Δφ = J2M(q*) − J2M(q) &nbsp;<span class="cm">// 모터 위치 오차</span></p>
+          <p class="eq">φ̇ = G · q̇ &nbsp;<span class="cm">// G = ∂m/∂q (=cal_dmdq)</span></p></div></div>
+        <div class="conn"></div>
+        <div class="step"><div class="num">3</div><div><p class="lbl">모터 공간 PD</p>
+          <p class="eq">τ_m = kφ ∘ Δφ − k_d ∘ φ̇</p></div></div>
+        <div class="conn"></div>
+        <div class="step"><div class="num">4</div><div><p class="lbl">motor → joint 토크</p>
+          <p class="eq">τ_q = <span class="hl">Gᵀ</span> · τ_m</p></div></div>
+        <div class="conn"></div>
+        <div class="step"><div class="num">5</div><div><p class="lbl">sim 인가</p>
+          <p class="eq">τ_q → control.joint_f &nbsp;<span class="cm">// 매 physics substep</span></p></div></div>
+        <div class="callout">등가 조인트 강성
+          <span class="f">k_q = <b>Gᵀ · diag(kφ) · G</b></span>
+          <b>off-diagonal 존재</b> → PIP만 명령해도 MCP에 토크가 실린다.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= 02 왜 G ================= -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">02</span><h2>왜 자코비안 G 인가</h2><span class="hint">G = ∂m/∂q</span></div>
+    <p class="sec-lede">전동 자코비안을 얻는 길이 둘이다(J2M 피팅 vs M2J 피팅). 둘은 <b>정확한 역함수가 아니라</b>
+      값이 다르다(off-diagonal 최대 2×). 실기 펌웨어(<code>janghwan_mj_map</code>)가 쓰는 J2M 쪽 = G를 채택.</p>
+    <div class="jrow">
+      <div class="jcard pick">
+        <div class="jh"><span class="name">G = ∂m/∂q</span><span class="jtag">채택</span></div>
+        <p class="def">J2M 맵을 직접 미분 (= cal_dmdq)</p>
+        <p class="desc"><b>모터 오차 Δφ = J2M(q*)−J2M(q)에 쓴 맵의 미분</b>이라 자기일관. 펌웨어 command 경로가 실제 쓰는 것.</p>
+      </div>
+      <div class="jcard drop">
+        <div class="jh"><span class="name">inv(J_m2q)</span><span class="jtag">안 씀</span></div>
+        <p class="def">M2J 맵(dq/dm) 미분 → 역행렬</p>
+        <p class="desc"><b>별도 피팅</b>이라 위치 맵(J2M)과 안 맞음. MATLAB Test_kq가 쓰던 분석용 값.</p>
+      </div>
+    </div>
+    <ul class="pts">
+      <li><b>자기일관</b> — 모터 오차를 J2M 맵으로 계산하니, 속도·토크 변환도 같은 맵의 미분 G를 써야 물리적으로 맞다.</li>
+      <li><b>토크는 전치(Gᵀ), 역행렬 아님</b> — <code>τ_q = Gᵀ·τ_m</code> (가상일). inv(G)는 등장하지 않는다.</li>
+      <li><b>k_q도 G로 통일</b> — 제어가 <code>Gᵀτ_m</code>를 만드니 등가 강성 = <code>Gᵀ·diag(kφ)·G</code>. 방법1(k_q·Δq)=방법2가 일관.</li>
+      <li><b>디지털 트윈</b> — 로봇이 실제 돌리는 맵(펌웨어 J2M)을 그대로 써야 sim = real.</li>
+    </ul>
+  </section>
+
+  <!-- ================= 03 검증 ================= -->
+  <section class="sec">
+    <div class="sec-head"><span class="sec-num">03</span><h2>검증 — 손계산 = sim</h2><span class="badge-ok">END-TO-END OK</span></div>
+    <div class="vcard">
+      <p class="work-in">현재 q = <b>[0, 5.69, 32.29]°</b> &nbsp;→&nbsp; 목표 q* = <b>[0, 10, 40]°</b> &nbsp;·&nbsp; kφ = [0.0012, 0.00012, 0.0005]</p>
+      <div class="wsteps">
+        <div class="ws"><span class="wl">① Δφ = J2M(q*) − J2M(q)</span><span class="wv">[0, 4.551, 9.971] rad</span></div>
+        <div class="ws"><span class="wl">② τ_m = kφ ∘ Δφ</span><span class="wv">[0, 5.46e‑4, 4.99e‑3] Nm (모터)</span></div>
+        <div class="ws res"><span class="wl">③ τ_q = Gᵀ · τ_m</span><span class="wv">τ_q2 = 0.2825 &nbsp; τ_q3 = 0.2009 Nm</span></div>
+      </div>
+      <div style="overflow-x:auto">
+      <table class="cktbl">
+        <thead><tr><th>계산 방식</th><th>τ_q2 (MCP)</th><th>τ_q3 (PIP)</th></tr></thead>
+        <tbody>
+          <tr class="faint"><td>방법 1 · k_q·Δq (선형 근사)</td><td class="n">0.263</td><td class="n">0.185</td></tr>
+          <tr><td>방법 2 · Gᵀ·kφ·(J2M(q*)−J2M(q)) &nbsp;— sim 적용</td><td class="n">0.282</td><td class="n">0.201</td></tr>
+          <tr class="sim"><td>▶ sim 실측</td><td class="n">0.28</td><td class="n">0.20</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p class="vnote"><b>손으로 계산한 τ_q = sim이 인가한 τ_q</b> (sub‑mNm 일치) → firmware J2M → 커널 → joint_f → readout 전 구간
+        부호·전치·인덱싱·단위가 정합. τ_q2의 절반 이상(0.250)이 <b>PIP 모터 토크가 Gᵀ를 통해 MCP로 넘어온 커플링</b>.
+        남은 최종 단계: 같은 q·q*·kφ로 <b>실기 로그와 대조</b>하면 디지털 트윈이 닫힌다.</p>
+    </div>
+  </section>
+
+  <!-- footer -->
+  <div class="foot">
+    <div class="fcard">
+      <h3>구현 위치</h3>
+      <p><b>커널:</b> <code>coupled_pd_kernel</code> · <code>motor_coupling.py</code> (<code>drive/motor2joint/</code>) — warp, 매 substep CUDA‑graph 상주.</p>
+      <p><b>맵 소스:</b> <code>mj_mapping/</code> — 펌웨어 <code>cal_motorAngles</code>(J2M) 계수, G는 그 gradient.</p>
+      <p><b>배선:</b> <code>NewtonBackend._run_substeps</code> — native PD off + <code>joint_f</code> 인가. 토글 <code>METALAB_MOTOR_COUPLING=0</code>.</p>
+    </div>
+    <div class="fcard">
+      <h3>왜 이렇게 하나</h3>
+      <p>실기 펌웨어가 <b>모터 위치 PD</b>로 돈다: 조인트 목표 q*를 J2M 맵으로 모터 목표 φ*로 바꾸고, 모터가 φ 공간에서 PD를 돈 뒤 전동이 <code>Gᵀ</code>로 조인트 토크를 만든다.</p>
+      <p>3모터↔3조인트가 비선형으로 얽혀 있어 <b>대각 PD로는 재현 불가</b>. sim이 실기와 같은 흐름을 타야 디지털 트윈이 성립한다.</p>
+    </div>
+  </div>
+
+  <p class="legend">q 조인트각 · m/φ 모터각 · G = ∂m/∂q (J2M 자코비안) · kφ,k_d 모터 P/D 게인 · ∘ 원소별 곱 · ᵀ 전치</p>
+
+</div></div>
+</body>
+</html>

@@ -1,0 +1,46 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# MetaLab · genesis engine environment (uv-managed).
+#
+# This is NOT a distributable package — it is the *lockfile owner* for the genesis training env.
+# Deps = the genesis engine (editable, pinned sibling source) + our in-process trainer's runtime
+# needs (torch/tensordict/wandb; rsl_rl is vendored in the allex repo). `uv sync` reproduces the
+# exact env from uv.lock — replacing the old conda-pack S3 snapshot. genesis-world brings its own
+# large dep set; it does NOT declare torch (BYO), so we pin the CUDA build here.
+#
+# Sibling source (../../../../../genesis-world) is pinned by sim/metalab/sim_versions.env + cloned by
+# sim/setup.sh; editable so it stays hackable. Bump = re-checkout + `uv lock` + commit.
+# ──────────────────────────────────────────────────────────────────────────────
+[project]
+name = "metalab-genesis-env"
+version = "0.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "genesis-world",          # editable sibling (see [tool.uv.sources]); brings its own deps
+    "torch==2.10.0",          # CUDA build via the cu128 index below (matches the validated env)
+    "tensordict==0.13.0",     # trainer observation TensorDict (rl extra)
+    "wandb",                  # training logs
+    "tensorboard",            # RL logger default (--logger tensorboard); torch.utils.tensorboard needs it
+    "gitpython",              # run-name git SHA stamping
+    "imageio-ffmpeg",         # training-time eval video (rl_eval --record → wandb.Video) frame encode
+    "matplotlib",             # eval plotting / fk metrics
+    "warp-lang==1.15.0",      # REQUIRED by control_mode:motor — the coupled PD runs the newton warp
+                              # kernels here too (no fallback; see backends/genesis/backend.py)
+    # .rrd recordings for the rollout report's 3D pane. Same floor the newton env pins, and the version
+    # uv.lock resolves is LOAD-BEARING: it is baked into the viewer URL the report links to, and an .rrd
+    # stays readable only across adjacent minor versions. Bump both engines together.
+    "rerun-sdk>=0.27.1",
+    # (genesis-world already brings moviepy + opencv-python)
+]
+
+[tool.uv]
+# genesis-world is a source (editable) build; keep it out of the resolver's "build these" cache churn.
+package = false
+
+[tool.uv.sources]
+genesis-world = { path = "../../../../../genesis-world", editable = true }
+torch = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

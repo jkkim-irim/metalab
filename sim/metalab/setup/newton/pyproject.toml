@@ -1,0 +1,67 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# MetaLab · newton engine environment (uv-managed).
+#
+# Lockfile owner for the newton training env (NOT a distributable package). Deps = the newton
+# engine (editable, pinned sibling source) with its sim + importers extras + our in-process
+# trainer's runtime needs (torch/tensordict/wandb; rsl_rl is vendored in the allex repo).
+# `uv sync` reproduces the exact env from uv.lock — replacing the old conda-pack S3 snapshot.
+#
+# newton REQUIRES a warp-lang dev build (>=1.15.0.dev…) from NVIDIA's index — there is no stable
+# warp-lang that satisfies it (newton itself is 1.5.0.dev0). uv resolves to the latest nightly and
+# PINS it in uv.lock, so it is reproducible; bump = re-lock after validating the new build runs.
+#
+# Sibling source (../../../../../newton) is pinned by sim/metalab/sim_versions.env + cloned by
+# sim/setup.sh; editable so it stays hackable. Index defs mirror newton's own pyproject.
+# ──────────────────────────────────────────────────────────────────────────────
+[project]
+name = "metalab-newton-env"
+version = "0.0.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "newton[sim,importers]",  # editable sibling; pulls warp-lang (nvidia), mujoco-warp, usd schemas
+    "torch==2.10.0",          # CUDA build via the cu128 index (matches the validated env)
+    "tensordict==0.13.0",     # trainer observation TensorDict (rl extra)
+    "wandb",                  # training logs
+    "tensorboard",            # RL logger default (--logger tensorboard); torch.utils.tensorboard needs it
+    "gitpython",              # run-name git SHA stamping
+    "moviepy",                # training-time eval video (rl_eval --record → wandb.Video)
+    "imageio-ffmpeg",         # video frame encode
+    "matplotlib",             # eval plotting / fk metrics
+    "opencv-python",          # frame handling (newton doesn't bring it transitively)
+    # newton's GL viewer (--viz) + offscreen video recorder live in newton's examples/rtx extras,
+    # so newton[sim,importers] does NOT pull them — add explicitly (matches newton's own constraints).
+    "pyglet>=2.1.6,<3",       # OpenGL viewer window + offscreen render (gl/opengl.py, image_logger)
+    "imgui-bundle>=1.92.0",   # viewer GUI overlay (gl/gui.py)
+    # ViewerRerun (--viz rerun + .rrd checkpoint recordings). Same floor newton itself pins, and the
+    # version uv.lock resolves is LOAD-BEARING: it is baked into the app.rerun.io viewer URL a report
+    # links to, and .rrd stays readable only across adjacent minor versions. Bump = re-link the reports.
+    "rerun-sdk>=0.27.1",
+]
+
+[project.optional-dependencies]
+# OVRTX real-time ray-traced viewer for Newton --viz (rl_train/rl_eval --viewer rtx). Opt-in, NOT in the
+# default env — headless training/AWS never render and ovrtx raises the GPU floor (RTX GPU only). It presents
+# in a pyglet window (already a base dep). setup_env.sh installs it only when --viewer rtx is requested;
+# see sim/README.md "Newton RTX viewer".
+rtx = ["ovrtx>=0.3"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+newton = { path = "../../../../../newton", editable = true }
+warp-lang = { index = "nvidia" }
+torch = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com/"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

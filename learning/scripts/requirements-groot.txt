@@ -1,0 +1,42 @@
+# GR00T-N1.7 runtime env — a SEPARATE venv from the ACT one. ACT (pyproject.toml) pins torch==2.10.0;
+# GR00T's N1.7 backbone + flash-attn are built for the torch 2.7.1 line, so the two can't share a venv.
+#
+# These pins are the proven set the internalized-equivalence run + the GR00T ablations trained on,
+# TRIMMED to what's actually imported: the learning.model.groot closure (torch/transformers/diffusers/
+# flash-attn/albumentations/opencv/dm-tree/tyro/einops/numpy/scipy/PIL) + the trainer/data/FK deps.
+# Fat Isaac-GR00T deps are intentionally dropped (NOT in the import/training closure): tensorrt, onnx,
+# onnxruntime, datasets, lmdb, msgpack(-numpy), gymnasium, peft, bitsandbytes.
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+# torch line (cu128 wheels; the DLAMI already carries these)
+torch==2.7.1
+torchvision==0.22.1
+torchcodec==0.4.0            # LeRobot video decode — PyPI x86_64 wheel (NOT the aarch64 local wheel that broke `uv sync`)
+
+# VLM backbone (Qwen3-VL) + flow-matching DiT head. The backbone is now VENDORED under
+# learning.model.groot._hf (no `transformers` package) — we keep its lightweight runtime deps:
+diffusers==0.35.1           # DiT flow head (ConfigMixin/ModelMixin/Attention); does NOT require transformers
+jinja2>=3.1                 # Qwen chat-template rendering (was transitive via transformers)
+flash-attn @ https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.7cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
+albumentations==1.4.18
+opencv-python-headless>=4.5,<4.13
+dm-tree==0.1.10
+tyro==0.9.17
+einops==0.8.1
+numpy==1.26.4
+scipy==1.15.3
+pillow==12.3.0
+safetensors==0.8.0
+huggingface-hub==0.36.2
+tokenizers==0.22.2
+
+# trainer / data / FK — the learning package's runtime deps, at GR00T-compatible versions
+accelerate==1.14.0
+deepspeed==0.17.6           # accelerate ZeRO-2 for the full-VLM finetune (fits 40 GB)
+pandas==2.2.3
+pyarrow==24.0.0
+termcolor==3.2.0
+wandb>=0.24                 # gr00t pinned 0.23.0, which has a service-init bug
+pytorch_kinematics==0.10.0  # FK validation metrics
+matplotlib==3.10.1          # FK skeleton videos
+imageio-ffmpeg==0.6.0
