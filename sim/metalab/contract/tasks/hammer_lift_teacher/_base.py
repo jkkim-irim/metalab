@@ -85,9 +85,9 @@ class SCENE:
         {   # hammer — 3 MJCF variants, env i gets variant i % 3
             "name": "hammer",
             "asset": {"mjcf": [                       # from S3 — object assets are not in git
-                assets.s3_mjcf("hammer_cylinder"),
-                assets.s3_mjcf("hammer_rect"),
-                assets.s3_mjcf("hammer_edge"),
+                assets.object_mjcf("hammer_cylinder"),
+                assets.object_mjcf("hammer_rect"),
+                assets.object_mjcf("hammer_edge"),
             ]},
             "mass": 0.55, "variants": 3,   # friction: not authored here — the reset DR event owns it
             "init_pos": [0.5, -0.1, 0.91],

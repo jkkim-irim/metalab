@@ -19,10 +19,9 @@ def restore_default_sigint() -> None:
     only when it finds SIGINT at ``SIG_DFL``. A process started down such a chain therefore never
     raises ``KeyboardInterrupt``: SIGINT is discarded, silently.
 
-    BOTH detached launch paths do exactly that, so every run they started was uninterruptible:
-      * the Launchpad server (``sim/metalab/launchpad.sh``: ``nohup … &``) — its ignored SIGINT is
-        inherited by every run the Stop button later tries to interrupt;
-      * ``learning/scripts/aws/metalab_train.sh`` (``setsid bash … &`` in the SSM shell).
+    The detached launch path does exactly that, so every run it started was uninterruptible: the
+    Launchpad server (``sim/metalab/launchpad.sh``: ``nohup … &``) has an ignored SIGINT, inherited by
+    every run the Stop button later tries to interrupt.
     Stop SIGINTs the trainer and SIGKILLs it once the grace elapses, so an ignored SIGINT turned
     every Stop into a hard kill: the trainer never reached ``wandb.finish(exit_code=255)`` and W&B
     timed the run out as **crashed** instead of marking it **killed**.

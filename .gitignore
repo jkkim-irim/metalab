@@ -29,7 +29,7 @@ allex_learning.egg-info/
 # never be refreshed. The ENGINE locks (sim/metalab/**/uv.lock) ARE the sync source and stay tracked.
 /uv.lock
 
-# YCB scan assets (sim/metalab/assets/ycb_to_mjcf.py output) — ~210MB of textured meshes for 79 objects.
-# The generator is tracked, its output is not: it lives in
-# s3://wirobotics-internal/shared/sim_assets/objects/<object>/.
+# Object assets are TRACKED (sim/metalab/assets/objects/<name>/) so a clone runs every task as-is. This
+# only ignores a bulk scan library dropped in beside them — a full YCB set is ~170MB and does not belong
+# in git.
 sim/metalab/assets/objects/ycb/

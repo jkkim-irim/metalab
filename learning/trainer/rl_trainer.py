@@ -1,6 +1,6 @@
 """ALLEX learning — Newton RL trainer.
 
-Peer of BCTrainer, dispatched from learning/train.py (`--trainer rl`). Runs IN-PROCESS in the learning
+Dispatched from learning/train.py. Runs IN-PROCESS in the learning
 venv — like BCTrainer holds the BC loop, RLTrainer.run() holds the RL orchestration: it spawns the sim
 server (`sim/isaaclab/server.py`) in the isaaclab env via `learning/rl/service.py`, builds the
 sim-service client, and runs the (owned) PPO `OnPolicyRunner`. No Isaac Lab import on this side — the
@@ -20,7 +20,6 @@ import glob
 import importlib
 import os
 import shutil
-import subprocess
 import tempfile
 
 from learning.eval.protocol import build_actor, eval_srv_args, rollout_first_episodes
@@ -31,61 +30,33 @@ from learning.rl.utils.video import slow_mp4
 
 # The sim-service client imports the shared transport.py from the sim-service dir; put that dir on
 # sys.path before importing the client. This module is imported lazily (only for `--trainer rl`, from
-# learning/train.py), so this module-level setup runs only on an RL run.
+# learning/train.py), so this module-level setup runs when the trainer is loaded.
 ensure_transport_importable()
 from learning.rl.client import NaNSafeVecEnv, SimServiceVecEnv  # noqa: E402
 
-# CloudFront distribution fronting s3://wirobotics-internal (object key maps 1:1). The report is an HTML
-# page, so it is read through this URL — an s3:// path cannot be opened in a browser.
-_REPORT_S3_PREFIX = "s3://wirobotics-internal/"
-_REPORT_CLOUDFRONT = "https://d1iitptfxhu64e.cloudfront.net/"
-
 
 def _publish_report(vdir: str, ckpt_path: str, it: int | None) -> str:
-    """Put this checkpoint's rollout report where its CHECKPOINT lives; return the URL to open it (or "").
+    """Put this checkpoint's rollout report where its CHECKPOINT lives; return the local path (or "").
 
     The sim-service writes the recording (``rollout.rrd`` + ``data.json`` + ``report.html``) into ``vdir``,
-    which the caller deletes as soon as the recording is uploaded, so it is filed here:
-
-    * ``$CKPT_S3_ROOT/<run_name>/report_<it>/`` when S3 checkpointing is on — inside the same folder that
-      already holds that run's ``model_*.pt`` (same key scheme as ``OnPolicyRunner._upload_ckpt_s3``). This
-      is the normal case for BOTH a node and a workstation run: S3 is on by default in the launcher.
-    * otherwise (no S3 destination, or the upload failed) a LOCAL copy at ``<log_dir>/report_<it>/``, so the
-      report is never lost just because S3 was unavailable.
+    which the caller deletes as soon as the recording is done, so it is copied to
+    ``<log_dir>/report_<it>/`` — beside that run's ``model_*.pt``.
 
     ONE SUBDIR PER CHECKPOINT, because the page addresses its recording by BASENAME: a flat layout would
     collide across checkpoints (every one writes ``rollout.rrd``) and silently repoint an older page at a
     newer rollout.
 
-    Synchronous by necessity — ``vdir`` is about to be deleted — and small (a few MB per checkpoint). A
-    failure is reported and returns "": the recording itself already succeeded, and training must not die
-    over publishing an auxiliary artifact.
+    Synchronous by necessity — ``vdir`` is about to be deleted — and small (a few MB per checkpoint).
     """
     if not os.path.exists(os.path.join(vdir, "report.html")):
         print("[rl-trainer] WARN: recording has no report.html — nothing to publish "
               "(is the sim spoke's rollout log wired in?)", flush=True)
         return ""
     name = f"report_{it if it is not None else 'final'}"
-    ckpt_dir = os.path.dirname(os.path.abspath(ckpt_path))
-    root = os.environ.get("CKPT_S3_ROOT", "").strip().rstrip("/")
-
-    def _keep_local() -> str:
-        shutil.copytree(vdir, os.path.join(ckpt_dir, name), dirs_exist_ok=True)
-        print(f"[rl-trainer] report kept locally -> {os.path.join(ckpt_dir, name)}", flush=True)
-        return ""
-
-    if not root:
-        return _keep_local()
-    dest = f"{root}/{os.path.basename(ckpt_dir)}/{name}"
-    r = subprocess.run(["aws", "s3", "cp", "--recursive", vdir, dest + "/"],
-                       capture_output=True, text=True)
-    if r.returncode != 0:
-        print(f"[rl-trainer] report upload FAILED {dest}: {r.stderr.strip()}", flush=True)
-        return _keep_local()
-    url = (f"{_REPORT_CLOUDFRONT}{dest[len(_REPORT_S3_PREFIX):]}/report.html"
-           if dest.startswith(_REPORT_S3_PREFIX) else f"{dest}/report.html")
-    print(f"[rl-trainer] report → {url}", flush=True)
-    return url
+    dest = os.path.join(os.path.dirname(os.path.abspath(ckpt_path)), name)
+    shutil.copytree(vdir, dest, dirs_exist_ok=True)
+    print(f"[rl-trainer] report -> {dest}", flush=True)
+    return dest
 
 
 def _make_record_callback(task: str, recipe: str, device: str, policy_cfg: dict, seed: int,
@@ -101,7 +72,7 @@ def _make_record_callback(task: str, recipe: str, device: str, policy_cfg: dict,
 
     WHAT GOES TO W&B IS A LINK. The sim writes a rerun ``.rrd`` plus the synced plot report into the recording
     dir (see sim/metalab/runtime/rollout_report.py), :func:`_publish_report` files that beside this run's
-    checkpoints, and its URL is logged on the checkpoint's own training step — so a checkpoint's replay, its
+    checkpoints, and its path is logged on the checkpoint's own training step — so a checkpoint's replay, its
     per-step series and its ``.pt`` all live in one place. No ``wandb.Video``: the report's 3D pane replays the
     same rollout with a free camera, which the per-env MP4s (one fixed angle, ~32 s of blocking render per
     checkpoint measured) only ever approximated.
@@ -111,8 +82,8 @@ def _make_record_callback(task: str, recipe: str, device: str, policy_cfg: dict,
     checkpoints in with NO page reload (its step slider just extends) and older ones stay one drag away.
     A ``wandb.Table`` accumulating one row per checkpoint was tried instead (2026-08-04..05) and reverted:
     its cell value is a ``wandb-client-artifact://…:latest`` reference and the table panel resolves that
-    from cache, so rows appeared only after a page RELOAD — measured against a link that was already on
-    S3 and committed to W&B within 30 s of the checkpoint.
+    from cache, so rows appeared only after a page RELOAD — measured against a link that was already
+    committed to W&B within 30 s of the checkpoint.
 
     BLOCKING: records synchronously on the train thread — the loop pauses per checkpoint until the link is
     logged (``wandb.log(..., step=iter)``).
@@ -155,7 +126,7 @@ def _make_record_callback(task: str, recipe: str, device: str, policy_cfg: dict,
             # A fresh short-lived sim-service records the rollout server-side; the EVAL_POLICY plugin loads
             # THIS checkpoint (a FRESH actor — runner.alg untouched) and rolls out one window on the training GPU.
             vargs = argparse.Namespace(
-                checkpoint=ckpt_path, checkpoint_s3="", device=device, task=task, recipe=recipe,
+                checkpoint=ckpt_path, device=device, task=task, recipe=recipe,
                 num_envs=record_envs, seed=seed, play=True, export=False, meta_out="",
                 # video=False: the MetaLab spokes have no MP4 path any more, and the shared eval plugin
                 # reads this flag (it still serves sims that do). --rrd IS the record path; data.json and
@@ -188,7 +159,7 @@ def _make_record_callback(task: str, recipe: str, device: str, policy_cfg: dict,
             # Publish the .rrd + series + page beside this run's checkpoints, then log where it went.
             url = _publish_report(vdir, ckpt_path, it)
             if url:
-                payload = {"val/report": wandb.Html(f'<a href="{url}" target="_blank">{url}</a>')}
+                payload = {"val/report": wandb.Html(f"<code>{url}</code>")}
                 # blocking: synchronous at checkpoint time → step=it is valid on the training step axis
                 wandb.log(payload, step=it) if it is not None else wandb.log(payload)
                 print(f"[rl-trainer] report @iter {it} (SR {sr}) → W&B (val/report) {url}", flush=True)
@@ -210,7 +181,7 @@ class RLTrainer:
     """Newton RL trainer: runs the owned PPO trainer in-process against the Isaac Lab sim service."""
 
     def __init__(self, forward_args):
-        # RL CLI args that survived learning/train.py's extras stripping
+        # RL CLI args forwarded from learning/train.py
         # (--task / --num_envs / --max_iterations / --device / --logger / --wandb_project / --seed / ...).
         self.forward_args = list(forward_args)
 
@@ -238,11 +209,8 @@ class RLTrainer:
                             "a wrong name fails loudly at import)")
         p.add_argument("--wbt", action="store_true",
                        help="train the sim's whole-body-tracking (WBT) env variant (forwarded as --wbt)")
-        p.add_argument("--reference_dir", default="/home/ubuntu/sim_references",
-                       help="dir of ref_*.npz reference motions on the node (used with --wbt)")
-        p.add_argument("--reference_s3", default="",
-                       help="S3 dir the reference dataset was built from — recorded in the run config "
-                            "(the node-local reference_dir alone identifies no dataset)")
+        p.add_argument("--reference_dir", default="sim_references",
+                       help="dir of ref_*.npz reference motions (used with --wbt)")
         p.add_argument("--save_interval", type=int, default=None,
                        help="checkpoint every N iterations (overrides the experiment default; finer "
                             "intervals catch sharp eval peaks for checkpoint selection)")
@@ -258,22 +226,7 @@ class RLTrainer:
         p.add_argument("--val_video_envs", type=int, default=4,
                        help="of those, envs to RENDER (per-env GL render is the real per-env cost)")
         p.add_argument("--val_video_n", type=int, default=4, help="per-env val MP4s to upload to W&B")
-        p.add_argument("--local", action="store_true",
-                       help="local run: keep checkpoints on this machine only and skip the S3 upload. "
-                            "Without it, CKPT_S3_ROOT must be set (the rl_train.sh launcher sets a "
-                            "per-user default) or the trainer aborts before training.")
         args, _ = p.parse_known_args(self.forward_args)
-
-        # Checkpoints must be durable off-node: a GPU node is terminated when idle, taking its local disk
-        # (and any checkpoints not yet on S3) with it. Require an S3 destination unless this is an explicit
-        # --local run. Checked here, before the sim server spawns, so a misconfigured run fails immediately.
-        ckpt_s3_root = None if args.local else os.environ.get("CKPT_S3_ROOT")
-        if not args.local and not ckpt_s3_root:
-            raise SystemExit(
-                "[rl-trainer] CKPT_S3_ROOT is not set — checkpoints would live only on this node and be "
-                "lost when it is terminated. Set CKPT_S3_ROOT=s3://<bucket>/<user>/sim_rl/ckpts (the "
-                "rl_train.sh launcher sets a per-user default from $AWS_USER) or pass --local to train "
-                "without S3 checkpointing.")
 
         # Select the experiment by convention (learning.rl.<experiment>.<task>.experiment — see
         # learning/rl/experiments.py; no registry, wrong names fail loudly at import). Its EXP
@@ -325,15 +278,14 @@ class RLTrainer:
         run_name = os.environ.get("RUN_NAME", "").strip() or build_run_name(
             args.task, exp["max_iterations"], args.num_envs,
             run_name=exp.get("run_name", ""), repo_root=os.getcwd())
-        # It becomes a directory name AND an S3 key prefix — reject anything that would escape either.
+        # It becomes a directory name — reject anything that would escape it.
         assert run_name and "/" not in run_name and not run_name.startswith("."), \
             f"RUN_NAME must be a single safe path segment — got {run_name!r}"
         exp["run_name"] = run_name
         # Dataset/lineage provenance -> the runner cfg, so the W&B run config records WHICH reference
         # dataset this run tracked and any checkpoint it resumed from (the writer folds scalar cfg
-        # entries into wandb.config; a bare node-local path identifies nothing after the node is gone).
+        # entries into wandb.config).
         exp["reference_dir"] = args.reference_dir
-        exp["reference_s3"] = args.reference_s3
         exp["resume_ckpt"] = args.resume_ckpt
         # The two contract axes, so a run says WHICH contract it trained on even when the run name does
         # not (the task has never been a name segment). `task_recipe`, not `recipe`: the writer already
@@ -413,8 +365,7 @@ class RLTrainer:
                                               args.seed,
                                               train_env=env,
                                               latest_metrics=lambda: runner.logger.last_metrics)
-            runner = OnPolicyRunner(env, exp, log_dir=log_dir, device=args.device, on_checkpoint=record_cb,
-                                    ckpt_s3_root=ckpt_s3_root)
+            runner = OnPolicyRunner(env, exp, log_dir=log_dir, device=args.device, on_checkpoint=record_cb)
 
             def _val_video(it: int) -> None:
                 """Every --val_video_every iters: roll out --val_video_envs tracking envs on a short-lived

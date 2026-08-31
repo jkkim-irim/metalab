@@ -3,8 +3,7 @@
     <out>/<name>/<name>.xml
     <out>/<name>/meshes/<name>_hull*.obj
 
-That is the shared object store's layout, so `aws s3 sync <out>/ s3://…/shared/sim_assets/objects/`
-uploads the result as-is. Authored coordinates are baked in, including the frame knobs, so nothing has to
+That is `sim/metalab/assets/objects/`'s layout, so the result drops in as-is. Authored coordinates are baked in, including the frame knobs, so nothing has to
 be fixed up at load time. Needs pxr + coacd (the newton env); `--help` documents the knobs.
 """
 from __future__ import annotations

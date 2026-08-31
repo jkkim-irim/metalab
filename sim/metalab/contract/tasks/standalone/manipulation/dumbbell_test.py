@@ -72,11 +72,11 @@ TASK = base.build_task(
     "dumbbell_test",
     objects=[
         # dumbbells (usd_to_mjcf assets, served from the bucket); mass/friction/pose authored here
-        {"name": "dumbbell_1kg", "asset": {"mjcf": [assets.s3_mjcf("dumbbell_1kg")]},
+        {"name": "dumbbell_1kg", "asset": {"mjcf": [assets.object_mjcf("dumbbell_1kg")]},
          "mass": 1.0, "init_pos": [0.65, -0.18, 1.0]},
-        {"name": "dumbbell_2kg", "asset": {"mjcf": [assets.s3_mjcf("dumbbell_2kg")]},
+        {"name": "dumbbell_2kg", "asset": {"mjcf": [assets.object_mjcf("dumbbell_2kg")]},
          "mass": 2.0, "init_pos": [0.65, -0.01, 1.0]},
-        {"name": "dumbbell_3kg", "asset": {"mjcf": [assets.s3_mjcf("dumbbell_3kg")]},
+        {"name": "dumbbell_3kg", "asset": {"mjcf": [assets.object_mjcf("dumbbell_3kg")]},
          "mass": 3.0, "init_pos": [0.65, 0.145, 1.01]},
     ],
     physics={"hz": 200},

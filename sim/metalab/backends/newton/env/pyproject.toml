@@ -35,7 +35,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # OVRTX real-time ray-traced viewer for Newton --viz (rl_train/rl_eval --viewer rtx). Opt-in, NOT in the
-# default env — headless training/AWS never render and ovrtx raises the GPU floor (RTX GPU only). It presents
+# default env — headless training never renders and ovrtx raises the GPU floor (RTX GPU only). It presents
 # in a pyglet window (already a base dep). setup_env.sh installs it only when --viewer rtx is requested;
 # see sim/metalab/README.md "Newton RTX viewer".
 rtx = ["ovrtx>=0.3"]

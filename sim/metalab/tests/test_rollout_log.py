@@ -357,17 +357,17 @@ def test_report_without_a_recording_still_plots():
 
 
 def test_report_is_self_contained_apart_from_the_pinned_viewer():
-    """One file that renders the same locally and from CloudFront: the series are INLINED (no data fetch),
-    and the only external host is the version-pinned rerun viewer the 3D pane loads."""
+    """One file wherever it is opened: the series are INLINED (no data fetch), and the only external host
+    is the version-pinned rerun viewer the 3D pane loads."""
     with tempfile.TemporaryDirectory() as tmp:
         html = Path(build_report(_recording(tmp, steps=3))).read_text()
         p = _payload(html)                                  # inlined, and strict JSON
         assert len(p["data"]["0"]["step"]) == 3
         assert "data.json" not in html                      # the series ride in the page, not a sibling fetch
         hosts = set(re.findall(r"https?://([^/\s\"']+)", html))
-        assert hosts == {"d1iitptfxhu64e.cloudfront.net"}, hosts
+        assert hosts == {"app.rerun.io"}, hosts
         # the viewer is PINNED: an .rrd only stays readable across adjacent rerun minors
-        assert re.search(r"rerun-viewer/\d+\.\d+\.\d+", html), "the viewer URL must pin a version"
+        assert re.search(r"app\.rerun\.io/version/\d+\.\d+\.\d+", html), "the viewer URL must pin a version"
 
 
 def test_report_title_defaults_to_task_and_engine():

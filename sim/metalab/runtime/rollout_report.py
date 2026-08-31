@@ -25,10 +25,9 @@ cache; the x window, the playhead and the env are SHARED, so the same sample sit
 every panel and one recording drives them all. ``custom`` holds everything that is not a raw contract channel —
 the log's joint-state measurements plus the views this module synthesizes (:func:`_add_custom_section`).
 
-NOT SELF-CONTAINED ANY MORE. The series are still inlined as JSON, but the 3D half needs two same-origin
-fetches: the version-pinned viewer bundle at :data:`_RERUN_BASE` (~39 MB, shared by every report, cached
-immutably) and the sibling ``.rrd``. Both are addressed so that a report works wherever it is uploaded, and
-the pane degrades to a message — plots intact — over ``file://`` or when either fetch fails.
+NOT SELF-CONTAINED. The series are still inlined as JSON, but the 3D half fetches the version-pinned viewer
+bundle from rerun's own hosting (:data:`_RERUN_BASE`, ~39 MB, cached immutably) and reads the sibling
+``.rrd``. The pane degrades to a message — plots intact — over ``file://`` or when either fetch fails.
 
 
 Usage (also the wiring point for the eval/train paths)::
@@ -46,19 +45,12 @@ import time
 # The CUSTOM section's pairing plan — the same one the live RL tab uses.
 from sim.metalab.runtime import rl_monitor
 
-#: Where the self-hosted rerun web-viewer bundle lives (``re_viewer.js`` + ``re_viewer_bg.wasm``, ~39 MB,
-#: plus ``runtime/rerun_player.html``). ONE shared, immutable prefix — never copied per recording — and the
-#: report loads it from here by absolute URL. VERSION-PINNED on purpose: an .rrd stays readable only across
-#: adjacent rerun minor versions, so this path moves together with the ``rerun-sdk`` pin in
-#: ``sim/metalab/setup/newton/pyproject.toml`` (resolved to 0.35.0 in its uv.lock). On skew the viewer says
-#: so instead of going blank.
-#:
-#: Not app.rerun.io: rerun's own loader fetches the .rrd with credentials omitted (ehttp defaults to
-#: ``Credentials::Omit``), which our Slack-authenticated CloudFront answers with a login redirect that a
-#: cors-mode fetch cannot follow. The page therefore fetches the bytes itself and pushes them into the
-#: viewer over its log channel — see the header of ``runtime/rerun_player.html``.
-_RERUN_BASE = "https://d1iitptfxhu64e.cloudfront.net/jkkim/tools/rerun-viewer/0.35.0"
-_RERUN_PLAYER = _RERUN_BASE + "/rerun_player.html"
+#: The rerun web viewer, from rerun's own hosting. VERSION-PINNED on purpose: an .rrd stays readable only
+#: across adjacent rerun minor versions, so this moves together with the ``rerun-sdk`` pin in
+#: ``sim/metalab/setup/<engine>/pyproject.toml``. On skew the viewer says so instead of going blank.
+#: The page fetches the .rrd itself and pushes the bytes into the viewer over its log channel, so the
+#: viewer never touches the network for the recording.
+_RERUN_BASE = "https://app.rerun.io/version/0.35.0"
 
 _PAGE = r"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>__TITLE__</title>
@@ -113,10 +105,6 @@ button:hover{color:var(--ink);border-color:var(--accent)}
 .seg button{border:none;border-right:1px solid var(--line);border-radius:0}
 .seg button:last-child{border-right:none}
 .seg button.on{background:var(--accent);color:#fff}
-.rrdlink{font-size:.78rem;padding:5px 11px;border:1px solid var(--accent);border-radius:6px;
-background:var(--surface);color:var(--accent-ink);text-decoration:none;margin-left:auto}
-.rrdlink:hover{background:var(--accent);color:#fff}
-.rrdlink[hidden]{display:none}
 .read{font-family:var(--mono);font-size:.72rem;color:var(--soft);line-height:1.6}
 .read b{color:var(--accent-ink)}
 .ctabs{flex:none;display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding-bottom:2px}
@@ -198,8 +186,6 @@ canvas{width:100%;height:100%;display:block;cursor:crosshair}
       <button id="play" title="play / pause (space)">⏸ pause</button>
       <button id="prev" title="one policy step back (←)">◀ step</button>
       <button id="next" title="one policy step forward (→)">step ▶</button>
-      <a id="rrd" class="rrdlink" target="_blank" hidden
-         title="open this recording in a full browser window">full ↗</a>
     </div>
     <div class="read" id="readout"></div>
   </div>
@@ -330,9 +316,9 @@ async function bootViewer(){
     panel_state_overrides:{time:"Hidden",blueprint:"Hidden",selection:"Hidden",top:"Hidden"}});
   await h.start($("the_canvas_id"));
 
-  // OUR fetch, with cookies: rerun's own loader omits credentials (ehttp defaults to Credentials::Omit),
-  // so behind the Slack-authenticated CloudFront its request is answered with a login redirect that a
-  // cors-mode fetch cannot follow. See runtime/rerun_player.html for the full story.
+  // OUR fetch, then the bytes go in over the viewer's log channel: rerun's own loader omits credentials
+  // (ehttp defaults to Credentials::Omit), so it cannot read a recording behind any auth. Fetching it
+  // ourselves also keeps the viewer off the network entirely.
   vstat("fetching recording…");
   const res=await fetch(new URL(M.rrd,location.href).href,{credentials:"same-origin"});
   if(!res.ok) throw new Error(M.rrd+": "+res.status+" "+res.statusText);
@@ -382,15 +368,12 @@ if(!M.rrd){
   vstat("3D needs the report served over http(s)",
         "Opened from a local file, where the viewer bundle and the recording cannot be fetched.");
 }else{
-  const a=$("rrd");                       // full-window escape hatch; also the fallback if the embed fails
-  a.href="__RERUN_PLAYER__?url="+encodeURIComponent(new URL(M.rrd,location.href).href);
-  a.hidden=false;
   bootViewer().then(()=>{
     $("vstatus").classList.add("hidden");
     setPlayLabel();
   }).catch(e=>vstat("3D viewer failed to load",
-    String(e&&e.message||e)+" — the plots below still work; <code>full ↗</code> opens the recording "
-    +"in its own window."));
+    String(e&&e.message||e)+" — the plots below still work, and the sibling "
+    +"<code>rollout.rrd</code> opens in a local rerun viewer."));
 }
 
 const SECTS=[]; M.tabs.forEach(t=>{ if(!SECTS.some(s=>s.name===t.section)) SECTS.push({name:t.section,tabs:[]});
@@ -954,7 +937,7 @@ def build_report(record_dir: str, out_path: str | None = None, title: str = "") 
     blob = json.dumps(payload, separators=(",", ":")).replace("<", "\\u003c")
     page = _PAGE.replace("__PAYLOAD__", blob).replace(
         "__TITLE__", (title or f"{meta['task']} · {meta['engine']} · eval rollout").replace("<", "")
-    ).replace("__RERUN_PLAYER__", _RERUN_PLAYER).replace("__RERUN_BASE__", _RERUN_BASE)
+    ).replace("__RERUN_BASE__", _RERUN_BASE)
     with open(out, "w") as f:
         f.write(page)
     print(f"[rollout-report] {len(meta['envs'])} envs × {len(meta['tabs'])} channels "

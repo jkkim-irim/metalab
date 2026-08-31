@@ -1,0 +1,4 @@
+newmtl material_0
+# shader_type beckmann
+map_Kd ycb_048_hammer_grasp_offset_texture.png 
+

@@ -3,59 +3,28 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "allex-learning"
+name = "metalab-learning"
 version = "0.0.0"
-description = "ALLEX learning — ACT train/eval pipeline and dataset tooling"
-requires-python = ">=3.10,<3.11"   # validated on Python 3.10.12 (the node DLAMI)
-# Single source of truth for the training env — versions match the validated 5m3dzdwe
-# reproduction. torch / torchvision / torchcodec are CUDA builds the node DLAMI already provides
-# at these exact versions, so `pip install -e .` is a no-op for them on the node; on a fresh box,
-# install the CUDA torch from the appropriate index first. The ACT model + v3.0 dataset + config +
-# utils are reimplemented in-repo (learning/), so lerobot and draccus are NOT dependencies at all.
-# The faithfulness equivalence tests that proved the reimplementation matches lerobot 0.4.4 live in
-# this branch's git history (see the "remove lerobot" PR); they are not part of the shipped suite.
+description = "MetaLab learning — RL train/eval over the sim-service boundary"
+requires-python = ">=3.10"
+# The trainer and the engine server run in the SAME engine uv env (sim/metalab/setup/<engine>/), which
+# already pins torch and the engine; this package is not installed separately for a normal run. Listed
+# here so `learning` is importable as a package and its extra runtime needs are recorded.
 dependencies = [
-    "torch==2.10.0",
-    "torchvision==0.25.0",
-    "torchcodec==0.10.0",
-    "accelerate==1.14.0",
-    "einops==0.8.2",
-    "numpy==2.2.6",
-    "pandas==2.3.3",
-    "pyarrow==24.0.0",
-    "termcolor==3.3.0",
-    "wandb==0.24.2",
+    "numpy",
+    "tensordict",       # the observation TensorDict crossing the sim-service boundary
+    "torch",
+    "wandb",
 ]
 
-# The raw -> LeRobot converters (learning/data/conversion) additionally need scipy; the MCAP teleop
-# converter (mcap_teleop_to_wir) also needs mcap + mcap-ros2-support to decode rosbag2 MCAP episodes.
 [project.optional-dependencies]
-conversion = ["scipy", "mcap", "mcap-ros2-support"]
 test = ["pytest"]
-# Task-space (forward-kinematics) validation metrics + skeleton videos (opt-in via --fk_validation /
-# --fk_video_n; see learning/metrics/). pytorch_kinematics does the FK; matplotlib + imageio-ffmpeg
-# render the pred-vs-GT skeleton MP4s. Versions are pinned to what resolves on the node DLAMI.
-fk = ["pytorch_kinematics==0.10.0", "matplotlib==3.10.9", "imageio-ffmpeg==0.6.0"]
-# Deps for the vendored policy + sim-service client (learning/rl/), used by the eval over the boundary
-# (learning/eval). rsl_rl is vendored in-repo (no rsl-rl-lib dep); the only extra runtime need beyond
-# torch (already a core dep) is tensordict, for the observation TensorDict. The Isaac Lab sim runs
-# behind the sim service (sim/isaaclab), in a separate env — never installed here.
-rl = ["tensordict==0.13.0"]
 
 [tool.setuptools.packages.find]
 include = ["learning*"]
 
 [tool.ruff]
 line-length = 100
-# Vendored / upstream trees we don't lint (CLAUDE.md: don't modify vendored code). Kept here so the
-# hook, CI, and local `ruff` all agree — CI passes explicit file lists with --force-exclude to honor this.
-extend-exclude = [
-    "allex_groot/Isaac-GR00T",
-    "ros2_workspace/allex_third_party",
-    "**/third_party",
-    "**/Meta-OpenXR-SDK",
-    "**/ManusSDK_v3.1.1",
-]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I"]   # import placement, real errors, pyflakes, import sorting

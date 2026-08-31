@@ -2,7 +2,7 @@
 
 Engine-agnostic robot-learning sim (**Newton** / **Genesis**) with a one-click web console. This is the
 onboarding manual: from a fresh clone to a training run — reproduced **identically** on a local
-workstation or an AWS GPU node. Engine environments are **uv-managed** (`uv.lock` per engine) — no conda.
+workstation. Engine environments are **uv-managed** (`uv.lock` per engine) — no conda.
 
 ## TL;DR
 
@@ -10,7 +10,7 @@ First time on a fresh box? Skim [What you need first](#what-you-need-first) — 
 `uv` for you, but you still need a GPU + driver, `git`, and `build-essential`.
 
 ```bash
-git clone git@github.com:wirobotics-rih/allex.git ~/allex_ws/allex && cd ~/allex_ws/allex
+git clone git@github.com:jkkim-irim/metalab.git ~/metalab_ws/metalab && cd ~/metalab_ws/metalab
 sim/metalab/setup.sh              # clone the pinned sims + `uv sync` each engine env (from uv.lock)
 sim/metalab/launchpad.sh       # open the web console → pick engine / task / train|eval → Launch
 ```
@@ -31,16 +31,15 @@ automatically if missing (uv also provides Python — no miniconda needed).
 | `uv` | manages each engine env + Python | **auto-installed by `sim/metalab/setup.sh`** (or `curl -LsSf https://astral.sh/uv/install.sh \| sh`) |
 | Chrome *(optional)* | the Launchpad opens as a standalone **app window**; without it, falls back to your default browser | — |
 
-> No miniconda, and **no AWS account needed to set up the env** — deps come from public indexes (PyPI,
-> PyTorch cu128, NVIDIA). AWS is only for training on a GPU node or S3 checkpoints (see [Connect AWS](#connect-aws)).
+> No miniconda and no account anywhere — deps come from public indexes (PyPI, PyTorch cu128, NVIDIA).
 
 ## What `sim/metalab/setup.sh` does
 
 1. **Clones the pinned simulator sources** as *siblings* of this repo (at the exact pinned commit):
 
    ```
-   allex_ws/
-   ├── allex/           ← this repo
+   metalab_ws/
+   ├── metalab/         ← this repo
    ├── newton/          ← pinned commit
    └── genesis-world/   ← pinned commit
    ```
@@ -49,9 +48,9 @@ automatically if missing (uv also provides Python — no miniconda needed).
    truth — so everyone builds against the exact same simulator revision.
 
 2. **`uv sync`s each engine's env** (`newton`, `genesis`) from its committed `uv.lock`
-   ([`sim/metalab/backends/<engine>/env/`](backends/genesis/env)) into a venv under `~/.metalab/venvs/<engine>`. The lockfile pins
+   ([`sim/metalab/setup/<engine>/`](setup/genesis)) into a venv under `~/.metalab/venvs/<repo-dir>/<engine>`. The lockfile pins
    every dependency (torch cu128, warp, usd, …) by exact version + hash — reproducible from git, no
-   conda-pack, no S3 snapshot. The engine source is installed *editable* so it stays hackable.
+   conda-pack. The engine source is installed *editable* so it stays hackable.
 
 ## Run
 
@@ -78,7 +77,7 @@ learning/scripts/local/metalab_eval.sh  --sim genesis --viz --num_envs 1     # w
 ## Reproducibility model
 
 A run is determined by four version-controlled pieces, so "clone + `setup.sh`" reproduces the setup
-identically, local or AWS:
+identically on any machine:
 
 | Piece | Where | Pinned by |
 |---|---|---|
@@ -93,36 +92,6 @@ identically, local or AWS:
 > Newton pins a **warp-lang dev build** from NVIDIA's index (newton itself is a dev release — no stable
 > warp satisfies it). It's pinned by hash in `uv.lock`, so it's reproducible as long as that nightly
 > stays on the index.
-
-## Connect AWS
-
-Only needed to **train on a GPU node** or read/write **S3 checkpoints** — *not* for the local env. You
-need access to the team AWS account. Sign in with the AWS CLI's console-based login (temporary
-credentials, auto-refreshed while your console session is valid):
-
-```bash
-aws login                       # opens the browser → sign in to the AWS console
-aws sts get-caller-identity     # verify you're connected
-```
-
-Credentials expire when your console session lapses (by design — no permanent keys); just re-run
-`aws login` when that happens.
-
-### Train on an AWS GPU node
-
-Same engines, same trainer — reached over SSM. The node builds the env the same way (`uv sync` from the
-committed lockfiles), so nothing depends on your workstation once it's running:
-
-```bash
-AWS_PROFILE=<gpu-launchers profile> \
-  learning/scripts/aws/metalab_train.sh --sim genesis --task hammer-lift-teacher --num-envs 8192
-```
-
-You must be in the **gpu-launchers** group; the node role is a one-time setup (ask jkkim). Details in the
-`learning/scripts/aws/metalab_train.sh` header. **Stop idle GPU nodes** — they dominate cost.
-
-> ⚠️ **The AWS node path is still being migrated to uv** (node bootstrap + `uv sync` on the node). Local
-> is done and verified; verify the AWS path before relying on it.
 
 ## wandb
 
@@ -140,10 +109,10 @@ export WANDB_API_KEY=...    # provide a key, or
 When a new newton/genesis commit is validated:
 
 1. set the matching `*_REF` in `sim/metalab/sim_versions.env`
-2. re-checkout the sibling + re-lock: `sim/metalab/setup.sh` (or `uv lock` in `sim/metalab/backends/<engine>`)
+2. re-checkout the sibling + re-lock: `sim/metalab/setup.sh` (or `uv lock` in `sim/metalab/setup/<engine>`)
 3. commit `sim_versions.env` + the updated `uv.lock`, merge → teammates re-run `sim/metalab/setup.sh` to converge
 
-No S3 snapshot to rebuild — the lockfile *is* the reproducible artifact.
+The lockfile *is* the reproducible artifact.
 
 ## Troubleshooting
 
@@ -160,7 +129,7 @@ No S3 snapshot to rebuild — the lockfile *is* the reproducible artifact.
 Newton's `--viz gl` opens an **OpenGL** window; `--viz rtx` uses **OVRTX** (NVIDIA's real-time path tracer),
 presented in a pyglet window. (`--viz none`, the default, is headless. `--viz` with no value fails loud.)
 
-This is **opt-in** — `ovrtx` is *not* in the default newton env (headless training / AWS never render, and it
+This is **opt-in** — `ovrtx` is *not* in the default newton env (headless training never renders, and it
 needs an RTX GPU). `metalab_train.sh` syncs the `rtx` extra **automatically when you pass `--viz rtx`**:
 
 ```bash
@@ -170,8 +139,8 @@ learning/scripts/local/metalab_train.sh --sim newton --task hammer-lift-teacher 
 To install it into the newton env by hand (e.g. for `metalab_eval.sh`, which does not auto-sync it yet):
 
 ```bash
-UV_PROJECT_ENVIRONMENT=~/.metalab/venvs/newton \
-  uv sync --project sim/metalab/backends/newton/env --extra rtx
+UV_PROJECT_ENVIRONMENT=~/.metalab/venvs/<repo-dir>/newton \
+  uv sync --project sim/metalab/setup/newton --extra rtx
 ```
 
-The default (`--viz none`) install is unaffected — newton training / AWS stay lean.
+The default (`--viz none`) install is unaffected — headless newton training stays lean.

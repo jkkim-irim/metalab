@@ -67,7 +67,7 @@ SCENE = {
     },
     # objects=[{                             # 10x6.5x4.5cm box (box.xml); mass/friction/pose authored here
     #     "name": "box",
-    #     "asset": {"mjcf": [_assets.s3_mjcf("box")]},   # from .. import _assets
+    #     "asset": {"mjcf": [_assets.object_mjcf("box")]},   # from .. import _assets
     #     "mass": 0.1377, "friction": 0.5, "restitution": 0.0,
     #     "init_pos": [0.6, -0.16, 0.855],    # on the table (top ≈ 0.86 + box half-height 0.0225)
     #     "init_rpy": [0.0, 90.0, 90.0],      # roll, pitch, yaw [deg] (or init_quat wxyz; either/or)

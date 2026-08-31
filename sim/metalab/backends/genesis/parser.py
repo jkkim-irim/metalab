@@ -3,7 +3,7 @@
 Loads **both robot and objects from MJCF (source of truth)** (native equality/gains/armature/palm/chest
 frame/mass/contact properties). Mask-0 joints load from a ``mjcf_prep`` copy that makes them 0°-FIXED.
 Objects spawn the MJCF-variant list as a **heterogeneous entity** (per-env variant; genesis maps them). Asset
-paths resolve through ``contract.asset_path`` (repo-root-relative, or ``s3://`` fetched into a cache).
+paths resolve through ``contract.asset_path`` (repo-root-relative).
 
 Scene construction only (no obs/reward/action logic). Applies env_spacing and robot overrides (kp/kv).
 """

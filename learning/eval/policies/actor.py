@@ -16,8 +16,7 @@ capability/flag-driven, not sim-identity-driven:
     (MetaLab: an .rrd + the synced report; ``--video`` is the separate, mp4-based path other sims use).
   * ``--episodes < 0`` = infinite watch mode (roll out until Ctrl-C / the viewer closes).
 
-Isaac-free and engine-free (no sim import here). Driven reproducibly by
-``learning/scripts/aws/rl_eval.sh`` and ``learning/scripts/local/rl_eval.sh``.
+Engine-free (no sim import here). Driven reproducibly by ``learning/scripts/local/metalab_eval.sh``.
 
 The eval entrypoints live under ``learning.eval`` (not ``learning.rl``) on purpose: the PPO trainer's
 ``resolve_callable`` scans the modules directly under ``learning.rl`` for a bare class name, so a
@@ -107,8 +106,8 @@ def _upload_wandb_videos(args, sr: float, mean_step_reward: float, wbt_stats: di
     run = wandb.init(project=args.wandb_project, name=(args.wandb_run or None), job_type="eval",
                      config={"experiment": args.experiment, "train": args.train,
                              "wbt": bool(args.wbt), "replay": bool(args.replay),
-                             "checkpoint": args.checkpoint_s3 or args.checkpoint, "num_envs": int(args.num_envs),
-                             "reference_dir": args.reference_dir, "reference_s3": args.reference_s3})
+                             "checkpoint": args.checkpoint, "num_envs": int(args.num_envs),
+                             "reference_dir": args.reference_dir})
     payload = {"eval/mean_step_reward": mean_step_reward}
     # eval/SR = the ORIGINAL lift task's success gate (goal pose + palm + contact-count, held). In WBT
     # builds the gate's state machine runs via the negligible-weight task_success reward term; sr is nan
@@ -340,8 +339,7 @@ def _run_eval(env, args, POLICY, knobs: dict | None = None) -> dict:
     if args.meta_out:
         meta = {
             "experiment": args.experiment, "eval_date": args.eval_date, "eval_sha": args.eval_sha,
-            "train": args.train, "checkpoint": args.checkpoint_s3 or args.checkpoint, "play": bool(args.play),
-            "reference_s3": getattr(args, "reference_s3", ""),
+            "train": args.train, "checkpoint": args.checkpoint, "play": bool(args.play),
             "num_envs": int(env.num_envs), "seed": args.seed, "steps": step,
             "SR": round(sr, 4), "episodes": n_ep, "successes": n_succ,
             "episode_detail": episodes,  # env + success + step for each episode
@@ -358,9 +356,6 @@ def _run_eval(env, args, POLICY, knobs: dict | None = None) -> dict:
 def run(argv=None) -> int:
     p = argparse.ArgumentParser(description="Eval a checkpoint over the sim-service client boundary.")
     p.add_argument("--checkpoint", default="", help="path to a model_*.pt checkpoint; unused with --replay")
-    p.add_argument("--checkpoint_s3", default="",
-                   help="S3 source of the checkpoint — recorded in the meta json (the canonical, "
-                        "reproducible location) instead of the node-local --checkpoint path")
     p.add_argument("--num_envs", type=int, default=16)
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--episodes", type=int, default=64,
@@ -404,10 +399,8 @@ def run(argv=None) -> int:
     p.add_argument("--rsi_play", action="store_true",
                    help="PLAY env with reference-RSI'd starts (fixed refs): score a plain task "
                         "policy under the tracker's exact eval start distribution (protocol control)")
-    p.add_argument("--reference_dir", default="/home/ubuntu/sim_references",
-                   help="dir of ref_*.npz reference motions on the node (used with --wbt)")
-    p.add_argument("--reference_s3", default="",
-                   help="S3 dir the reference dataset was built from (provenance -> wandb config + meta)")
+    p.add_argument("--reference_dir", default="sim_references",
+                   help="dir of ref_*.npz reference motions (used with --wbt)")
     p.add_argument("--wandb", action="store_true", help="upload a sample of the per-env videos + metrics to a W&B run")
     p.add_argument("--wandb_project", default="chrisryu-simrl")
     p.add_argument("--wandb_run", default="", help="W&B run name (default: auto)")

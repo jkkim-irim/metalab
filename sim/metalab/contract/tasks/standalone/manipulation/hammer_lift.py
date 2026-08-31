@@ -25,7 +25,7 @@ TASK = base.build_task(
             # vertex, so the hammer rests exactly on the surface.
             # The name must PREFIX the MJCF model — newton groups contact params by the body-label prefix.
             "name": "ycb_048_hammer_grasp_offset",
-            "asset": {"mjcf": assets.s3_mjcf("ycb_048_hammer_grasp_offset")},
+            "asset": {"mjcf": assets.object_mjcf("ycb_048_hammer_grasp_offset")},
             # friction: comes from the asset MJCF (standalone runs no DR)
             "mass": 0.55, "init_pos": [0.7, -0.2, base.DESK_TOP],
         },

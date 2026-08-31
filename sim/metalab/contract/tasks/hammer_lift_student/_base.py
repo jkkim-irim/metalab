@@ -186,7 +186,7 @@ class SCENE:
             # S3; the name must PREFIX the MJCF model, which newton uses to group contact params.
             # SIZE randomized per reset (randomize_object_scale).
             "name": "ycb_048_hammer_grasp_offset",
-            "asset": {"mjcf": assets.s3_mjcf("ycb_048_hammer_grasp_offset")},
+            "asset": {"mjcf": assets.object_mjcf("ycb_048_hammer_grasp_offset")},
             "mass": 0.55, "variants": 1, "init_pos": [0.7, -0.2, 0.874],
         },
         {   # table — scenery: welded, size stays a task knob (procedural, no asset)

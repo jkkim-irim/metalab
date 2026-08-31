@@ -72,7 +72,7 @@ esac
 # --viz → GUI 라이브 watch(녹화 off; 뷰어+오프스크린 이중 GL 컨텍스트 회피). 미지정 → headless 녹화(로컬, 기본).
 if [ "$VIZ_ON" = 1 ]; then VIZ=gl; RECORD=0; else VIZ=none; fi
 # Headless GL for the offscreen recorder: newton's ViewerGL uses pyglet, which opens an X display at import
-# (even with headless=True) and crashes on a display-less node (AWS: NoSuchDisplayException). PYGLET_HEADLESS=1
+# (even with headless=True) and crashes on a display-less machine (NoSuchDisplayException). PYGLET_HEADLESS=1
 # routes pyglet to EGL (hardware GL on the GPU, no X). Only when there's no DISPLAY → local --viz (needs X) untouched.
 [ -z "${DISPLAY:-}" ] && export PYGLET_HEADLESS=1
 # record: 각 env 를 개별 클립으로 녹화하므로 num_envs 는 최소 RECORD_ENVS 필요 — 부족하면 상향(BASENAME 반영 전).
@@ -141,7 +141,7 @@ python -m learning.eval.eval_service --policy actor --experiment_pkg dexblind --
   --viz "$VIZ" --meta_out "$META_OUT" $EXPORT_FLAG "${RECORD_ARGS[@]}" \
   --experiment "$EXPNAME" --eval_sha "$EVAL_SHA" --train "$TRAIN_TAG" --eval_date "$EVAL_DATE"
 
-# The recording + meta are kept LOCAL (S3 publishing removed) — point the user at them.
+# The recording + meta are kept local — point the user at them.
 if [ "$RECORD" = 1 ]; then
   if [ -f "$VIDEO_DIR/report.html" ]; then
     log "recorded → $VIDEO_DIR/report.html (local; meta $META_OUT)"

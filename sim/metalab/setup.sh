@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
-# setup.sh — one-command onboarding for MetaLab (local workstation OR AWS node).
+# setup.sh — one-command onboarding for MetaLab.
 #
 # From a freshly-cloned `allex` repo this makes the machine ready to train/eval, per engine:
 #   1) clone the PINNED simulator source (newton, genesis-world) as a SIBLING of this repo
-#   2) `uv sync` the engine's uv env from its committed uv.lock  (no conda, no S3 snapshot)
+#   2) `uv sync` the engine's uv env from its committed uv.lock  (no conda)
 # Both steps are done by learning/scripts/local/setup_env.sh; this script just preflights and
 # calls it for each engine. Idempotent — re-run any time; already-current pieces are no-ops.
 #

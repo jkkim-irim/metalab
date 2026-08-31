@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
 # setup_env.sh — make sure the engine's uv env exists and matches its committed uv.lock. So a
-# freshly-cloned repo — local OR on an AWS node — can train the moment you run metalab_train.sh: no
-# manual conda/pip, no S3 env snapshot.
+# freshly-cloned repo can train the moment you run metalab_train.sh: no manual conda/pip.
 #
 #   1) clone the PINNED simulator source (a sibling of the repo), or converge it to the pin
 #   2) `uv sync` the engine's uv project (sim/_setup/<engine>) into its venv (METALAB_VENV_ROOT)
 #
 # Engine + all deps come from uv.lock (torch cu128, warp nightly from NVIDIA's index, usd, …) —
-# reproducible from git, no conda-pack, no AWS creds. Versions pinned in sim/_setup/sim_versions.env.
-# (Replaces the old conda-pack-from-S3 restore; snapshot_env.sh is retired — the lockfile is the artifact.)
+# reproducible from git. Versions pinned in sim/metalab/sim_versions.env.
 #
 # Usage:  setup_env.sh --sim genesis        # or --sim newton
 # ──────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,24 @@
+<mujoco model="dumbbell_2kg">
+  <compiler meshdir="meshes" angle="radian"/>
+  <default>
+    <default class="visual"><geom contype="0" conaffinity="0" group="2" rgba="0.9 0.6 0.15 1"/></default>
+    <default class="collision"><geom group="3" solref="0.01 1" solimp="0.9 0.95 0.001 0.5 2"/></default>
+  </default>
+  <asset>
+    <mesh name="dumbbell_2kg_hull0" file="dumbbell_2kg_hull0.obj"/>
+    <mesh name="dumbbell_2kg_hull1" file="dumbbell_2kg_hull1.obj"/>
+    <mesh name="dumbbell_2kg_hull2" file="dumbbell_2kg_hull2.obj"/>
+  </asset>
+  <worldbody>
+    <body name="object" pos="0 0 0">
+      <freejoint name="object_free"/>
+      <geom type="mesh" mesh="dumbbell_2kg_hull0" class="visual"/>
+      <geom type="mesh" mesh="dumbbell_2kg_hull1" class="visual"/>
+      <geom type="mesh" mesh="dumbbell_2kg_hull2" class="visual"/>
+      <geom type="mesh" mesh="dumbbell_2kg_hull0" class="collision"/>
+      <geom type="mesh" mesh="dumbbell_2kg_hull1" class="collision"/>
+      <geom type="mesh" mesh="dumbbell_2kg_hull2" class="collision"/>
+      <site name="grasp" pos="0 0 0" size="0.005" rgba="0 1 0 0.5"/>
+    </body>
+  </worldbody>
+</mujoco>

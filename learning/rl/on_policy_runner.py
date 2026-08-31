@@ -7,8 +7,6 @@
 from __future__ import annotations
 
 import os
-import subprocess
-import threading
 import time
 
 import torch
@@ -27,16 +25,12 @@ class OnPolicyRunner:
     """The actor-critic algorithm."""
 
     def __init__(self, env: VecEnv, train_cfg: dict, log_dir: str | None = None, device: str = "cpu",
-                 on_checkpoint=None, ckpt_s3_root: str | None = None) -> None:
+                 on_checkpoint=None) -> None:
         """Construct the runner, algorithm, and logging stack.
 
         ``on_checkpoint``: optional engine-agnostic callback ``fn(path)`` fired right after each checkpoint
         is written (the trainer uses it to record eval videos of that checkpoint — see
-        rl_trainer._make_record_callback).
-
-        ``ckpt_s3_root``: ``s3://.../<user>/sim_rl/ckpts`` to upload each checkpoint to as it is written,
-        or ``None`` for a local run (no upload). The caller (rl_trainer) requires a non-None value on
-        managed runs and only passes None for an explicit ``--local`` run."""
+        rl_trainer._make_record_callback)."""
         self.env = env
         self.cfg = train_cfg
         self.device = device
@@ -66,12 +60,6 @@ class OnPolicyRunner:
         )
 
         self.current_learning_iteration = 0
-
-        # Background S3 checkpoint uploads. Each save() fires a thread that pushes the just-written
-        # model_<it>.pt to ckpt_s3_root the moment it exists (durable immediately, not batch-copied at
-        # run end), tracked here so learn() can wait for them to drain before the process exits.
-        self._ckpt_s3_root = ckpt_s3_root
-        self._ckpt_upload_threads: list[threading.Thread] = []
 
     def learn(self, num_learning_iterations: int, init_at_random_ep_len: bool = False,
               iter_callback=None, callback_interval: int = 0) -> None:
@@ -161,61 +149,18 @@ class OnPolicyRunner:
             self.save(os.path.join(self.logger.log_dir, f"model_{self.current_learning_iteration}.pt"))  # type: ignore
             self.logger.stop_logging_writer()
 
-        # Don't exit until every background checkpoint upload has drained — otherwise the process can die
-        # (and the S3 uploads with it) right after the final save, losing the last checkpoints from S3.
-        self._join_ckpt_uploads()
-
     def save(self, path: str, infos: dict | None = None) -> None:
         """Save the models and training state to a given path and upload them if external logging is used."""
         saved_dict = self.alg.save()
         saved_dict["iter"] = self.current_learning_iteration
         saved_dict["infos"] = infos
         torch.save(saved_dict, path)
-        # Publish to S3 as soon as the checkpoint exists (see _upload_ckpt_s3). Not uploaded to W&B —
-        # duplicating every checkpoint into W&B run files added no durability and dominated storage cost.
-        self._upload_ckpt_s3(path)
+        # Not uploaded to W&B — duplicating every checkpoint into W&B run files added no durability and
+        # dominated storage cost.
         # Engine-agnostic post-save hook — the trainer records eval videos of this checkpoint here
         # (event-driven; no polling). The hook loads a FRESH actor from the file, so self.alg is untouched.
         if self.on_checkpoint is not None:
             self.on_checkpoint(path)
-
-    def _upload_ckpt_s3(self, path: str) -> None:
-        """Push a just-written checkpoint to S3 in the background (no-op if ``ckpt_s3_root`` is None).
-
-        Uploads to ``<ckpt_s3_root>/<run_name>/<file>`` where ``run_name`` is the log_dir basename, matching
-        the key scheme the eval/launch scripts expect. Runs off-thread so the training loop never blocks on
-        S3; the thread is tracked and joined in :meth:`_join_ckpt_uploads`. Only the rank-0 process (the one
-        that owns the checkpoint) uploads. Failures are logged loudly, not raised — the local copy and the
-        launch script's end-of-run backstop still cover a transient S3 error.
-        """
-        if not self._ckpt_s3_root or self.gpu_global_rank != 0:
-            return
-        run_name = os.path.basename(os.path.normpath(self.logger.log_dir))
-        dest = f"{self._ckpt_s3_root.rstrip('/')}/{run_name}/{os.path.basename(path)}"
-
-        def _upload() -> None:
-            try:
-                result = subprocess.run(["aws", "s3", "cp", path, dest], capture_output=True, text=True)
-            except Exception as exc:  # e.g. aws CLI not on PATH — log loudly, don't kill training
-                print(f"[rl-trainer] S3 checkpoint upload ERROR {dest}: {exc}", flush=True)
-                return
-            if result.returncode != 0:
-                print(f"[rl-trainer] S3 checkpoint upload FAILED {dest}: {result.stderr.strip()}", flush=True)
-            else:
-                print(f"[rl-trainer] S3 checkpoint uploaded {dest}", flush=True)
-
-        thread = threading.Thread(target=_upload, name=f"ckpt-s3-{os.path.basename(path)}")
-        thread.start()
-        self._ckpt_upload_threads.append(thread)
-
-    def _join_ckpt_uploads(self) -> None:
-        """Block until all in-flight background checkpoint uploads have finished."""
-        pending = [t for t in self._ckpt_upload_threads if t.is_alive()]
-        if pending:
-            print(f"[rl-trainer] waiting for {len(pending)} checkpoint upload(s) to finish...", flush=True)
-        for thread in self._ckpt_upload_threads:
-            thread.join()
-        self._ckpt_upload_threads.clear()
 
     def load(
         self, path: str, load_cfg: dict | None = None, strict: bool = True, map_location: str | None = None

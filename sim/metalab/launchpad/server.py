@@ -3,7 +3,7 @@
 
 Boots an HTTP server, auto-discovers engines + tasks from the repo, and serves the launcher page
 (engine/task/mode/knobs + a live, accurate command preview). Launch shell-outs to the maintained
-scripts (local metalab_train.sh / metalab_eval.sh / sim/standalone.sh / aws metalab_train.sh) — the single
+scripts (metalab_train.sh / metalab_eval.sh / standalone.sh) — the single
 source of truth — with a run registry, live log tail, and per-run Stop.
 
 Runs under any python3 (stdlib only) — the Launchpad never needs an engine env; the launched
@@ -208,51 +208,20 @@ def standalone_preview_describe() -> dict:
 
 
 def creds() -> dict:
-    """What this machine is actually connected to — the UI disables the controls that need it.
+    """Is wandb logged in? The UI locks the run to ``--no_wandb`` when it is not.
 
-    ``aws``   — the aws CLI is on PATH and its credentials resolve (``sts get-caller-identity``).
-    ``wandb`` — the SAME test learning/scripts/local/metalab_train.sh makes before a run (WANDB_MODE /
-                WANDB_API_KEY / the ``api.wandb.ai`` entry ``wandb login`` writes to ~/.netrc), so the
-                page and the script never disagree about whether a run can log.
+    The SAME test learning/scripts/local/metalab_train.sh makes before a run (WANDB_MODE /
+    WANDB_API_KEY / the ``api.wandb.ai`` entry ``wandb login`` writes to ~/.netrc), so the page and the
+    script never disagree about whether a run can log.
 
-    Probed per request (its own endpoint, not /api/discover, which the launch path also calls) — the
-    page reads it once on load, so connect first or reload after ``aws login`` / ``wandb login``.
+    Its own endpoint, not /api/discover, which the launch path also calls. The page reads it once on
+    load, so log in first or reload after ``wandb login``.
     """
-    try:
-        out = subprocess.run(["aws", "sts", "get-caller-identity", "--output", "text"],
-                             capture_output=True, text=True, timeout=15)
-        aws_ok = out.returncode == 0
-    except Exception:                       # aws not installed / hung — same answer either way: no AWS
-        aws_ok = False
     netrc = Path.home() / ".netrc"
     wandb_ok = bool(os.environ.get("WANDB_MODE") or os.environ.get("WANDB_API_KEY")) or (
         netrc.is_file() and "api.wandb.ai" in netrc.read_text(errors="ignore"))
-    return {"aws": aws_ok, "wandb": wandb_ok}
+    return {"wandb": wandb_ok}
 
-
-def list_ec2() -> dict:
-    """Live EC2 GPU instances (running/stopped) for the AWS launch combo. The Hub is stdlib-only, so it
-    shells the aws CLI (creds/login done by the user). GPU-filtered (g*/p* families) to cut account noise;
-    the picked instance-id is passed to aws/metalab_train.sh as --node (reuse; start it if stopped)."""
-    try:
-        out = subprocess.run(
-            ["aws", "ec2", "describe-instances",
-             "--filters", "Name=instance-state-name,Values=running,stopped",
-             "--query", "Reservations[].Instances[].{id:InstanceId,state:State.Name,"
-                        "type:InstanceType,name:Tags[?Key=='Name']|[0].Value}",
-             "--output", "json"],
-            capture_output=True, text=True, timeout=25)
-    except Exception as e:
-        return {"instances": [], "error": f"aws 실행 실패: {e}"}
-    if out.returncode != 0:
-        return {"instances": [], "error": (out.stderr or "aws ec2 describe-instances 실패").strip()[:200]}
-    try:
-        items = json.loads(out.stdout or "[]")
-    except Exception:
-        return {"instances": [], "error": "describe-instances 파싱 실패"}
-    gpu = [i for i in items if str(i.get("type", "")).startswith(("g", "p"))]
-    gpu.sort(key=lambda i: (i.get("state") != "running", (i.get("name") or "").lower()))
-    return {"instances": gpu}
 
 
 def list_gpus() -> dict:
@@ -307,11 +276,10 @@ RUNS_JSONL = RUNS_DIR / "runs.jsonl"        # append-only launch log (persists a
 LOGS_DIR = RUNS_DIR / "runs"                # per-run stdout+stderr log files
 PIDFILE = RUNS_DIR / "hub.pid"              # written by metalab_hub.sh --bg; cleared on Exit
 _SCRIPT = {
-    ("train", "local"): "learning/scripts/local/metalab_train.sh",
-    ("train", "aws"):   "learning/scripts/aws/metalab_train.sh",   # MetaLab AWS launcher (chris' isaaclab rl_train.sh untouched)
-    ("eval",  "local"): "learning/scripts/local/metalab_eval.sh",
-    ("standalone", "local"): "sim/metalab/standalone.sh",
-}   # (mode, target) → maintained script. AWS eval/standalone unsupported (both are local; standalone = GUI-only).
+    "train":      "learning/scripts/local/metalab_train.sh",
+    "eval":       "learning/scripts/local/metalab_eval.sh",
+    "standalone": "sim/metalab/standalone.sh",
+}   # mode → the maintained script it shells out to.
 
 _runs: dict = {}                             # run_id -> {proc, logf, meta}  (this session's launches)
 _runs_lock = threading.Lock()
@@ -338,8 +306,8 @@ def _int(v) -> str:
 def _label(v) -> str:
     """run-name label segment → validated, or "" (the launcher then omits the segment entirely).
 
-    It lands inside the run name, which is at once a directory name, an S3 key prefix and a W&B run name —
-    so anything but path-safe characters is rejected here rather than producing a broken key later."""
+    It lands inside the run name, which is at once a directory name and a W&B run name — so anything but
+    path-safe characters is rejected here rather than producing a broken name later."""
     v = str(v or "").strip()
     if v and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", v):
         raise ValueError(f"run label 은 영문/숫자/._- 만 (공백·/ 불가): {v!r}")
@@ -358,7 +326,6 @@ def _build(params: dict) -> tuple[str, list, dict]:
     discovery + numeric knobs, then assemble the maintained script's flags. No shell is used, so
     args are passed literally. Returns (script_relpath, flag_args, env_vars)."""
     mode = params.get("mode", "train")
-    target = params.get("target", "local")
     engine, task = params.get("engine"), params.get("task")
     recipe = (params.get("recipe") or "").strip()
     d = discover()
@@ -376,10 +343,8 @@ def _build(params: dict) -> tuple[str, list, dict]:
                          f"(받은 값: {recipe!r})")
     if not avail and recipe:
         raise ValueError(f"태스크 {task!r} 는 단일 파일 계약이라 레시피를 받지 않습니다 ({recipe!r})")
-    if target not in ("local", "aws"):
-        raise ValueError(f"알 수 없는 target: {target!r}")
-    if (mode, target) not in _SCRIPT:
-        raise ValueError(f"지원 안 함: mode={mode!r} target={target!r} (AWS eval 미지원 — eval 은 local in-process)")
+    if mode not in _SCRIPT:
+        raise ValueError(f"지원 안 함: mode={mode!r}")
     knob = params.get("knobs") or {}
     adv = params.get("adv") or {}
     # Robot drive mode — motor-space coupled PD (the robot YAML's control_mode) vs native per-joint PD.
@@ -394,46 +359,9 @@ def _build(params: dict) -> tuple[str, list, dict]:
     if mode == "standalone":   # env-only GUI run: --sim/--task only. Runs on the default (display) GPU so
         # The group is a UI shelf, not part of the contract's name — standalone.sh and the loader both
         # take the CONTRACT stem — so the chosen recipe IS the --task value and no --recipe is sent.
-        return _SCRIPT[(mode, target)], ["--sim", engine, "--task", recipe or task], env
+        return _SCRIPT[mode], ["--sim", engine, "--task", recipe or task], env
 
-    if mode == "train" and target == "aws":
-        # aws/metalab_train.sh — HYPHENATED flags; headless + wandb on (no --viz/--no_wandb); the script adds
-        # --s3-sync itself + launches/provisions a gpu-launcher node. SAPG env (ALGO/SAPG_BLOCKS) is set
-        # here and forwarded to the node by aws/metalab_train.sh's remote `export` (workstation env alone won't reach it).
-        algo = params.get("algo", "ppo")
-        if algo == "sapg":
-            epb, nb = _int(knob.get("envs_per_block", "")), _int(knob.get("num_blocks", ""))
-            if epb and nb:
-                flags += ["--num-envs", str(int(epb) * int(nb))]
-                env["ALGO"] = "sapg"
-                env["SAPG_BLOCKS"] = nb
-                ed = str(knob.get("embed_dim", "")).strip()
-                if ed:
-                    int(ed)  # validate — fail loud on non-numeric
-                    env["SAPG_EMBED_DIM"] = ed
-                sc = str(knob.get("ir_coef_scale", "")).strip()
-                if sc:
-                    float(sc)  # validate — fail loud on non-numeric
-                    env["SAPG_IR_COEF_SCALE"] = sc
-            v = _int(knob.get("max_iterations", ""))
-            if v:
-                flags += ["--max-iterations", v]
-        else:
-            for k, fl in (("num_envs", "--num-envs"), ("max_iterations", "--max-iterations")):
-                v = _int(knob.get(k, ""))
-                if v:
-                    flags += [fl, v]
-        nid = str(knob.get("instance_id", "")).strip()   # existing EC2 instance to reuse (combo → --node)
-        if nid:
-            flags += ["--node", nid]
-        if adv.get("record"):
-            flags.append("--record")
-        lbl = _label(knob.get("run_label", ""))     # empty → the launcher leaves the label segment out
-        if lbl:
-            flags += ["--run-label", lbl]
-        return _SCRIPT[(mode, target)], flags, env
-
-    if mode == "train":  # local (in-process on this workstation)
+    if mode == "train":
         algo = params.get("algo", "ppo")
         if algo == "sapg":
             # SAPG: user picks envs-per-policy(block) + num-policies(blocks). Total num_envs = per_block *
@@ -468,8 +396,6 @@ def _build(params: dict) -> tuple[str, list, dict]:
             flags += ["--device", dv]
         if adv.get("viz"):
             flags += ["--viz", "gl"]   # "3D 뷰어 창" → GL viewer; --viz needs a value (gl|none, newton도 rtx)
-        # No S3 toggle: metalab_train.sh mirrors checkpoints to S3 by DEFAULT now (same path as an AWS
-        # run), so a checkbox for it would only ever be checked. Opting out is a CLI-only case (--no-s3-sync).
         for k, fl in (("no_wandb", "--no_wandb"), ("record", "--record")):
             if adv.get(k):
                 flags.append(fl)
@@ -486,7 +412,7 @@ def _build(params: dict) -> tuple[str, list, dict]:
             v = _int(knob.get(k, ""))
             if v:
                 env[name] = v
-    return _SCRIPT[(mode, target)], flags, env
+    return _SCRIPT[mode], flags, env
 
 
 def _display(env: dict, script: str, flags: list) -> str:
@@ -508,7 +434,7 @@ def launch(params: dict) -> dict:
     Executed as `bash <abs script>` (robust to cwd/exec-bit); the displayed command stays relative."""
     script, flags, env = _build(params)
     now = datetime.now()
-    run_id = now.strftime("%Y%m%d-%H%M%S") + f"-{params['engine']}-{params['task']}-{params.get('target','local')}-{params['mode']}"
+    run_id = now.strftime("%Y%m%d-%H%M%S") + f"-{params['engine']}-{params['task']}-{params['mode']}"
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
     logpath = LOGS_DIR / f"{run_id}.log"
     logf = open(logpath, "wb")
@@ -517,7 +443,7 @@ def launch(params: dict) -> dict:
     exec_argv = ["bash", str(REPO / script), *flags]
     proc = subprocess.Popen(exec_argv, cwd=str(REPO), env=full_env, stdout=logf,
                             stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
-    meta = {"run_id": run_id, "mode": params["mode"], "target": params.get("target", "local"),
+    meta = {"run_id": run_id, "mode": params["mode"],
             "engine": params["engine"], "task": params["task"],
             "task_recipe": (params.get("recipe") or ""),
             # the form state as clicked — lets a card click restore the whole launcher (algo/knobs/adv)
@@ -566,24 +492,9 @@ def _read_registry() -> tuple[dict, dict]:
     return metas, updates
 
 
-_node_cache: dict = {}   # run_id -> node id (log parsing is file IO; cache it — the id never changes)
-
-
-def _node_of(meta: dict) -> str | None:
-    rid = meta.get("run_id", "")
-    if rid not in _node_cache:
-        _node_cache[rid] = _aws_node_id(meta)
-    return _node_cache[rid]
-
-
 def list_runs() -> list:
     """Merge the persisted registry (past sessions) + its status updates with this session's live
-    process status, retire superseded AWS cards (persisted), and drop dismissed cards. Newest first.
-
-    AWS lifecycle: while the LOCAL launcher runs the card is live ``running``; when the launcher exits
-    cleanly the training is DETACHED on the node, so the card STAYS ``running`` (not ``done``) until an
-    explicit update lands — Stop (``stopped``), a newer launch on the same node (``ended``), or the
-    background node reconciler finding the node/training gone (``ended``)."""
+    process status, and drop dismissed cards. Newest first."""
     metas, updates = _read_registry()
     out: dict = {}
     for rid, m in metas.items():
@@ -598,14 +509,9 @@ def list_runs() -> list:
             m.update(updates.get(rid, {}))
             if rc is None:
                 m["status"] = "running"
-            elif m.get("target") == "aws":
-                # launcher exited: rc 0 = training detached on the node -> still running (unless an
-                # explicit update already landed, e.g. Stop); rc != 0 = the launch itself failed.
-                if "status" not in updates.get(rid, {}):
-                    m["status"] = "running" if rc == 0 else "failed"
             else:
-                # local/standalone launcher finished — persist the terminal status ONCE so a later
-                # console session shows done/failed (not the pid-gone "ended" fallback).
+                # launcher finished — persist the terminal status ONCE so a later console session shows
+                # done/failed (not the pid-gone "ended" fallback).
                 new = "done" if rc == 0 else "failed"
                 m["status"] = new
                 if "status" not in updates.get(rid, {}):
@@ -614,42 +520,19 @@ def list_runs() -> list:
             m["live"] = rc is None
             out[rid] = m
     out = {rid: m for rid, m in out.items() if not m.get("dismissed")}
-    # Non-live LOCAL/standalone cards left "running" by a previous console session: the run is detached
-    # (the console that spawned it is gone), so re-derive from the pid — alive & ours → still running,
-    # else → ended (persist once). This is what makes "close the console, reopen it" show the truth.
+    # Non-live cards left "running" by a previous console session: the run is detached (the console that
+    # spawned it is gone), so re-derive from the pid — alive & ours → still running, else → ended
+    # (persist once). This is what makes "close the console, reopen it" show the truth.
     for rid, m in out.items():
-        if m.get("live") or m.get("status") != "running" or m.get("target") == "aws":
+        if m.get("live") or m.get("status") != "running":
             continue
         pid = int(m.get("pid") or 0)
         if pid > 0 and _pid_alive(pid) and _is_our_run_pid(pid):
             continue                                # genuinely still running (detached, reparented to init)
         m["status"] = "ended"
         _append_update(rid, status="ended", ended_by="process gone")
-    _retire_superseded_aws(out)
-    for m in out.values():                     # annotate the node id on aws cards (UI shows it)
-        if m.get("target") == "aws":
-            m["node"] = _node_of(m)
     return sorted(out.values(), key=lambda m: m.get("started_at", ""), reverse=True)
 
-
-def _retire_superseded_aws(runs: dict) -> None:
-    """Flip superseded ``running`` AWS cards to ``ended`` — PERSISTED (append-only update), so the
-    downgrade happens once and survives restarts. A node runs ONE training at a time and every new AWS
-    launch reuses/replaces it, so among AWS runs sharing a node only the NEWEST can still be running;
-    the older ones are superseded. Group by node (cheap: --node in argv, else the run log — no SSM).
-    Leaves the newest as-is (the background reconciler owns its truth) and never touches a live card."""
-    by_node: dict = {}
-    for m in runs.values():
-        if m.get("target") != "aws" or m.get("live") or m.get("status") != "running":
-            continue
-        node = _node_of(m)
-        if node:
-            by_node.setdefault(node, []).append(m)
-    for node_runs in by_node.values():
-        node_runs.sort(key=lambda m: m.get("started_at", ""))   # oldest first
-        for m in node_runs[:-1]:                                # all but the newest on this node
-            m["status"] = "ended"
-            _append_update(m["run_id"], status="ended", ended_by="superseded")
 
 
 def dismiss_run(run_id: str) -> dict:
@@ -674,60 +557,11 @@ def stop_all() -> dict:
     return {"stopped": len(roots)}
 
 
-def _aws_node_id(meta: dict) -> str | None:
-    """Instance id of an aws run: explicit ``--node`` in argv (reused node), else parsed from the run log
-    (aws/metalab_train.sh logs ``[metalab-aws ...] node = i-...`` for a freshly launched node)."""
-    argv = meta.get("argv") or []
-    if "--node" in argv:
-        i = argv.index("--node")
-        if i + 1 < len(argv):
-            return str(argv[i + 1]).strip()
-    logp = meta.get("log")
-    if logp:
-        try:
-            m = re.search(r"node = (i-[0-9a-f]+)", Path(logp).read_text(errors="ignore"))
-            if m:
-                return m.group(1)
-        except OSError:
-            pass
-    return None
-
-
-def _ssm_kill_train(iid: str) -> None:
-    """SSM into an AWS node and kill the DETACHED training stack (trainer + sim server). The local launcher
-    the Hub tracks does NOT own the node processes (aws/metalab_train.sh runs them detached via setsid on the
-    node, then exits), so a local kill can't reach them. Best-effort fire-and-forget send-command; the node
-    stays RUNNING (billing) — terminate/stop it separately."""
-    # SIGINT (Ctrl-C), NOT SIGTERM: the trainer's wandb run marks itself 'killed' on KeyboardInterrupt,
-    # whereas SIGTERM bypasses wandb's finish → the run shows 'crashed'. Give wandb time to flush + finish
-    # (sleep 12) BEFORE any hard SIGKILL backstop for a process that ignored the interrupt.
-    remote = (
-        "pkill -INT -f learning.train 2>/dev/null || true; "   # TRAINER ONLY → wandb 'killed' + it tears down its own sim-server
-        "sleep 15; "                                            # let wandb flush/finish + the server exit before any hard kill
-        # both names: nodes deployed before the metalab_train.sh rename still run the old script
-        "pkill -TERM -f 'metalab_train.sh|rl_train.sh' 2>/dev/null || true; "
-        "pkill -KILL -f learning.train 2>/dev/null || true; "   # backstop (SIGINT-ignoring trainer)
-        "pkill -KILL -f sim.metalab.backends.genesis.server 2>/dev/null || true; "   # + a server the trainer didn't reap
-        "pkill -KILL -f sim.metalab.backends.newton.server 2>/dev/null || true; "
-        "echo hub-stop-killed"
-    )
-    params = json.dumps({"commands": [remote]})
-    try:
-        out = subprocess.run(
-            ["aws", "ssm", "send-command", "--instance-ids", iid, "--document-name", "AWS-RunShellScript",
-             "--timeout-seconds", "120", "--parameters", params, "--query", "Command.CommandId", "--output", "text"],
-            capture_output=True, text=True, timeout=60,
-        )
-        print(f"[hub] aws stop: ssm pkill sent to {iid} (cmd={(out.stdout or '').strip() or 'FAILED'}) "
-              f"{(out.stderr or '').strip()[:200]}", flush=True)
-    except Exception as e:   # system boundary: aws-cli/SSM failure must never break the Hub
-        print(f"[hub] aws stop: ssm send failed for {iid}: {e}", flush=True)
 
 
 def stop_run(run_id: str) -> dict:
-    """Stop ONLY the given run, leaving siblings alone. Kills the LOCAL process tree (SIGINT→SIGKILL,
-    sweep=False). For an AWS run the training is DETACHED on the remote node (the local launcher the Hub
-    tracks doesn't own it), so we ALSO SSM into the node and kill the training stack there."""
+    """Stop ONLY the given run, leaving siblings alone: kills that run's process tree
+    (SIGINT→SIGKILL, sweep=False)."""
     root, meta = None, None
     with _runs_lock:
         r = _runs.get(run_id)
@@ -744,14 +578,11 @@ def stop_run(run_id: str) -> dict:
         return {"ok": False, "stopped": 0, "run_id": run_id, "error": "run not found"}
     if root is not None:
         threading.Thread(target=lambda: _kill_roots([root], sweep=False), daemon=True).start()
-    aws_node = _node_of(meta) if meta and meta.get("target") == "aws" else None
-    if aws_node:
-        threading.Thread(target=lambda: _ssm_kill_train(aws_node), daemon=True).start()
-    # persist "stopped" for ANY target so the card stays stopped across console restarts — local/
-    # standalone too (otherwise a restart re-derives it from the now-dead pid as a generic "ended").
+    # persist "stopped" so the card stays stopped across console restarts (otherwise a restart
+    # re-derives it from the now-dead pid as a generic "ended").
     if meta:
         _append_update(run_id, status="stopped")
-    return {"ok": True, "stopped": 1, "run_id": run_id, "aws_node": aws_node}
+    return {"ok": True, "stopped": 1, "run_id": run_id}
 
 
 def reset_run(run_id: str) -> dict:
@@ -799,92 +630,8 @@ def read_log(run_id: str, max_bytes: int = 200_000) -> str:
     return Path(logpath).read_bytes()[-max_bytes:].decode("utf-8", "replace")
 
 
-# ── AWS node reconciler: keep "running" aws cards truthful (background, best-effort) ─────────────────
-def _ec2_states(ids: list) -> dict:
-    """Instance states for the given ids in ONE describe-instances call — {} on any failure (leave
-    the cards untouched rather than guessing)."""
-    try:
-        out = subprocess.run(
-            ["aws", "ec2", "describe-instances", "--instance-ids", *ids,
-             "--query", "Reservations[].Instances[].{id:InstanceId,state:State.Name}", "--output", "json"],
-            capture_output=True, text=True, timeout=25)
-        if out.returncode != 0:
-            return {}
-        return {i["id"]: i["state"] for i in json.loads(out.stdout or "[]")}
-    except Exception:
-        return {}
 
 
-def _ssm_probe_train(iid: str) -> bool | None:
-    """Is a training stack alive on the node? READ-ONLY SSM probe (pgrep) — True/False, or None on any
-    SSM failure (unknown -> leave the card untouched). Matches the launcher script too (metalab_train.sh) so
-    the provisioning window before learning.train starts doesn't read as dead."""
-    try:
-        cid = subprocess.run(
-            ["aws", "ssm", "send-command", "--instance-ids", iid, "--document-name", "AWS-RunShellScript",
-             "--timeout-seconds", "60",
-             "--parameters", json.dumps({"commands": ["pgrep -f 'learning.train|metalab_train.sh|rl_train.sh' >/dev/null && echo ALIVE || echo DEAD"]}),
-             "--query", "Command.CommandId", "--output", "text"],
-            capture_output=True, text=True, timeout=30)
-        if cid.returncode != 0:
-            return None
-        cmd_id = cid.stdout.strip()
-        for _ in range(15):
-            time.sleep(2)
-            inv = subprocess.run(
-                ["aws", "ssm", "get-command-invocation", "--command-id", cmd_id, "--instance-id", iid,
-                 "--query", "[Status,StandardOutputContent]", "--output", "json"],
-                capture_output=True, text=True, timeout=15)
-            if inv.returncode != 0:
-                continue
-            status, stdout = json.loads(inv.stdout)
-            if status in ("Success", "Failed", "Cancelled", "TimedOut"):
-                if status != "Success":
-                    return None
-                return "ALIVE" in (stdout or "")
-        return None
-    except Exception:
-        return None
-
-
-def _reconcile_aws_once() -> None:
-    """One reconcile pass: for every non-live aws card still ``running``, check reality — node not
-    running (EC2, one batch call) or no training process on the node (SSM pgrep, one probe per node)
-    → persist ``ended``. Unknown (creds expired, SSM offline) leaves the card as-is."""
-    cards = [m for m in list_runs()
-             if m.get("target") == "aws" and m.get("status") == "running" and not m.get("live")]
-    by_node: dict = {}
-    for m in cards:
-        node = m.get("node") or _node_of(m)
-        if node:
-            by_node.setdefault(node, []).append(m)
-    if not by_node:
-        return
-    states = _ec2_states(sorted(by_node))
-    for node, node_runs in by_node.items():
-        st = states.get(node)
-        dead_reason = None
-        if st and st != "running":
-            dead_reason = f"node {st}"
-        elif st == "running":
-            alive = _ssm_probe_train(node)
-            if alive is False:
-                dead_reason = "no training process on the node"
-        if dead_reason:
-            for m in node_runs:
-                _append_update(m["run_id"], status="ended", ended_by=dead_reason)
-                print(f"[hub] reconcile: {m['run_id']} -> ended ({dead_reason})", flush=True)
-
-
-def _reconcile_aws_loop() -> None:
-    """Background thread: reconcile every 90s (only does work while a non-live aws card claims
-    ``running``). Best-effort — any AWS/SSM error just skips the pass."""
-    while True:
-        try:
-            _reconcile_aws_once()
-        except Exception as e:   # system boundary: the reconciler must never kill the hub
-            print(f"[hub] reconcile error (ignored): {e}", flush=True)
-        time.sleep(90)
 
 
 def _pid_alive(pid: int) -> bool:
@@ -1156,8 +903,6 @@ def _make_handler():
                 self._json(discover())
             elif u.path == "/api/creds":
                 self._json(creds())
-            elif u.path == "/api/ec2":
-                self._json(list_ec2())
             elif u.path == "/api/gpus":
                 self._json(list_gpus())
             elif u.path == "/api/ls":
@@ -1200,12 +945,11 @@ def _make_handler():
 
 
 def _reset_state() -> None:
-    """Compact the registry at start — do NOT kill anything. ALL runs are preserved (local + aws): a
-    launched run is a detached session that OUTLIVES the launchpad, so its card + log must survive a
-    restart, and ``list_runs`` re-derives the true status from the pid (local/standalone) or the node
-    (aws). COMPACT: fold the append-only status updates into each meta (baking status/node) and drop
-    dismissed cards + their logs, so the registry never grows unbounded. (Previously LOCAL cards were
-    dropped here because Exit had killed them — Exit no longer kills, so they are kept.)"""
+    """Compact the registry at start — do NOT kill anything. ALL runs are preserved: a launched run is a
+    detached session that OUTLIVES the launchpad, so its card + log must survive a restart, and
+    ``list_runs`` re-derives the true status from the pid. COMPACT: fold the append-only status updates
+    into each meta (baking status) and drop dismissed cards + their logs, so the registry never grows
+    unbounded. (Previously cards were dropped here because Exit had killed them — Exit no longer kills.)"""
     try:
         keep: list[str] = []
         kept_logs: set[str] = set()
@@ -1215,8 +959,6 @@ def _reset_state() -> None:
             m.update(updates.get(rid, {}))
             if m.get("dismissed"):                    # dismissed → gone for good (+ its log below)
                 continue
-            if m.get("target") == "aws":
-                m["node"] = m.get("node") or _aws_node_id(m)   # bake node id (log may be pruned later)
             keep.append(json.dumps(m))
             if m.get("log"):
                 kept_logs.add(Path(m["log"]).name)
@@ -1243,8 +985,6 @@ def serve(host: str = "127.0.0.1", port: int = 8770, open_browser: bool = True) 
     print(f"[hub] MetaLab Launchpad → {url}", flush=True)
     print(f"[hub] engines={d['engines']}  tasks={d['tasks']}", flush=True)
     print("[hub] Ctrl-C 또는 웹의 Exit 버튼으로 종료.", flush=True)
-    # aws-card truth keeper: flips dead "running" aws cards to ended (EC2 state + SSM pgrep, 90s cycle)
-    threading.Thread(target=_reconcile_aws_loop, daemon=True).start()
     if open_browser:
         _open_browser(url)
     try:
@@ -1293,7 +1033,6 @@ header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:2px
 .rdot.running{background:#1a9a5f;box-shadow:0 0 0 3px rgba(26,154,95,.22)}
 .rdot.failed{background:#c0392b}
 .rlabel{flex:1;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rnode{font-family:var(--mono);font-size:.64rem;color:var(--faint)}
 .rst{font-family:var(--mono);font-size:.68rem;color:var(--soft)}
 .rx{flex:none;font-family:var(--mono);font-size:.72rem;color:var(--faint);padding:0 3px;cursor:pointer;border-radius:4px}
 .rx:hover{color:#c0392b;background:var(--surface2)}
@@ -1438,12 +1177,6 @@ details[open] summary::before{content:"▾ "}
     <option value="ppo">PPO</option>
     <option value="sapg">SAPG · Split-and-Aggregate</option>
   </select></div>
-<div class="field" id="targetfield"><label>3b · 실행 위치 (Local = 이 워크스테이션 in-process / AWS = gpu 노드 런치)</label>
-  <div class="seg" id="target">
-    <button data-v="local" class="on">로컬 · Local</button>
-    <button data-v="aws">AWS 노드</button>
-  </div></div>
-
 <div class="field"><label>4 · 노브 (기본값 프리필 — 그냥 두고 실행해도 됨)</label>
   <div class="knobs" id="knobs"></div></div>
 
@@ -1464,8 +1197,7 @@ details[open] summary::before{content:"▾ "}
 <div class="rcfilter">
   <div class="rcseg" id="rcmode">
     <button data-v="all" class="on">전체</button>
-    <button data-v="local">Local</button>
-    <button data-v="aws">AWS</button>
+    <button data-v="local">학습·검증</button>
     <button data-v="standalone">Standalone</button>
   </div>
   <div class="rcchips" id="rcstatus"></div>
@@ -1531,10 +1263,10 @@ function ansiToHtml(raw){                         // render terminal SGR (bold/c
 let DESC=null;
 // ctrl = robot drive mode: "motor" (motor-space coupled PD, the robot YAML's control_mode) or "joint"
 // (native per-joint diagonal PD) — carried to every run as METALAB_MOTOR_COUPLING=1|0.
-const state={engine:null,task:null,recipe:"",mode:"train",target:"local",algo:"ppo",ctrl:"motor",knob:{},adv:{}};
-// What this machine is connected to (/api/creds). Optimistic until the probe answers — a failed probe
-// must never lock a working setup out; the launched script still fails loudly if it was wrong.
-let CREDS={aws:true,wandb:true};
+const state={engine:null,task:null,recipe:"",mode:"train",algo:"ppo",ctrl:"motor",knob:{},adv:{}};
+// Is wandb logged in (/api/creds)? Optimistic until the probe answers — a failed probe must never lock a
+// working setup out; the launched script still fails loudly if it was wrong.
+let CREDS={wandb:true};
 
 // mode-dependent knob + advanced specs (matched to the maintained local scripts)
 const SPEC={
@@ -1544,13 +1276,6 @@ const SPEC={
            ["seed","42","--seed"],["device","cuda:0","--device"],["run_label","","--run_label"]],
     adv:[["viz","--viz","3D 뷰어 창 (엔진 GUI)"],["no_wandb","--no_wandb","wandb 끄기"],
          ["record","--record","체크포인트별 녹화"]],
-    advhint:""
-  },
-  train_aws:{
-    script:"learning/scripts/aws/metalab_train.sh",
-    knobs:[["num_envs","4096","--num-envs"],["max_iterations","5000","--max-iterations"],
-           ["instance_id","","--node"],["run_label","","--run-label"]],
-    adv:[["record","--record","체크포인트별 녹화"]],
     advhint:""
   },
   eval:{
@@ -1568,8 +1293,7 @@ const SPEC={
   }
 };
 
-// current spec: train+AWS uses the aws script/flags; else the mode's local spec.
-function curSpec(){return (state.mode==="train"&&state.target==="aws")?SPEC.train_aws:SPEC[state.mode];}
+function curSpec(){return SPEC[state.mode];}
 function renderKnobs(){
   const sp=curSpec();
   let html=sp.knobs.map(([k,def])=>{
@@ -1578,7 +1302,6 @@ function renderKnobs(){
            + `<div class="knob"><label>num policies</label><input id="k_num_blocks" value="${esc(state.knob.num_blocks??"4")}"></div>`
            + `<div class="knob"><label>entropy scale</label><input id="k_ir_coef_scale" value="${esc(state.knob.ir_coef_scale??"0")}"></div>`
            + `<div class="knob"><label>embed dim</label><select id="k_embed_dim" class="selbox">${[32,16,8].map(d=>`<option value="${d}"${(state.knob.embed_dim??"32")===String(d)?" selected":""}>${d}</option>`).join("")}</select></div>`;
-    if(k==="instance_id") return `<div class="knob"><label>instance (name)</label><select id="k_instance_id" class="selbox"><option value="">(EC2 로딩…)</option></select></div>`;
     if(k==="device") return `<div class="knob"><label>device (GPU)</label><select id="k_device" class="selbox"></select></div>`;
     if(k==="run_label") return `<div class="knob"><label>run label (선택)</label><input id="k_run_label" placeholder="(비우면 생략)" value="${esc(state.knob[k]??def)}"></div>`;
     if(k==="checkpoint") return `<div class="knob ckwrap"><label>checkpoint</label><div class="ckrow"><input id="k_checkpoint" placeholder="(비우면 최신 자동)" value="${esc(state.knob[k]??def)}"><button type="button" id="ckbrowse">📁 찾아보기</button></div></div>`;
@@ -1591,8 +1314,7 @@ function renderKnobs(){
   $("knobs").innerHTML=html;
   [...sp.knobs,...(sp.envknobs||[])].forEach(([k])=>{
     const el=$("k_"+k); if(!el) return;
-    if(k==="instance_id"){el.onchange=e=>{state.knob[k]=e.target.value;render();};loadEc2();}
-    else if(k==="device"){el.onchange=e=>{state.knob[k]=e.target.value;render();};loadGpus();}
+    if(k==="device"){el.onchange=e=>{state.knob[k]=e.target.value;render();};loadGpus();}
     else if(k==="gpu"){el.onchange=e=>{state.knob[k]=e.target.value;render();};loadEvalGpus();}
     else el.oninput=e=>{state.knob[k]=e.target.value;render();};});
   ["envs_per_block","num_blocks","ir_coef_scale"].forEach(k=>{const el=$("k_"+k);if(el)el.oninput=e=>{state.knob[k]=e.target.value;render();};});
@@ -1632,16 +1354,6 @@ function loadCkDir(dir){
     box.querySelectorAll(".ckfile").forEach(it=>it.onclick=()=>{state.knob.checkpoint=it.dataset.p;
       const inp=$("k_checkpoint");if(inp)inp.value=it.dataset.p;$("ckmodal").hidden=true;render();});
   }).catch(()=>{box.innerHTML="조회 실패";});
-}
-// AWS: populate the instance combo from live EC2 (running/stopped GPU nodes). Picked id → --node.
-function loadEc2(){
-  const sel=$("k_instance_id"); if(!sel) return;
-  fetch("/api/ec2").then(r=>r.json()).then(d=>{
-    if(d.error){sel.innerHTML=`<option value="">(EC2 조회 실패: ${esc(d.error)})</option>`;return;}
-    const list=d.instances||[], cur=state.knob.instance_id||"";
-    sel.innerHTML=`<option value="">(인스턴스 선택 — 필수)</option>`+list.map(i=>
-      `<option value="${esc(i.id)}" ${i.id===cur?"selected":""}>${esc(i.name||i.id)} · ${esc(i.state)} · ${esc(i.type)}</option>`).join("");
-  }).catch(()=>{sel.innerHTML=`<option value="">(EC2 조회 실패)</option>`;});
 }
 function renderAdv(){
   const sp=curSpec();
@@ -1730,22 +1442,7 @@ function selectMode(m){state.mode=m;
   [...$("mode").children].forEach(b=>b.classList.toggle("on",b.dataset.v===m));
   const af=$("algofield"); if(af) af.style.display=(m==="train")?"":"none";   // algorithm selector: train mode only
   const rb=$("reset"); if(rb) rb.hidden=(m!=="standalone");   // 'Reset Simulator' button: standalone only
-  syncAwsBtn();
   populateTasks();renderKnobs();renderAdv();render();}   // switch the task combobox to this mode's list
-// AWS node is train-only (eval = in-process, standalone = GUI on the display GPU — mirrors the server,
-// which has no (eval|standalone, aws) script), and it needs working AWS credentials: without them every
-// aws call in the launcher fails. Either way the button is disabled and the target pinned to local.
-function syncAwsBtn(){
-  const trainOnly=(state.mode==="train"), ok=trainOnly&&CREDS.aws;
-  const awsBtn=$("target").querySelector('[data-v="aws"]');
-  if(awsBtn){awsBtn.disabled=!ok;
-    awsBtn.title=ok?"":(trainOnly?"AWS 미연동 — `aws login` 후 페이지를 새로고침하세요"
-                                 :"AWS 노드는 train 전용 — eval/standalone 은 로컬에서만 실행됩니다");}
-  if(!ok&&state.target!=="local") selectTarget("local");
-}
-function selectTarget(tg){state.target=tg;
-  [...$("target").children].forEach(b=>b.classList.toggle("on",b.dataset.v===tg));
-  renderKnobs();renderAdv();render();}
 
 fetch("/api/discover").then(r=>r.json()).then(d=>{DESC=d;
   $("dot").classList.add("on");$("livetxt").textContent="ready";
@@ -1760,14 +1457,13 @@ fetch("/api/discover").then(r=>r.json()).then(d=>{DESC=d;
   $("recipe").onchange=e=>{state.recipe=e.target.value;render();};
   $("algo").onchange=e=>{state.algo=e.target.value;renderKnobs();render();};
   [...$("mode").children].forEach(b=>b.onclick=()=>selectMode(b.dataset.v));
-  [...$("target").children].forEach(b=>b.onclick=()=>selectTarget(b.dataset.v));
   [...$("ctrl").children].forEach(b=>b.onclick=()=>selectCtrl(b.dataset.v));
   renderKnobs();renderAdv();render();
 }).catch(()=>{$("livetxt").textContent="discover 실패";});
 
-// Gate the controls that need an external account: no AWS creds -> no AWS node, no wandb login -> the
-// run is pinned to --no_wandb. Independent of /api/discover (order does not matter — both re-render).
-fetch("/api/creds").then(r=>r.json()).then(d=>{CREDS=d;syncAwsBtn();renderAdv();render();}).catch(()=>{});
+// No wandb login -> the run is pinned to --no_wandb. Independent of /api/discover (order does not
+// matter — both re-render).
+fetch("/api/creds").then(r=>r.json()).then(d=>{CREDS=d;renderAdv();render();}).catch(()=>{});
 
 $("copy").onclick=()=>{const t=$("cmd").dataset.plain||"";
   navigator.clipboard.writeText(t).then(()=>{$("toast").textContent="복사됨 ✓";
@@ -1776,8 +1472,7 @@ function gatherParams(){const sp=curSpec(),knobs={},adv={};
   [...sp.knobs,...(sp.envknobs||[])].forEach(([k])=>{const el=$("k_"+k);if(el)knobs[k]=el.value;});
   ["envs_per_block","num_blocks","ir_coef_scale","embed_dim"].forEach(k=>{const el=$("k_"+k);if(el)knobs[k]=el.value;});
   sp.adv.forEach(([k])=>{const el=$("a_"+k);if(el)adv[k]=el.checked;});
-  const target=(state.mode==="eval"||state.mode==="standalone")?"local":state.target;   // AWS eval/standalone unsupported → local
-  return {engine:state.engine,task:state.task,recipe:state.recipe,mode:state.mode,target,
+  return {engine:state.engine,task:state.task,recipe:state.recipe,mode:state.mode,
           algo:state.algo,ctrl:state.ctrl,knobs,adv};}
 $("launch").onclick=()=>{const p=gatherParams();
   if(!p.engine||!p.task){$("toast").textContent="엔진/태스크를 먼저 고르세요";return;}
@@ -1798,7 +1493,7 @@ $("stop").onclick=()=>{
   fetch("/api/stop",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({run_id:CURRENT})})
     .then(r=>r.json()).then(j=>{
       $("toast").textContent=j.ok
-        ?("정지: "+CURRENT+(j.aws_node?(" + AWS 노드 "+j.aws_node+" 학습 kill(SSM)"):" Ctrl-C 전송"))
+        ?("정지: "+CURRENT+" Ctrl-C 전송")
         :("정지 실패: "+(j.error||""));
       setTimeout(()=>$("toast").textContent="",4000);})
     .catch(()=>{$("stop").disabled=false;$("toast").textContent="정지 요청 실패";});};
@@ -1859,10 +1554,10 @@ function heartbeat(){if(EXITING)return;            // the server is on its way o
     renderCards(j.runs);
     syncSimFrame(j.runs);              // Standalone tab: live dashboard while its run lives, else preview
   }).catch(()=>{});}
-// run cards: grouped mode(Local/AWS/Standalone) → status filter → date. Click a card → show its launch
-// info (mode/params/sha for reproduce) + tail its log. AWS cards show node id; non-running cards get ✕.
+// run cards: grouped mode(학습·검증/Standalone) → status filter → date. Click a card → show its launch
+// info (mode/params/sha for reproduce) + tail its log. Non-running cards get ✕.
 let RCFILTER={mode:"all",status:"all"}, RUNS_CACHE=[];
-function cardMode(m){ return m.mode==="standalone" ? "standalone" : (m.target==="aws" ? "aws" : "local"); }
+function cardMode(m){ return m.mode==="standalone" ? "standalone" : "local"; }
 function renderStatusChips(){
   const inMode=RUNS_CACHE.filter(m=>RCFILTER.mode==="all"||cardMode(m)===RCFILTER.mode);
   if(RCFILTER.status!=="all" && !inMode.some(m=>(m.status||"?")===RCFILTER.status)) RCFILTER.status="all";
@@ -1884,10 +1579,9 @@ function renderCards(runs){
     const d=new Date(m.started_at), dk=isNaN(d)?"(날짜 미상)":d.toLocaleDateString("ko-KR");
     if(dk!==lastDate){html+=`<div class="rcdate">${esc(dk)}</div>`;lastDate=dk;}
     const st=m.status||"?";
-    const node=(m.target==="aws"&&m.node)?`<span class="rnode" title="AWS node">${esc(m.node)}</span>`:"";
     const x=(st!=="running")?`<span class="rx" data-x="${esc(m.run_id)}" title="카드 지우기">✕</span>`:"";
     html+=`<div class="rcard${m.run_id===CURRENT?" on":""}" data-rid="${esc(m.run_id)}"><span class="rdot ${esc(st)}"></span>`+
-      `<span class="rlabel">${esc(m.engine||"")}·${esc(m.task||"")}${m.task_recipe?"/"+esc(m.task_recipe):""} <b>${esc(m.mode||"")}/${esc(m.target||"")}</b></span>`+
+      `<span class="rlabel">${esc(m.engine||"")}·${esc(m.task||"")}${m.task_recipe?"/"+esc(m.task_recipe):""} <b>${esc(m.mode||"")}</b></span>`+
       node+`<span class="rst">${esc(st)}</span>`+x+`</div>`;
   }
   el.innerHTML=html;
@@ -1948,7 +1642,6 @@ function restoreForm(m){
   if(!m) return;
   if(m.engine) state.engine=m.engine;
   if(m.mode) state.mode=m.mode;
-  if(m.target) state.target=m.target;
   // algo: stored field first; fall back to env ALGO / cmd (pre-feature cards recorded the SAPG choice
   // only in the env, not as a top-level field, so m.algo was undefined and the selector stayed on PPO).
   state.algo=((m.algo)||((m.env&&m.env.ALGO))||(/(^|[ =])ALGO=sapg/.test(m.cmd||"")?"sapg":"ppo")||"ppo").toLowerCase();
@@ -1956,12 +1649,10 @@ function restoreForm(m){
   state.ctrl=(m.ctrl)||(((m.env&&m.env.METALAB_MOTOR_COUPLING)==="0")?"joint":"motor");
   state.knob={...(m.knobs||{})};
   state.adv={...(m.adv||{})};
-  // reflect selections into the widgets (mirror selectMode/selectTarget's visibility rules)
+  // reflect selections into the widgets (mirror selectMode's visibility rules)
   [...$("engines").children].forEach(b=>b.classList.toggle("on",b.dataset.v===state.engine));
   [...$("mode").children].forEach(b=>b.classList.toggle("on",b.dataset.v===state.mode));
-  [...$("target").children].forEach(b=>b.classList.toggle("on",b.dataset.v===state.target));
   [...$("ctrl").children].forEach(b=>b.classList.toggle("on",b.dataset.v===state.ctrl));
-  const tf=$("targetfield"); if(tf) tf.style.display=(state.mode==="standalone")?"none":"";
   const af=$("algofield"); if(af) af.style.display=(state.mode==="train")?"":"none";
   const rb=$("reset"); if(rb) rb.hidden=(state.mode!=="standalone");
   const a=$("algo"); if(a) a.value=state.algo;
@@ -1983,7 +1674,7 @@ function showTab(t){document.querySelectorAll(".tab").forEach(b=>b.classList.tog
   $("pane-console").hidden=(t!=="console");$("pane-sim").hidden=(t!=="sim");$("pane-telem").hidden=(t!=="telem");}
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 document.querySelectorAll(".rtab").forEach(b=>b.onclick=()=>showRTab(b.dataset.rt));   // 터미널/실행정보
-// run-card mode subtabs (Local/AWS/Standalone) → re-filter the card list
+// run-card mode subtabs → re-filter the card list
 [...$("rcmode").children].forEach(b=>b.onclick=()=>{RCFILTER.mode=b.dataset.v;
   [...$("rcmode").children].forEach(x=>x.classList.toggle("on",x.dataset.v===RCFILTER.mode));
   renderCards(RUNS_CACHE);});
@@ -2037,8 +1728,7 @@ def main():
     # did the killing, which is why those W&B runs showed "crashed" instead of "killed".
     # Re-arming SIGINT here fixes it for the whole tree at once: exec resets a CAUGHT signal to
     # SIG_DFL in the child, so launcher shells, trainers and sim servers all start interruptible.
-    # (Each entrypoint also self-heals via restore_default_sigint — the AWS node detaches its own
-    # training with `setsid … &`, out of our reach.) Foreground runs are unaffected: SIGINT is
+    # (Each entrypoint also self-heals via restore_default_sigint.) Foreground runs are unaffected: SIGINT is
     # already default there, and serve() keeps catching KeyboardInterrupt either way.
     signal.signal(signal.SIGINT, signal.default_int_handler)
     ap = argparse.ArgumentParser(description="MetaLab Launchpad (stdlib-only launcher/monitor web console)")

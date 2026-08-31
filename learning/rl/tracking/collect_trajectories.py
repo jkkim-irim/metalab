@@ -10,7 +10,7 @@ records alongside the per-episode env ``setup`` (for exact RSI). ``learning/rl/t
 repackages ``tracking_state`` (+ ``setup``) into ``ref_*.npz``.
 
 Inference-only (rebuilds the actor from POLICY, loads ``actor_state_dict``); Isaac-free — runs in the
-isaaclab conda env. Driven reproducibly by ``learning/scripts/aws/wbt_collect.sh``.
+isaaclab conda env.
 
 Lives in ``learning.rl.tracking`` (a subpackage; not a module directly under ``learning.rl``, so it does
 not trip rsl_rl's ``resolve_callable`` module scan)."""
@@ -57,7 +57,6 @@ def _load_policy(train_cfg: dict, obs, num_actions: int, checkpoint: str, device
 def main() -> int:
     p = argparse.ArgumentParser(description="Collect WBT success trajectories over the sim-service client.")
     p.add_argument("--checkpoint", required=True, help="path to a model_*.pt checkpoint (on the node)")
-    p.add_argument("--checkpoint_s3", default="", help="S3 source of the checkpoint (recorded in meta)")
     p.add_argument("--num_envs", type=int, default=64)
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--min_trajectories", type=int, default=1000, help="collect at least this many successes")
@@ -157,7 +156,7 @@ def main() -> int:
             np.savez_compressed(os.path.join(args.out_dir, f"traj_{j:04d}.npz"), **traj)
         meta = {
             "experiment": args.experiment, "eval_date": args.eval_date, "eval_sha": args.eval_sha,
-            "train": args.train, "checkpoint": args.checkpoint_s3 or args.checkpoint, "play": bool(args.play),
+            "train": args.train, "checkpoint": args.checkpoint, "play": bool(args.play),
             "num_envs": n, "seed": args.seed, "num_trajectories": len(trajectories),
             "episodes_done": n_done, "successes_seen": n_succ, "steps": step,
             "obs_groups": shapes, "num_actions": int(env.num_actions),

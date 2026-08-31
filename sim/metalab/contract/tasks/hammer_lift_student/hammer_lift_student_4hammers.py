@@ -23,7 +23,7 @@ _TABLE = next(o for o in base.SCENE.objects if o["name"] == "table")
 OBJECTS = [
     {
         "name": "hammer",
-        "asset": {"mjcf": [assets.s3_mjcf(a) for a in _HAMMERS]},
+        "asset": {"mjcf": [assets.object_mjcf(a) for a in _HAMMERS]},
         "mass": 0.55, "variants": len(_HAMMERS), "init_pos": [0.7, -0.2, 0.874],
     },
     _TABLE,
