@@ -10,7 +10,7 @@ type: project
 - 배제: 초기 q/v, armature, coupled PD 첫 launch, 중력보상, 모터 커플링(`METALAB_MOTOR_COUPLING=0` 재현).
 - ⇒ genesis 가 첫 substep 에 지시 없는 토크(~2.4 N·m) 주입. 후보: genesis 자체 equality spawn 해소
   (`eq_solref/eq_solimp` 가 newton 블록에만 있음), reset 경로.
-- 재현: `parity_rollout holddump --engine genesis --task motor-parity --n_steps 50`.
+- 재현: `parity_rollout holddump --engine genesis --task motor-parity --n_steps 50` — 단 이 하니스(`runtime/parity_rollout.py`)는 2026-09-01 제거됨(다른 방식의 parity 체크로 대체 예정).
 - ⚠️ genesis 학습은 **매 리셋마다 이 임펄스를 맞는다**. 미해결.
 
 관련: [[motor-to-joint-coupled-pd]], [[engine-parity-settings]]

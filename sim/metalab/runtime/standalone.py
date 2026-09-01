@@ -1,6 +1,6 @@
 """Standalone sim runner — build ONE task env and step it with the GUI, no policy / no learning.
 
-Drives the engine **backend directly** (like ``parity_rollout``), NOT the training ``EnvDriver.step`` —
+Drives the engine **backend directly**, NOT the training ``EnvDriver.step`` —
 so there is **no termination, no domain randomization, no reward/curriculum, and no automatic reset**
 (those are training/eval concerns that live inside ``EnvDriver.step``). The robot holds its init pose
 (a zero policy: PD target = contract init pose), OR follows a **cubic-Hermite CSV trajectory** driven from
@@ -79,8 +79,8 @@ def _on_sigusr1(_signum, _frame) -> None:
 
 def _build(engine: str, task: str):
     """Engine spoke ``build_env`` → EnvDriver, single-env on the default GPU with the GL viewer. Lazy
-    import so only the selected engine (which lives in its own uv venv) is imported — mirrors
-    ``parity_rollout._build``. We use only ``env.backend``/``env.spec`` below (never ``env.step``)."""
+    import so only the selected engine (which lives in its own uv venv) is imported.
+    We use only ``env.backend``/``env.spec`` below (never ``env.step``)."""
     if engine == "genesis":
         from sim.metalab.backends.genesis.server import build_env
     elif engine == "newton":
