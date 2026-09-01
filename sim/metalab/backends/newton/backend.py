@@ -170,13 +170,20 @@ class NewtonBackend:
         self._t_body_q = wp.to_torch(self.state_0.body_q)
         self._t_body_qd = wp.to_torch(self.state_0.body_qd)
 
-        # object(s) = child body of each FREE joint (robot is fixed base). Scene-only standalone tasks may have
+        # object(s) = child body of each FREE joint EXCEPT a floating robot's own root (the parser adds
+        # the robot first, so that root is the first FREE joint). Scene-only standalone tasks may have
         # ZERO objects (robot only), so guard every object index/pose cache; object read/DR methods just aren't
         # called then. When objects exist the single-object RL API (object_pos/vel, set_object_pose, mass/wrench
         # DR) uses the FIRST free object, mirroring the genesis backend (objects[0]).
         jtype = m.joint_type.numpy()
         jchild = m.joint_child.numpy()
         free_local = [j for j in range(self._joints_pw) if int(jtype[j]) == int(JointType.FREE)]
+        if not spec.robot.fixed_base:
+            assert free_local, "robot.fixed_base=False but the model has no FREE joint"
+            free_local = free_local[1:]
+        assert len(free_local) == len(spec.movable_objects), (
+            f"{len(spec.movable_objects)} movable objects in the contract but {len(free_local)} free "
+            f"joints in the model (after the floating-robot root) — object classification would be wrong")
         self._has_object = len(free_local) >= 1
         self._obj_body_idx = (self._world_off_body + int(jchild[free_local[0]])) if self._has_object else None  # (N,) object 0
         # ALL free-object bodies (every world); empty when no objects. Classifies shapes as 'object' below so that
@@ -302,12 +309,16 @@ class NewtonBackend:
             # env draws the build-time size in the viewer and in the .rrd (see viewer_scale). Empty headless.
             self._scale_syncs = make_scale_syncs((self._viewer, self._rerun), m, self._obj_shapes)
         # (c) fixed-base root joint (FIXED & parent==-1; object FREE joint is the only other parent==-1) → joint_X_p z
-        jparent = m.joint_parent.numpy()
-        root_local = [j for j in range(self._joints_pw)
-                      if int(jtype[j]) == int(JointType.FIXED) and int(jparent[j]) == -1]
-        assert len(root_local) == 1, f"exactly one fixed-base root joint required — {len(root_local)}"
-        self._root_j = (torch.arange(wc, device=self.device) * self._joints_pw + root_local[0]).long()
-        self._root_z0 = wp.to_torch(m.joint_X_p)[self._root_j, 2].clone()            # (N,)
+        if spec.robot.fixed_base:
+            jparent = m.joint_parent.numpy()
+            root_local = [j for j in range(self._joints_pw)
+                          if int(jtype[j]) == int(JointType.FIXED) and int(jparent[j]) == -1]
+            assert len(root_local) == 1, f"exactly one fixed-base root joint required — {len(root_local)}"
+            self._root_j = (torch.arange(wc, device=self.device) * self._joints_pw + root_local[0]).long()
+            self._root_z0 = wp.to_torch(m.joint_X_p)[self._root_j, 2].clone()            # (N,)
+        else:
+            self._root_j = None                       # floating base — no welded root to offset
+            self._root_z0 = None
         # (d) external-wrench impulse buffer — reapplied to body_f after clear_forces each substep via the
         # _write_body_wrench kernel (graph-resident; lasts 1 control-step). Events write the torch view; the
         # wp views alias the same memory, so the captured graph always reads current values.
@@ -1127,6 +1138,7 @@ class NewtonBackend:
         (legacy randomize_fixed_base_root_height_newton — root identified exactly via FIXED&parent==-1, not xy-nearest.)"""
         if int(env_idx.numel()) == 0:
             return
+        assert self._root_j is not None, "set_root_height needs a fixed-base robot (robot.fixed_base=False)"
         j = self._root_j[env_idx]
         wp.to_torch(self.model.joint_X_p)[j, 2] = self._root_z0[env_idx] + dz
         self.solver.notify_model_changed(newton.ModelFlags.JOINT_PROPERTIES)
