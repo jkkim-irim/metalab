@@ -1,0 +1,43 @@
+# Floating base: the MJCF keeps its upstream <freejoint/> (genesis reads the root type from the XML;
+# newton follows this flag). Our copy drops only the upstream <keyframe> — nothing here consumes it and
+# it hard-fails MuJoCo compile whenever the root or a joint mask changes the qpos layout.
+asset:
+  mjcf: sim/metalab/assets/robots/go2/mjcf/go2.xml
+fixed_base: false
+
+joints:
+  FL_hip_joint: 1
+  FL_thigh_joint: 1
+  FL_calf_joint: 1
+  FR_hip_joint: 1
+  FR_thigh_joint: 1
+  FR_calf_joint: 1
+  RL_hip_joint: 1
+  RL_thigh_joint: 1
+  RL_calf_joint: 1
+  RR_hip_joint: 1
+  RR_thigh_joint: 1
+  RR_calf_joint: 1
+
+action_groups:
+  legs: [FL_hip_joint, FL_thigh_joint, FL_calf_joint,
+         FR_hip_joint, FR_thigh_joint, FR_calf_joint,
+         RL_hip_joint, RL_thigh_joint, RL_calf_joint,
+         RR_hip_joint, RR_thigh_joint, RR_calf_joint]
+
+# The go2 MJCF actuates with torque <motor> elements (no position gains in the XML), so the PD drive
+# contract must be authored here. kp/kv follow the common Go2 RL locomotion setup (motor-level 25/0.5);
+# effort = the XML ctrlrange (hip/thigh 23.7, knee 45.43).
+joint_mode_param:
+  FL_hip_joint:   {kp: 25, kv: 0.5, effort: [-23.7, 23.7]}
+  FL_thigh_joint: {kp: 25, kv: 0.5, effort: [-23.7, 23.7]}
+  FL_calf_joint:  {kp: 25, kv: 0.5, effort: [-45.43, 45.43]}
+  FR_hip_joint:   {kp: 25, kv: 0.5, effort: [-23.7, 23.7]}
+  FR_thigh_joint: {kp: 25, kv: 0.5, effort: [-23.7, 23.7]}
+  FR_calf_joint:  {kp: 25, kv: 0.5, effort: [-45.43, 45.43]}
+  RL_hip_joint:   {kp: 25, kv: 0.5, effort: [-23.7, 23.7]}
+  RL_thigh_joint: {kp: 25, kv: 0.5, effort: [-23.7, 23.7]}
+  RL_calf_joint:  {kp: 25, kv: 0.5, effort: [-45.43, 45.43]}
+  RR_hip_joint:   {kp: 25, kv: 0.5, effort: [-23.7, 23.7]}
+  RR_thigh_joint: {kp: 25, kv: 0.5, effort: [-23.7, 23.7]}
+  RR_calf_joint:  {kp: 25, kv: 0.5, effort: [-45.43, 45.43]}
