@@ -57,9 +57,19 @@ def discover_engines() -> list[str]:
 
 
 def _task_families() -> list[Path]:
-    """tasks/rl/<family>/ dirs carrying an __init__.py — one per task family."""
-    return [d for d in sorted(RL_DIR.iterdir())
-            if d.is_dir() and (d / "__init__.py").is_file()] if RL_DIR.is_dir() else []
+    """tasks/rl/<family>/ or rl/<group>/<family>/ dirs carrying an __init__.py — one per task family.
+
+    A dir whose packages are subdirs is a GROUP shelf (rl/manipulation/): its families are listed,
+    never itself — mirrors sim/metalab/contract/loader.py:_rl_family_dir."""
+    if not RL_DIR.is_dir():
+        return []
+    out = []
+    for d in sorted(RL_DIR.iterdir()):
+        if not (d.is_dir() and (d / "__init__.py").is_file()):
+            continue
+        subs = [s for s in sorted(d.iterdir()) if s.is_dir() and (s / "__init__.py").is_file()]
+        out += subs or [d]
+    return out
 
 
 def discover_tasks() -> list[str]:
@@ -145,9 +155,9 @@ def _task_recipe(task: str, recipe: str, mode: str) -> dict:
         group = STANDALONE_DIR / stem
         paths = ([group / "_base.py", group / f"{contract}.py"] if group.is_dir()
                  else [STANDALONE_DIR / f"{contract}.py"])
-    elif (RL_DIR / stem).is_dir():
+    elif (fam := next((d for d in [RL_DIR / stem] + sorted(RL_DIR.glob(f"*/{stem}")) if d.is_dir()), None)):
         rec = recipe.replace("-", "_")
-        paths = [RL_DIR / stem / "_base.py", RL_DIR / stem / f"{stem}_{rec}.py"]
+        paths = [fam / "_base.py", fam / f"{stem}_{rec}.py"]
     else:
         paths = [RL_DIR / f"{stem}.py"]
     out: dict = {}
@@ -1168,7 +1178,7 @@ details[open] summary::before{content:"▾ "}
     <button data-v="eval">검증 · Eval</button>
     <button data-v="standalone">시뮬레이션 · Standalone</button>
   </div></div>
-<div class="field"><label>3 · Task · Recipe (자동 탐색: sim/metalab/contract/tasks/rl/ 의 폴더 = task, 그 안의 *.py = recipe)</label>
+<div class="field"><label>3 · Task · Recipe (자동 탐색: sim/metalab/contract/tasks/rl/ 아래 family 폴더 = task, 그 안의 *.py = recipe)</label>
   <div class="selrow">
     <select class="selbox" id="task"></select>
     <select class="selbox" id="recipe"></select>

@@ -179,14 +179,28 @@ def _report_ignored_effort(robot) -> None:
           f"Limit' tab). Live again under control_mode=joint. First: {', '.join(dead[:3])}…", flush=True)
 
 
-def task_recipes(name: str) -> list[str]:
-    """The recipe names of task family ``tasks/rl/<name>/``, or [] when it is not a family folder.
+def _rl_family_dir(name: str) -> Path | None:
+    """Task-family folder of ``name`` — ``rl/<name>/`` or ``rl/<group>/<name>/`` — or None.
 
-    A recipe file is ``tasks/rl/<name>/<name>_<recipe>.py``; ``_*.py`` (the shared ``_base``) is a
+    Like the standalone shelf, a group is a shelf and not part of the task's identity:
+    ``--task hammer-lift-student`` names the family wherever it is shelved. Two shelves holding the
+    same family name would make that ambiguous, so it fails here instead of resolving to whichever
+    sorted first."""
+    hits = [d for d in [_RL_DIR / name] + sorted(_RL_DIR.glob(f"*/{name}"))
+            if (d / "__init__.py").is_file()]
+    assert len(hits) <= 1, \
+        f"task family '{name}' is ambiguous — {', '.join(str(d.relative_to(_RL_DIR)) for d in hits)}"
+    return hits[0] if hits else None
+
+
+def task_recipes(name: str) -> list[str]:
+    """The recipe names of task family ``name`` (see :func:`_rl_family_dir`), or [] when it is not one.
+
+    A recipe file is ``<family dir>/<name>_<recipe>.py``; ``_*.py`` (the shared ``_base``) is a
     library, not a recipe. The prefix is enforced, not just matched — a differently named file would
     otherwise drop out of every list silently and its contract would be unreachable."""
-    d = _RL_DIR / name
-    if not (d / "__init__.py").is_file():
+    d = _rl_family_dir(name)
+    if d is None:
         return []
     files = [f for f in sorted(d.glob("*.py")) if not f.stem.startswith("_")]
     for f in files:
@@ -214,8 +228,9 @@ def _standalone_module(name: str) -> str:
 def load_task(name: str, recipe: str | None = None, num_envs: int | None = None) -> EnvSpec:
     """(task, recipe) → resolved EnvSpec.
 
-    Two axes. ``tasks/rl/<name>/`` is a task FAMILY — a shared ``_base.py`` core plus one file per
-    recipe, and it is NOT runnable by itself, so ``recipe`` is required and names ``<name>_<recipe>.py``.
+    Two axes. ``tasks/rl/<name>/`` (or one group-shelf deeper, ``tasks/rl/<group>/<name>/``) is a task
+    FAMILY — a shared ``_base.py`` core plus one file per recipe, and it is NOT runnable by itself, so
+    ``recipe`` is required and names ``<name>_<recipe>.py``.
     A single-file contract (``tasks/rl/<name>.py``, or ``tasks/standalone/<name>.py`` for the scene-only
     ones) takes no recipe. Every miss — no recipe given, unknown recipe, a family with none — fails here with
     the candidates listed, rather than resolving to whatever the family last defaulted to.
@@ -226,13 +241,15 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
     wire and the trainer is never imported. num_envs, if given, overrides the contract value (training
     CLI)."""
     avail = task_recipes(name)
-    if (_RL_DIR / name / "__init__.py").is_file():
+    fam = _rl_family_dir(name)
+    if fam is not None:
         assert avail, f"task family '{name}' has no recipe — add " \
-                      f"sim/metalab/contract/tasks/rl/{name}/{name}_<recipe>.py"
+                      f"{fam.relative_to(_REPO)}/{name}_<recipe>.py"
         assert recipe, f"task '{name}' is a family: pick a recipe (--recipe) — {', '.join(avail)}"
         rec = recipe.replace("-", "_")
         assert rec in avail, f"task '{name}': unknown recipe {recipe!r} — have {', '.join(avail)}"
-        mod = importlib.import_module(f"sim.metalab.contract.tasks.rl.{name}.{name}_{rec}")
+        mod = importlib.import_module(
+            ".".join(("sim", "metalab", "contract") + fam.relative_to(_ENVS_DIR).parts + (f"{name}_{rec}",)))
     else:
         # Single-file contract. The guard re-raises a REAL import error inside a task module (only
         # "module absent" falls through to tasks/standalone/, which is kept out of the train/eval list).

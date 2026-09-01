@@ -18,7 +18,7 @@ from __future__ import annotations
 from sim.metalab.contract.spec import Done, Event, Obs, TaskSpec, values
 from sim.metalab.terms import events, obs, terminate
 
-from ... import _assets as assets
+from .... import _assets as assets
 
 
 # --- physics / solver --------------------------------------------------------------------------------
