@@ -32,7 +32,7 @@ engine_uv_project(){ echo "$ROOT/sim/metalab/setup/$1"; }   # $1 = genesis|newto
 engine_venv(){ echo "$METALAB_VENV_ROOT/$1"; }           # $1 = genesis|newton → its venv path
 
 # Trainer log root (checkpoints land under $RL_LOG_ROOT/<exp>/<run_name>/model_*.pt).
-export RL_LOG_ROOT="${RL_LOG_ROOT:-$ROOT/logs/rl}"
+export RL_LOG_ROOT="${RL_LOG_ROOT:-$ROOT/_logs/rl}"
 
 # ── task · recipe (two axes; mirrors sim/metalab/contract/loader.py) ─────────────────────────────
 # Contracts live on two shelves: RL ones under tasks/rl/ (what Train/Eval run) and scene-only ones under

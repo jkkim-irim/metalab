@@ -10,7 +10,7 @@ server owns the Isaac env; the trainer owns the experiment (algorithm + task tun
 The PPO trainer is owned in-repo under `learning/rl/` (no `rsl-rl-lib` dep); the RL extra is just
 `tensordict` + `GitPython` (`pip install -e .[rl]`). Server node layout is env-overridable via
 SIM_CONDA_SH / SIM_CONDA_ENV / ISAACLAB_DIR / SIM_SERVER_SCRIPT (see learning/rl/service.py); trainer
-log root via RL_LOG_ROOT (default `$PWD/logs/rl`).
+log root via RL_LOG_ROOT (default `$PWD/_logs/rl`).
 """
 from __future__ import annotations
 
@@ -197,7 +197,7 @@ class RLTrainer:
                        help="open the sim server's viewer if it ships one "
                             "(gl|rtx; none = headless). Forwarded to the sim's launcher.")
         p.add_argument("--log_root",
-                       default=os.environ.get("RL_LOG_ROOT", os.path.join(os.getcwd(), "logs", "rl")))
+                       default=os.environ.get("RL_LOG_ROOT", os.path.join(os.getcwd(), "_logs", "rl")))
         p.add_argument("--experiment", default="dexblind",
                        help="which experiment package to train (resolved by convention: "
                             "learning.rl.<experiment>.<task>.experiment — see learning/rl/experiments.py; "

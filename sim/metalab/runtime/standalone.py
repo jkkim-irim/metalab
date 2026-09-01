@@ -15,7 +15,7 @@ Standalone plots exactly what a policy observes.
 This is SEPARATE from ``telemetry.py`` (env_driver's train/eval RL dashboard) — standalone bypasses env_driver.
 
 Recording: when a trajectory plays to the end (``finished``), the runner auto-saves the whole playback under
-``logs/standalone/<group>/<group>_<YYYYMMDDHHmm>_<engine>/`` as CSVs (first column ``timestamp`` = sim time [s]):
+``_logs/standalone/<group>/<group>_<YYYYMMDDHHmm>_<engine>/`` as CSVs (first column ``timestamp`` = sim time [s]):
 ``joint_position.csv`` [deg] (actual joint state read back), ``target_position.csv`` [deg] (commanded PD target
 sent to the robot), ``joint_torque.csv`` [Nm] — columns = the robot's driven joints in report order — and
 ``contact_force.csv`` [N] (per-fingertip net contact-force magnitude, columns = the 5 right fingertips,
@@ -146,14 +146,14 @@ def _write_joint_csv(path: Path, joints: list[str], times: list[float], rows: li
 def _save_trajectory_log(repo: Path, group_path: str, engine: str, times: list[float],
                          series: dict[str, tuple[list[str], list[list[float]]]]) -> Path:
     """Auto-save a finished playback under
-    ``logs/standalone/<group>/<group>_<YYYYMMDDHHmm>_<engine>/`` (``<group>`` = played CSV-group dir name with
+    ``_logs/standalone/<group>/<group>_<YYYYMMDDHHmm>_<engine>/`` (``<group>`` = played CSV-group dir name with
     a trailing ``_group`` trimmed; ``<engine>`` = genesis|newton). ``series`` maps each CSV filename to its
     ``(column_labels, rows)`` — written as ``timestamp`` + those columns. Returns the run directory."""
     gname = Path(group_path).name if group_path else ""
     if gname.endswith("_group"):
         gname = gname[: -len("_group")]
     gname = gname or "trajectory"
-    out_dir = repo / "logs" / "standalone" / gname / f"{gname}_{datetime.now().strftime('%Y%m%d%H%M')}_{engine}"
+    out_dir = repo / "_logs" / "standalone" / gname / f"{gname}_{datetime.now().strftime('%Y%m%d%H%M')}_{engine}"
     out_dir.mkdir(parents=True, exist_ok=True)
     for fname, (cols, rows) in series.items():
         _write_joint_csv(out_dir / fname, cols, times, rows)

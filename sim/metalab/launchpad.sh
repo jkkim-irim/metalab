@@ -50,8 +50,8 @@ LAUNCHPAD_WMCLASS="${LAUNCHPAD_WMCLASS:-$_WM}"
 
 DESKTOP_FILE="$DESKTOP_DIR/${LAUNCHPAD_DESKTOP_SLUG}.desktop"
 PORT="${HUB_PORT:-$_PORT}"
-PIDFILE="$REPO/logs/launchpad/launchpad.pid"
-LOGFILE="$REPO/logs/launchpad/launchpad_server.log"
+PIDFILE="$REPO/_logs/launchpad/launchpad.pid"
+LOGFILE="$REPO/_logs/launchpad/launchpad_server.log"
 PY="${PYTHON:-python3}"
 
 # Dedicated, isolated Chrome profile for the Launchpad's app window(s). Giving Chrome its own

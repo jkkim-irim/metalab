@@ -252,8 +252,8 @@ def list_gpus() -> dict:
 
 def list_dir(rel: str) -> dict:
     """One directory's contents for the checkpoint tree browser: subdirs (to descend) + *.pt (to pick).
-    Confined to logs/ (no escaping via ..). Dirs newest-first (timestamped run names), files newest (mtime)."""
-    base = (REPO / "logs").resolve()
+    Confined to _logs/ (no escaping via ..). Dirs newest-first (timestamped run names), files newest (mtime)."""
+    base = (REPO / "_logs").resolve()
     try:
         target = (REPO / rel).resolve() if rel else base
     except Exception:
@@ -282,7 +282,7 @@ def list_dir(rel: str) -> dict:
 
 
 # ── run launch + registry (P0 Step 3) ────────────────────────────────────────
-RUNS_DIR = REPO / "logs" / "launchpad"      # under /logs/ (gitignored) — runtime state only
+RUNS_DIR = REPO / "_logs" / "launchpad"     # under /_logs/ (gitignored) — runtime state only
 RUNS_JSONL = RUNS_DIR / "runs.jsonl"        # append-only launch log (persists across Launchpad restarts)
 LOGS_DIR = RUNS_DIR / "runs"                # per-run stdout+stderr log files
 PIDFILE = RUNS_DIR / "launchpad.pid"        # written by launchpad.sh --bg; cleared on Exit
@@ -1350,13 +1350,13 @@ function loadGpus(){
     state.knob.device=sel.value;render();
   }).catch(()=>{sel.innerHTML='<option value="cuda:0">cuda:0</option>';});
 }
-function openCkModal(){ $("ckmodal").hidden=false; loadCkDir("logs"); }
-// folder-tree browse under logs/: click a 📁 to descend, ⬆ to go up, 📄 .pt to select.
+function openCkModal(){ $("ckmodal").hidden=false; loadCkDir("_logs"); }
+// folder-tree browse under _logs/: click a 📁 to descend, ⬆ to go up, 📄 .pt to select.
 function loadCkDir(dir){
   const box=$("cklist"); box.innerHTML="로딩…";
   fetch("/api/ls?dir="+encodeURIComponent(dir)).then(r=>r.json()).then(d=>{
     let h=`<div class="ckcwd">📂 ${esc(d.cwd)}</div>`;
-    if(d.cwd!=="logs") h+=`<div class="ckitem ckdir" data-d="${esc(d.parent)}">⬆ .. (상위 폴더)</div>`;
+    if(d.cwd!=="_logs") h+=`<div class="ckitem ckdir" data-d="${esc(d.parent)}">⬆ .. (상위 폴더)</div>`;
     h+=(d.dirs||[]).map(x=>`<div class="ckitem ckdir" data-d="${esc(x.path)}">📁 ${esc(x.name)}</div>`).join("");
     h+=(d.files||[]).map(x=>`<div class="ckitem ckfile" data-p="${esc(x.path)}">📄 ${esc(x.name)}</div>`).join("");
     if(!(d.dirs&&d.dirs.length)&&!(d.files&&d.files.length)) h+='<div class="rnone">(하위 폴더·.pt 없음)</div>';

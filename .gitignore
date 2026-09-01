@@ -9,7 +9,7 @@ sim/metalab/assets/data/spline/
 # Editor / GUI / run artifacts — never committed.
 .vscode/
 imgui.ini
-/logs/
+/_logs/
 
 # Generated standalone trajectory exports (zipped recordings).
 sim/metalab/assets/data/trajectory/*.zip

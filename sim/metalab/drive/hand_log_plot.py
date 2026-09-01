@@ -110,7 +110,7 @@ def plot_hand_log(run_dir, joint: str = "R_Index_PIP", fingertip: str | None = N
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Overlay plot for a standalone hand-log run.")
-    ap.add_argument("run_dir", help="a logs/standalone/<group>/<group>_<ts>_<engine>/ directory")
+    ap.add_argument("run_dir", help="a _logs/standalone/<group>/<group>_<ts>_<engine>/ directory")
     ap.add_argument("--joint", default="R_Index_PIP",
                     help="joint column for position/target/torque (exact or unique substring)")
     ap.add_argument("--fingertip", default=None,

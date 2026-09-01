@@ -21,7 +21,7 @@
 # Args: --sim / --viz / --task / --num_envs / --checkpoint are CLI flags; other knobs are env vars
 # (EPISODES, STEPS, SEED, EXPORT, GPU, EXPNAME). --viz is a boolean (backend inferred from --sim).
 # Usage (from anywhere):
-#   learning/scripts/local/metalab_eval.sh --sim genesis --checkpoint logs/rl/.../model_499.pt    # DEFAULT: record → .rrd + report
+#   learning/scripts/local/metalab_eval.sh --sim genesis --checkpoint _logs/rl/.../model_499.pt   # DEFAULT: record → .rrd + report
 #   learning/scripts/local/metalab_eval.sh --sim genesis --viz --num_envs 1                       # live GUI watch (∞, Ctrl-C)
 #   RECORD=0 EPISODES=64 learning/scripts/local/metalab_eval.sh --sim newton --num_envs 16        # headless, 64-ep SR (no recording)
 #   GPU=1 learning/scripts/local/metalab_eval.sh --sim genesis --checkpoint .../model_499.pt      # pin to physical GPU 1
@@ -118,7 +118,7 @@ ITER_TAG="$(printf 'iter%06d' "$CKPT_ITER" 2>/dev/null || echo "iter${CKPT_ITER}
 bash "$ROOT/learning/scripts/local/setup_env.sh" --sim "$SIMULATOR"
 _VENV="$(engine_venv "$SIMULATOR")"
 source "$_VENV/bin/activate"
-OUT_DIR="${OUT_DIR:-$ROOT/logs/eval/$EVAL_DATE/$RUN_NAME/$ITER_TAG}"
+OUT_DIR="${OUT_DIR:-$ROOT/_logs/eval/$EVAL_DATE/$RUN_NAME/$ITER_TAG}"
 mkdir -p "$OUT_DIR"
 META_OUT="$OUT_DIR/$BASENAME.json"
 

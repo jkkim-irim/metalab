@@ -35,7 +35,7 @@ the Launchpad's ``/simui/`` prefix; ``describe.preview`` marks the no-run case (
 # Where the standalone runner caches its ``/describe`` payload (repo-relative) so the Launchpad's offline
 # preview can render the LAST run's real channel set with no engine env. Written by runtime/standalone.py,
 # read by launchpad/server.py — declared here because this is the one module both sides can load.
-DESCRIBE_CACHE_REL = "logs/standalone/last_describe.json"
+DESCRIBE_CACHE_REL = "_logs/standalone/last_describe.json"
 
 PAGE = r"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>MetaLab · trajectory</title>
