@@ -3,7 +3,7 @@
 """Sim-service client — the trainer-side proxy VecEnv (learning venv; no Isaac Lab).
 
 `SimServiceVecEnv` implements the rsl_rl `VecEnv` interface by driving `server.py` over the
-RPC + CUDA-IPC transport (`sim/service/transport.py`): a localhost socket carries the control
+RPC + CUDA-IPC transport (`sim/metalab/transport.py`): a localhost socket carries the control
 channel (plus a one-shot CUDA-IPC handle bootstrap), and the hot-path obs/action payload lives in
 shared GPU buffers exchanged once at connect — each step only writes the action buffer, sends a tiny
 "step" signal, and reads obs/rew/dones back from the buffers (the tensors never leave the GPU).
@@ -19,10 +19,11 @@ import logging
 from tensordict import TensorDict
 import torch
 
-# The sim service's wire protocol is the single source in sim/service/transport.py; the consumer
-# (learning/eval/eval_service.py) calls service.ensure_transport_importable() to put that dir on
-# sys.path before this client is imported.
-from transport import (
+from learning.rl.vec_env import VecEnv
+
+# The sim service's wire protocol is the single source in sim/metalab/transport.py — the same module
+# the server side imports, so the two ends cannot drift.
+from sim.metalab.transport import (
     K_ACTION,
     K_DONES,
     K_REW,
@@ -32,8 +33,6 @@ from transport import (
     RpcClient,
     obs_group,
 )
-
-from learning.rl.vec_env import VecEnv
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +129,7 @@ class SimServiceVecEnv(VecEnv):
         return int(self._ctl("curriculum_level") or 0)
 
     def apply_curriculum_end(self, train_level: int | None = None):
-        """Freeze the env's curriculum for eval/recording (sim/service servers; the isaaclab server has no
+        """Freeze the env's curriculum for eval/recording (the server has no
         such method and this is never called on that path).
 
         ``train_level=None`` snaps to the END world. ``train_level=L`` runs the WORLD of level L — what a

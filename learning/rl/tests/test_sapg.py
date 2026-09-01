@@ -17,13 +17,7 @@ import pytest
 from tensordict import TensorDict
 import torch
 
-from learning.rl.service import ensure_transport_importable
-
-# Models resolve their distribution by simple class name, and that scan imports learning.rl.client,
-# which needs the sim-service transport dir on sys.path. Same pattern as learning/eval/policies/actor.py.
-ensure_transport_importable()
-
-from learning.rl.models import MLPModel  # noqa: E402
+from learning.rl.models import MLPModel
 from learning.rl.ppo import PPO  # noqa: E402
 from learning.rl.sapg import (  # noqa: E402
     _BLOCK_KEY,

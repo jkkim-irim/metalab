@@ -12,7 +12,7 @@ learning.train (client)  ──control: socket──►  backends/<engine>/serve
 - **single-venv**: 트레이너와 서버가 **같은 엔진 uv venv**에서 뜬다(엔진 venv 안에서 `learning` 이 import
   가능하므로 환경 셋업은 추가로 필요 없다).
 - **토폴로지는 언제나 same-machine localhost** — 트레이너와 서버가 한 머신에 있다(WAN 경유 없음).
-- 구현: `sim/service/transport.py`(엔진 무관 단일 파일) — `RpcServer`/`RpcClient`/`serve_vec_env`,
+- 구현: `sim/metalab/transport.py`(단일 파일) — `RpcServer`/`RpcClient`/`serve_vec_env`,
   클라이언트 프록시는 `learning/rl/client.py` 의 `SimServiceVecEnv`.
 
 ## 핫패스는 GPU 를 벗어나지 않는다

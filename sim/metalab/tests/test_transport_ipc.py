@@ -10,16 +10,12 @@
 """
 from __future__ import annotations
 
-import os
-import sys
 import threading
 
 import pytest
 import torch
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # sim/service
-
-from transport import (  # noqa: E402
+from sim.metalab.transport import (
     K_ACTION,
     K_DONES,
     K_REW,

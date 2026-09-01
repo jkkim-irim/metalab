@@ -29,7 +29,7 @@ sim2real 로 갈 때 오차가 어디서 왔는지 짚지 못한다.
 | **SPOKE — 어떻게** | `backends/{genesis,newton}/` | 계약서를 그 엔진의 씬으로 번역한다. `parser` 가 씬을 만들고 `backend` 가 공통 인터페이스(read·control·step·reset)를 구현한다. **엔진 의존은 오직 이 층에만.** |
 | **RUNTIME — 돌린다** | `runtime/` | 엔진-무관 실행 층. `env_driver` 가 backend 를 학습용 VecEnv 로 감싸고, `parity_rollout` 이 두 엔진을 같은 계약서로 굴려 궤적을 대조한다. |
 
-프로세스 경계(RPC sim-service)는 `sim/service/` — 엔진 무관 공용 계층이다. 자세한 것은
+프로세스 경계(RPC sim-service)는 `sim/metalab/transport.py` 다. 자세한 것은
 **21_rpc_restore_plan**.
 
 ## 디렉터리

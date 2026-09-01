@@ -34,12 +34,10 @@ import os
 import torch
 
 from learning.eval.protocol import build_actor, eval_srv_args
+from learning.rl.client import NaNSafeVecEnv, SimServiceVecEnv
 from learning.rl.sapg import collapse_sapg_actor
-from learning.rl.service import ensure_transport_importable, sim_server
+from learning.rl.service import sim_server
 from learning.rl.utils.video import slow_mp4
-
-ensure_transport_importable()  # put the sim-service dir (transport.py) on sys.path before the client
-from learning.rl.client import NaNSafeVecEnv, SimServiceVecEnv  # noqa: E402
 
 
 def _load_policy(train_cfg: dict, obs, num_actions: int, checkpoint: str, device: str):

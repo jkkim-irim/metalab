@@ -909,7 +909,7 @@ class EnvDriver:
         Called once per policy step, right after ``_apply_actions`` and before physics, so the pause only
         DELAYS a step and never reorders one: the episode counters, rewards and dones all still run exactly
         once per advance, which is why a paused eval cannot skew its own SR. The RPC transport sets no socket
-        timeout, so a client blocked in ``env.step`` simply waits (verified in sim/service/transport.py).
+        timeout, so a client blocked in ``env.step`` simply waits (verified in sim/metalab/transport.py).
 
         The two sources are independent and either one holds. `_paused` is checked first and short-circuits,
         so the viewer's single-step request is not consumed (hence not lost) while the dashboard is pausing —

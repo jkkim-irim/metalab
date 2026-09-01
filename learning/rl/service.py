@@ -5,10 +5,7 @@ are SIM-OWNED (written in the sim's env/task files), so nothing experiment-relat
 boundary — only run args. learning/ knows NOTHING sim-specific here: the spawn recipe
 (interpreter/env activation/module/args) is owned by the sim itself as ``sim/<SIM>/launch.py``
 exposing ``spawn(args, port_file) -> subprocess.Popen`` (pure stdlib, no engine imports). The sim
-is selected with the ``SIM`` env var (a ``sim/<name>/`` package name; the launch scripts set it).
-
-Also puts the shared transport dir (``sim/service``, the wire protocol both sides share) on
-``sys.path`` so the client can import it — every sim serves over the same transport.
+is selected with the ``SIM`` env var (the launch scripts set ``SIM=metalab``).
 """
 from __future__ import annotations
 
@@ -23,31 +20,14 @@ _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 
 
 def _sim() -> str:
-    """The sim package serving this run — a ``sim/<name>/`` dir shipping ``launch.py`` + ``server``.
-    Default preserves the historical behavior (chris' spoke) when the launch script sets nothing."""
-    return os.environ.get("SIM", "isaaclab").lower()
-
-
-def ensure_transport_importable() -> None:
-    """Put sim/service (the unified transport dir, holds ``transport.py``) on sys.path so the client can
-    ``from transport import``. Every sim serves over the same sim/service/transport.py.
-
-    Resolves under SIM_ROOT (same rule as ``_spawn``): a node deploy ships sim/ under a different root
-    than learning/ (SIM_ROOT=<dir> -> <dir>/sim/service), so ``_REPO`` (the learning repo
-    root) would miss it. SIM_ROOT defaults to ``_REPO`` for a co-located checkout."""
-    sim_root = os.environ.get("SIM_ROOT", _REPO)
-    d = os.path.join(sim_root, "sim", "service")
-    if d not in sys.path:
-        sys.path.insert(0, d)
+    """The sim package serving this run — a ``sim/<name>/`` dir shipping ``launch.py`` + ``server``."""
+    return os.environ.get("SIM", "metalab").lower()
 
 
 def _spawn(args, port_file: str):
-    """Dispatch to the sim's own launcher (``sim.<SIM>.launch.spawn``). ``sim.<SIM>`` resolves from
-    the repo root by default; a node deploy where sim/ lives under a different root than learning/
-    sets SIM_ROOT."""
-    sim_root = os.environ.get("SIM_ROOT", _REPO)
-    if sim_root not in sys.path:
-        sys.path.insert(0, sim_root)
+    """Dispatch to the sim's own launcher (``sim.<SIM>.launch.spawn``)."""
+    if _REPO not in sys.path:
+        sys.path.insert(0, _REPO)
     launcher = importlib.import_module(f"sim.{_sim()}.launch")   # fail-loud on an unknown sim
     return launcher.spawn(args, port_file)
 

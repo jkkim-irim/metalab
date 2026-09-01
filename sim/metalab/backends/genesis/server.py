@@ -2,7 +2,7 @@
 
 Genesis counterpart of `sim/metalab/backends/newton/server.py`. Contract (`sim.metalab.contract.tasks.rl.<task>`) → `parser`
 (gs.Scene) → `GenesisBackend` → `EnvDriver` (VecEnv) → `RpcServer`. The sim-service is **RPC + CUDA-IPC as
-one set** (`sim/service/transport.py`): a localhost socket carries the control channel + one-shot
+one set** (`sim/metalab/transport.py`): a localhost socket carries the control channel + one-shot
 CUDA-IPC handle bootstrap (the team-required RPC boundary), and the hot-path obs/action payload lives in
 shared GPU buffers (never leaves the GPU). GPU-only (same-GPU client, single-venv).
 
@@ -30,7 +30,7 @@ from sim.metalab.runtime.vec_env_handler import (  # noqa: E402
     make_vec_env_handler,
     shield_shutdown_from_sigterm,
 )
-from sim.service.transport import (  # noqa: E402  (unified RPC + CUDA-IPC transport)
+from sim.metalab.transport import (  # noqa: E402  (unified RPC + CUDA-IPC transport)
     RpcServer,
     serve_vec_env,
 )

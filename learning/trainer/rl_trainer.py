@@ -23,16 +23,11 @@ import shutil
 import tempfile
 
 from learning.eval.protocol import build_actor, eval_srv_args, rollout_first_episodes
+from learning.rl.client import NaNSafeVecEnv, SimServiceVecEnv
 from learning.rl.on_policy_runner import OnPolicyRunner
-from learning.rl.service import ensure_transport_importable, sim_server
+from learning.rl.service import sim_server
 from learning.rl.utils.run_naming import build_run_name
 from learning.rl.utils.video import slow_mp4
-
-# The sim-service client imports the shared transport.py from the sim-service dir; put that dir on
-# sys.path before importing the client. This module is imported lazily (only for `--trainer rl`, from
-# learning/train.py), so this module-level setup runs when the trainer is loaded.
-ensure_transport_importable()
-from learning.rl.client import NaNSafeVecEnv, SimServiceVecEnv  # noqa: E402
 
 
 def _publish_report(vdir: str, ckpt_path: str, it: int | None) -> str:

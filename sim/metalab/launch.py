@@ -27,7 +27,7 @@ def _engine() -> str:
 
 def spawn(args, port_file: str) -> subprocess.Popen:
     """Launch the MetaLab sim server (``python -m sim.metalab.backends.<engine>.server``) over the
-    sim/service RPC + CUDA-IPC transport. SAME-VENV by default (the MetaLab single-venv rule — trainer +
+    RPC + CUDA-IPC transport (sim/metalab/transport.py). SAME-VENV by default (the MetaLab single-venv rule — trainer +
     engine server share one env), i.e. the trainer's own interpreter; override with SIM_PYTHON for a
     split-env node. Task knobs are sim-owned (inline in the task contract), so nothing
     experiment-related is shipped."""

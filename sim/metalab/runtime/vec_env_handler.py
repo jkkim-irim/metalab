@@ -1,7 +1,7 @@
 # Copyright (c) 2022-2026, The Isaac Lab Project Developers.
 # SPDX-License-Identifier: BSD-3-Clause
 """Adapt a duck-typed MetaLab VecEnv (``EnvDriver``) to the ``(method, payload)`` handler that
-:func:`sim.service.transport.serve_vec_env` drives — shared by the genesis + newton spokes' ``server.py``.
+:func:`sim.metalab.transport.serve_vec_env` drives — shared by the genesis + newton spokes' ``server.py``.
 
 The unified transport's ``serve_vec_env`` is handler-based (one callback for step/reset/get_observations
 + the cold methods) so isaaclab, metalab, libero, and maniskill all serve over the SAME loop. MetaLab's
@@ -18,7 +18,7 @@ import sys
 
 import torch
 
-from sim.service.transport import K_TASK_SUCCESS
+from sim.metalab.transport import K_TASK_SUCCESS
 
 
 def install_sigterm_unwind() -> None:

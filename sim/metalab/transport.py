@@ -1,10 +1,9 @@
 # Copyright (c) 2022-2026, The Isaac Lab Project Developers.
 # SPDX-License-Identifier: BSD-3-Clause
 """Unified sim-service transport — length-prefixed, torch-serialized RPC over a localhost socket, with a
-CUDA-IPC hot path. THE single wire protocol for every ALLEX sim eval service — isaaclab, metalab
-genesis/newton, libero, maniskill — imported by both the client (``learning/rl/client``,
-``learning/eval/eval_sim``) and every ``server.py``. Consumers put this dir on ``sys.path`` and
-``from transport import ...`` (see ``learning/rl/service.ensure_transport_importable``).
+CUDA-IPC hot path. THE single wire protocol of the sim service, imported by BOTH ends — the client
+(``learning/rl/client``) and each engine spoke's ``server.py`` — so the two cannot drift. Package
+import only: ``from sim.metalab.transport import ...``.
 
 Two transports share this file (and one socket):
 
@@ -12,7 +11,7 @@ Two transports share this file (and one socket):
   payload — `TensorDict` obs, nested `extras`, tensors, and scalars — in one shot, and serializing a
   CUDA tensor does the GPU→CPU→(bytes) round-trip automatically (map_location moves it back on
   receive). Simple, cross-process, cross-venv — the LIBERO / ManiSkill eval services + the
-  ``learning/eval/eval_sim`` action-replay eval use this path.
+  cold-path control channel uses this.
 
 * **CUDA-IPC hot path** (v2) — ``serve_vec_env`` / the shared-buffer methods: for the GPU RL
   sim-service the per-step serialize is pure overhead that grows with num_envs (measured ~6 ms/step

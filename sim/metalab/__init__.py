@@ -9,5 +9,5 @@ Submodules:
   (contract → EnvDriver → RPC sim-service). Engine imports are isolated to the spokes; the hub
   (``envs``) and runtime never import an engine.
 
-The RPC + CUDA-IPC process boundary the spokes serve over lives in ``sim.service`` (shared across sims).
+The RPC + CUDA-IPC process boundary the spokes serve over is ``sim.metalab.transport``.
 """
