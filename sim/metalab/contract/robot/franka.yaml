@@ -1,0 +1,18 @@
+asset:
+  mjcf: sim/metalab/assets/robots/franka_sim/mjcf/franka_panda.xml
+fixed_base: true
+
+joints:
+  panda0_joint1: 1
+  panda0_joint2: 1
+  panda0_joint3: 1
+  panda0_joint4: 1
+  panda0_joint5: 1
+  panda0_joint6: 1
+  panda0_joint7: 1
+  panda0_finger_joint1: 1
+  panda0_finger_joint2: 1
+
+action_groups:
+  arm: [panda0_joint1, panda0_joint2, panda0_joint3, panda0_joint4, panda0_joint5, panda0_joint6, panda0_joint7]
+  gripper: [panda0_finger_joint1, panda0_finger_joint2]
