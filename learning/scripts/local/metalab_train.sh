@@ -110,6 +110,7 @@ else
 fi
 [ "$SIMULATOR" = genesis ] && _VIZ_NAME=genesis || _VIZ_NAME=newton   # user-facing backend label (= --sim value)
 [ "$VIZ" != none ] && PASS+=(--viz "$VIZ")                            # forward the chosen viewer (gl|rtx) to the trainer
+[ "$VIZ" != none ] && { resolve_display || exit 2; }
 
 # GPU 선택: --device cuda:N 은 프로세스 전체를 물리 GPU N 에 고정한다(CUDA_VISIBLE_DEVICES). genesis 의
 # gs.init(gs.gpu)·warp·torch 가 모두 이 마스크를 따르므로 진짜 다중-GPU 격리가 된다 — 마스크 없이

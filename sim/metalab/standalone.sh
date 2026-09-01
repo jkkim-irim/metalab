@@ -53,6 +53,7 @@ fi
 # ensure the engine's uv env exists & matches uv.lock (clone pinned source + `uv sync`; no-op if current),
 # then activate it — the runner imports genesis/newton in this venv (in-process).
 bash "$ROOT/learning/scripts/local/setup_env.sh" --sim "$SIM"
+resolve_display || exit 2
 _VENV="$(engine_venv "$SIM")"
 source "$_VENV/bin/activate"
 log "$SIM · $TASK — env only, GL viewer, default GPU, no policy (venv=$_VENV). Ctrl-C to stop."

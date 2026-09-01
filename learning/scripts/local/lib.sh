@@ -34,6 +34,24 @@ engine_venv(){ echo "$METALAB_VENV_ROOT/$1"; }           # $1 = genesis|newton �
 # Trainer log root (checkpoints land under $RL_LOG_ROOT/<exp>/<run_name>/model_*.pt).
 export RL_LOG_ROOT="${RL_LOG_ROOT:-$ROOT/_logs/rl}"
 
+# GUI entry points call this before opening a viewer. A fresh SSH/IDE shell often carries no DISPLAY and
+# a long-lived server a stale one, and pyglet then dies with a cryptic NoSuchDisplayException. No-op when
+# $DISPLAY already points at a live X socket; otherwise adopt the machine's live socket; fail loud if none.
+resolve_display(){
+  local d="${DISPLAY:-}"; d="${d#:}"; d="${d%%.*}"
+  [ -n "$d" ] && [ -S "/tmp/.X11-unix/X$d" ] && return 0
+  local s live=""
+  for s in /tmp/.X11-unix/X*; do [ -S "$s" ] && live="${s##*/X}"; done
+  if [ -n "$live" ]; then
+    log "DISPLAY '${DISPLAY:-<unset>}' has no live X socket — using :$live"
+    export DISPLAY=":$live"
+    return 0
+  fi
+  echo "[${LOG_TAG:-local}] no live X display on this machine (no /tmp/.X11-unix socket)." >&2
+  echo "[${LOG_TAG:-local}] a GUI run needs a desktop session; otherwise run headless (drop --viz)." >&2
+  return 1
+}
+
 # ── task · recipe (two axes; mirrors sim/metalab/contract/loader.py) ─────────────────────────────
 # Contracts live on two shelves: RL ones under tasks/rl/ (what Train/Eval run) and scene-only ones under
 # tasks/standalone/. A TASK is a family folder tasks/rl/<task>/ (or a single-file tasks/rl/<task>.py); a
