@@ -322,7 +322,11 @@ class RobotSpec(_Data):
                                  _ARM_ELBOW_SLICE))
             groups.append(group("arm", f"arm_{hand}",
                                  [f"{side}_Wrist_{r}_Joint" for r in _WRIST_ROLES], _WRIST_MODEL, _ARM_WRIST_SLICE))
-        return [g for g in groups if g is not None]
+        resolved = [g for g in groups if g is not None]
+        assert resolved, (
+            "control_mode: motor matched no coupling groups — the motor transmission map covers ALLEX "
+            "joint names only. Set control_mode: joint for this robot.")
+        return resolved
 
     @model_validator(mode="after")
     def _check(self) -> "RobotSpec":
