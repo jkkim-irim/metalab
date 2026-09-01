@@ -127,10 +127,14 @@ def _rom_deg(lo_rad: float, hi_rad: float) -> dict:
 
 
 def _report_joints(spec) -> list[str]:
-    """Stable joint set driven + reported (targets, plots): CSV-map joints the robot owns, in map order.
-    = ALLEX_CSV_JOINT_NAMES ∩ active_joints (allex → 48, allex_right → 22)."""
+    """Stable joint set driven + reported (targets, plots): CSV-map joints the robot owns, in map order
+    (allex → 48, allex_right → 22). A robot outside the ALLEX CSV map falls back to its action_groups
+    order — only commandable joints are drivable (trajectory playback stays ALLEX-CSV shaped)."""
     active = spec.robot.active_joints()
-    return [j for names in ALLEX_CSV_JOINT_NAMES.values() for j in names if j in active]
+    csv_owned = [j for names in ALLEX_CSV_JOINT_NAMES.values() for j in names if j in active]
+    if csv_owned:
+        return csv_owned
+    return list(dict.fromkeys(j for names in spec.robot.action_groups.values() for j in names))
 
 
 def _write_joint_csv(path: Path, joints: list[str], times: list[float], rows: list[list[float]]) -> None:
