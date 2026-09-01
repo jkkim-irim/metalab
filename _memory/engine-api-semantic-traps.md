@@ -24,6 +24,8 @@ type: reference
 - newton 브리지는 **colliding shape 만** mj geom 화 → visual-only body 는 ngeom 0. geom 세는 코드 전부에 "0개 가능" 방어.
 - newton 네이티브 broadphase 는 build 때 구운 AABB 를 읽음 → **런타임 확대 시 접촉 조용히 소실**(1.2×에서 정착 0/32; 축소는 무해). 픽스 = `shape_collision_aabb_lower/upper` 도 ×s. 교훈: 형상 DR 은 narrow/broadphase 가 같은 배열을 읽는지 먼저 확인.
 
+- **중복 최상위 MJCF 섹션은 엔진마다 다르게 무시된다** (2026-09-01, franka_sim 이식에서 실측). MuJoCo 본체는 중복 `<compiler>`/`<actuator>`를 병합하지만: newton 임포터는 **첫 `<actuator>` 블록만** 읽음(뒤 블록 관절은 조용히 ke=0 → 팔이 통째로 처짐), genesis 로더는 **첫 `<compiler>`에만** 절대 meshdir 주입(뒤의 `meshdir=""`가 덮어써 `from_xml_string` 상대경로 붕괴). → 외부 에셋은 **include 평탄화 + 최상위 섹션(compiler/asset/default/actuator...) 단일화**해서 들여온다.
+
 ## newton 구조 제약 (회피만 가능)
 
 - env 간 **topology 동일 강제** → 형상 DR 불가, 질량·마찰 랜덤화로 대체.
