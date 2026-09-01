@@ -71,14 +71,3 @@ nohup learning/scripts/local/metalab_train.sh --sim newton \
 - **새 태스크**: `sim/metalab/contract/tasks/rl/<name>/` 에 `_base.py` + `<name>_<recipe>.py` 를 두면
   자동 인식. 물체 에셋 88종은 `object_mjcf("<이름>")` 으로 사용.
 - **새 엔진**: `sim/metalab/backends/<engine>/{parser,backend,server}` 스포크만 붙이면 같은 계약서가 돈다.
-
-## 자주 겪는 문제
-
-| 증상 | 해결 |
-|---|---|
-| `uv: command not found` | `sim/metalab/setup.sh` 재실행 후 `$HOME/.local/bin` 을 PATH 에 |
-| `uv sync` 빌드 실패 | `sudo apt install build-essential` |
-| `ModuleNotFoundError: genesis`/`newton` | `sim/metalab/setup.sh` 재실행 |
-| `GL_INVALID_OPERATION 0x502` | GUI 관전과 녹화를 동시에 켰다 — 하나만 |
-| 전부 GPU 0 으로 몰림 | `--device cuda:N`(train) / `GPU=N`(eval) |
-| 리포트 3D 패널이 안 뜸 | `file://` 로 열었다 — http 로 서빙하거나 `rollout.rrd` 를 rerun 뷰어로 |
