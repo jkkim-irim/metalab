@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import importlib
 import json
 import math
-import subprocess
-from datetime import datetime
 from pathlib import Path
+import subprocess
 
 import numpy as np
 import torch
@@ -54,9 +54,9 @@ def record(engine: str, task: str, joints: list[str], bodies: list[str], amp_deg
     phase = [2.0 * math.pi * drive.index(j) / len(drive) if j in drive else 0.0 for j in names]
 
     lo, hi = b.joint_limits(names)
-    for j, c, a, l, h in zip(names, center, amp, lo.cpu().tolist(), hi.cpu().tolist()):
-        assert l <= c - a and c + a <= h, (
-            f"{j}: sinusoid [{c - a:.4f}, {c + a:.4f}] rad leaves the joint range [{l:.4f}, {h:.4f}] "
+    for j, c, a, low, high in zip(names, center, amp, lo.cpu().tolist(), hi.cpu().tolist()):
+        assert low <= c - a and c + a <= high, (
+            f"{j}: sinusoid [{c - a:.4f}, {c + a:.4f}] rad leaves the joint range [{low:.4f}, {high:.4f}] "
             f"(center = init pose {c:.4f}, amp = {a:.4f}); lower --amp-deg or drop it from --joints")
 
     reads = {

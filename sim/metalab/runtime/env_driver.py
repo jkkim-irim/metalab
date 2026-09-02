@@ -20,9 +20,9 @@ import time
 from tensordict import TensorDict
 import torch
 
-from sim.metalab.runtime import snapshot as snap
 from sim.metalab.api.backend import assert_backend
 from sim.metalab.dashboard.telemetry import NO_DASHBOARD, LiveDashboard
+from sim.metalab.runtime import snapshot as snap
 
 
 def _hold_count(count: torch.Tensor, ok: torch.Tensor, mode: str) -> torch.Tensor:
