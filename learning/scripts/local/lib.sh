@@ -61,11 +61,19 @@ resolve_display(){
 _TASKS_DIR="$ROOT/sim/metalab/contract/tasks"
 _RL_DIR="$_TASKS_DIR/rl"
 _STANDALONE_DIR="$_TASKS_DIR/standalone"
-list_tasks(){                      # every runnable --task: rl/ family folders + rl/ single-file contracts
+family_dir(){                     # $1 = task (dash or underscore) → its family dir (rl/<t> or rl/<group>/<t>), empty if none
+  local t="${1//-/_}" d hits=()
+  for d in "$_RL_DIR/$t" "$_RL_DIR"/*/"$t"; do
+    [ -d "$d" ] && compgen -G "$d/${t}_*.py" >/dev/null && hits+=("$d")
+  done
+  [ ${#hits[@]} -le 1 ] || { echo "task family '$1' is ambiguous: ${hits[*]}" >&2; exit 2; }
+  [ ${#hits[@]} -eq 0 ] || echo "${hits[0]}"
+}
+list_tasks(){                      # every runnable --task: rl/[<group>/]<family>/ folders + rl/ single-file contracts
   local p n out=()
-  for p in "$_RL_DIR"/*/; do
+  for p in "$_RL_DIR"/*/ "$_RL_DIR"/*/*/; do
     n="$(basename "$p")"
-    [ ! -f "$p/__init__.py" ] || out+=("${n//_/-}")
+    ! compgen -G "$p/${n}_*.py" >/dev/null || out+=("${n//_/-}")
   done
   for p in "$_RL_DIR"/*.py; do      # '_*.py' is a shared library, not a contract
     n="$(basename "$p" .py)"
@@ -82,18 +90,20 @@ list_standalone_tasks(){           # tasks/standalone/[<group>/]*.py — the CON
   [ ${#out[@]} -eq 0 ] || printf '%s\n' "${out[@]//_/-}" | sort
 }
 list_recipes(){                    # $1 = task (dash or underscore) → its recipes, empty if single-file
-  local t="${1//-/_}" p n out=()
-  for p in "$_RL_DIR/$t/${t}_"*.py; do
+  local t="${1//-/_}" p n out=() fam
+  fam="$(family_dir "$t")"
+  [ -n "$fam" ] || return 0
+  for p in "$fam/${t}_"*.py; do
     [ -f "$p" ] || continue
     n="$(basename "$p" .py)"; out+=("${n#"${t}_"}")
   done
   [ ${#out[@]} -eq 0 ] || printf '%s\n' "${out[@]//_/-}" | sort
 }
 require_task_recipe(){             # $1 = tag for the message, $2 = task, $3 = recipe (may be empty)
-  local tag="$1" t="${2//-/_}" r="$3" recipes
+  local tag="$1" t="${2//-/_}" r="$3" recipes fam
   recipes="$(list_recipes "$t")"
-  if [ -d "$_RL_DIR/$t" ]; then
-    [ -n "$recipes" ] || { echo "[$tag] task '$2' is a family with no recipe — add $_RL_DIR/$t/${t}_<recipe>.py" >&2; exit 2; }
+  fam="$(family_dir "$t")"
+  if [ -n "$fam" ]; then
     if [ -z "$r" ]; then
       echo "[$tag] --recipe is required for task '$2' (a task family). Available recipes:" >&2
       echo "$recipes" | sed 's/^/  - /' >&2
