@@ -7,7 +7,6 @@ name: lint
 #                                     means cleaning that file. Violation count can only go down.
 #   2) ruff-report   (NON-BLOCKING) — full-repo scan for visibility: inline PR annotations + a per-rule
 #                                     count in the job summary, so the remaining backlog stays visible.
-# Same ruff version (0.15.17) and config (pyproject.toml) as .githooks/pre-commit and run_ci_tests.sh.
 
 on:
   pull_request:
