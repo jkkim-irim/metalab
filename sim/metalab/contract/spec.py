@@ -643,8 +643,7 @@ class TerminateTerm(_Logic):
     ``"@refs"`` resolved and stays MUTABLE at runtime, so a bar like ``min_height`` could be ramped live the
     way the curriculum ramps a reward knob. See sim/metalab/terms/terminate.py.
 
-    name = key for per-term done tracking/logging (Termination/<name>) + curriculum
-    termination_rate(name)."""
+    name = key for per-term done tracking/logging (Termination/<name>)."""
 
     name: str
     fn: Callable
@@ -654,7 +653,7 @@ class TerminateTerm(_Logic):
 
 class CurriculumTerm(_Logic):
     """Curriculum term (resolved). ``fn(env) -> dict[str, float]`` — env=EnvDriver
-    (common_step_counter, termination_rate, reward/event term access). Returned dict is logged as
+    (common_step_counter, reward/event term access). Returned dict is logged as
     ``Curriculum/<key>``. Called at each done-reset boundary (gate lives inside the term)."""
 
     name: str

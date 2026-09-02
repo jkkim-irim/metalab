@@ -16,6 +16,8 @@ sitting on "0","1",... beside it.
 """
 from __future__ import annotations
 
+import torch
+
 #: Component suffixes for a term that emits several numbers PER named body/joint, keyed by dims-per-entry.
 #: Quaternions are wxyz — the one order every pose obs term emits (envs/obs/common.py header).
 _COMPONENTS = {
@@ -101,3 +103,38 @@ def describe(driver, state) -> dict:
         "goal": ({"pos": list(goal.pos), "quat": list(goal.quat),
                   "goal_dist_tol": goal.goal_dist_tol} if goal is not None else None),
     }
+
+
+def rows(driver, idxs, extra=None) -> dict:
+    sel = torch.as_tensor([int(i) for i in idxs], dtype=torch.long, device=driver.device)
+    n = int(sel.numel())
+    obs_names, parts, obs_w = [], [], []
+    for gname, terms in driver.spec.obs.items():
+        noisy = gname in driver._obs_noise_groups
+        for t in terms:
+            if t.name in obs_names:
+                continue
+            v = t.fn(driver, **t.params)
+            if noisy and t.noise is not None:
+                v = driver._add_obs_noise(v, t.noise)
+            v = (v * t.scale)[sel]
+            obs_names.append(t.name); parts.append(v); obs_w.append(int(v.shape[-1]))
+    parts.append(driver.last_action[sel])
+    ex_names, ex_w = [], []
+    for name, fn, params, scale in (extra or ()):
+        v = fn(driver, **params)[sel] * scale
+        ex_names.append(name); parts.append(v); ex_w.append(int(v.shape[-1]))
+    flat = torch.cat(parts, dim=-1).detach().cpu()
+    step_c = driver.episode_length_buf[sel].cpu()
+    out = {}
+    for i in range(n):
+        row, off, obs_i = flat[i], 0, {}
+        for name, w in zip(obs_names, obs_w):
+            obs_i[name] = row[off:off + w].tolist(); off += w
+        act_i = row[off:off + driver.num_actions].tolist(); off += driver.num_actions
+        state_i = {}
+        for name, w in zip(ex_names, ex_w):
+            state_i[name] = row[off:off + w].tolist(); off += w
+        out[str(int(sel[i]))] = {"step": int(step_c[i]), "max_step": driver.max_episode_length,
+                                  "obs": obs_i, "action": act_i, "state": state_i}
+    return out

@@ -13,6 +13,7 @@ _MUST_MATCH = ("mode", "task", "joints", "driven", "bodies", "amp_deg", "action_
 def load(path: Path) -> tuple[dict[str, np.ndarray], dict]:
     arrays = dict(np.load(path))
     meta = json.loads(path.with_suffix(".json").read_text())
+    meta.setdefault("mode", "backend")
     return arrays, meta
 
 
