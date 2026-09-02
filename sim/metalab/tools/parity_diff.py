@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 
-_MUST_MATCH = ("task", "joints", "driven", "bodies", "amp_deg", "freq_hz", "ramp_s", "seconds",
-               "hz", "substeps", "decimation", "dt", "steps")
+_MUST_MATCH = ("mode", "task", "joints", "driven", "bodies", "amp_deg", "action_amp", "seed", "freq_hz",
+               "ramp_s", "seconds", "hz", "substeps", "decimation", "dt", "steps")
 
 
 def load(path: Path) -> tuple[dict[str, np.ndarray], dict]:
@@ -30,8 +30,9 @@ def diff(a_path: Path, b_path: Path) -> str:
         "",
         f"- A: `{a_path.name}` engine={ma['engine']} git={ma['git']}",
         f"- B: `{b_path.name}` engine={mb['engine']} git={mb['git']}",
-        f"- command: joints={ma['driven']} amp={ma['amp_deg']} deg freq={ma['freq_hz']} Hz "
-        f"ramp={ma['ramp_s']} s; {ma['steps']} steps at dt={dt:.6f} s",
+        (f"- command: action amp={ma['action_amp']} seed={ma['seed']}" if ma.get("mode") == "mdp"
+         else f"- command: joints={ma['driven']} amp={ma['amp_deg']} deg")
+        + f" freq={ma['freq_hz']} Hz ramp={ma['ramp_s']} s; {ma['steps']} steps at dt={dt:.6f} s",
         "",
         "| channel | shape | max abs diff | rms diff | max abs A | first diff [s] |",
         "|---|---|---:|---:|---:|---:|",

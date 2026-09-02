@@ -22,7 +22,7 @@ INIT_POSE = {
 }
 
 
-def build_task(name: str, *, objects=(), contact_params=None) -> TaskSpec:
+def build_task(name: str, *, objects=(), contact_params=None, physics=None, **mdp) -> TaskSpec:
     scene = {
         "ground": True,
         "robot": {
@@ -37,4 +37,5 @@ def build_task(name: str, *, objects=(), contact_params=None) -> TaskSpec:
         scene["objects"] = list(objects)
     if contact_params:
         scene["contact_params"] = dict(contact_params)
-    return TaskSpec(name=name, num_envs=1, physics=values(PHYSICS), scene=scene)
+    return TaskSpec(name=name, num_envs=1, physics=values(physics if physics is not None else PHYSICS),
+                    scene=scene, **mdp)

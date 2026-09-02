@@ -9,6 +9,7 @@
 #   sim/metalab/parity.sh --sim newton --task parity-joint-torque --joints panda0_joint1,panda0_joint2,panda0_joint3,panda0_joint4,panda0_joint5,panda0_joint6,panda0_joint7 --amp-deg 5 --freq-hz 0.25 --bodies $B
 #   sim/metalab/parity.sh --sim newton --task parity-contact      --joints panda0_joint2 --amp-deg 4 --freq-hz 0.5 --bodies $B
 #   sim/metalab/parity.sh --sim newton --task parity-objects      --joints panda0_joint1 --amp-deg 0 --bodies $B
+#   sim/metalab/parity.sh --sim newton --task parity-mdp --mode mdp      # EnvDriver.step: obs/reward/done
 #   python -m sim.metalab.tools.parity_diff _logs/parity/<task>/<a>.npz _logs/parity/<task>/<b>.npz [--out diff.md]
 LOG_TAG=parity
 source "$(dirname "${BASH_SOURCE[0]}")/../../learning/scripts/local/lib.sh"
@@ -20,7 +21,7 @@ while [ $# -gt 0 ]; do
     --sim=*)    SIM="${1#*=}"; shift ;;
     --task)     TASK="$2"; shift 2 ;;
     --task=*)   TASK="${1#*=}"; shift ;;
-    -h|--help)  sed -n '2,10p' "$0"; exit 0 ;;
+    -h|--help)  sed -n '2,11p' "$0"; exit 0 ;;
     *)          EXTRA+=("$1"); shift ;;
   esac
 done
