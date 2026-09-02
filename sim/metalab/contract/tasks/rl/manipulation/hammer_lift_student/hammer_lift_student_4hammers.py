@@ -15,7 +15,6 @@ from sim.metalab.terms import curriculum, events, gate, obs, reward
 from .... import _assets as assets
 from . import _base as base
 
-
 # --- scene: the ONLY thing this recipe changes about the world ----------------------------------------
 _HAMMERS = ["hammer_ycb", "hammer_cylinder", "hammer_edge", "hammer_rect"]
 _TABLE = next(o for o in base.SCENE.objects if o["name"] == "table")
