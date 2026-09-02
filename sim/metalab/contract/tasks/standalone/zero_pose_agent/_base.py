@@ -23,7 +23,7 @@ def build_task(name: str, *, robot: str, init_pose: dict[str, float],
                base_pos: list[float] = (0.0, 0.0, 0.0), fixed_base: bool = True) -> TaskSpec:
     """Assemble a zero-pose contract: the shared ground scene plus a recipe's robot and pose.
 
-    ``robot`` is the robot YAML name (``contract/robot/<robot>.yaml``); ``init_pose`` is its joint-name →
+    ``robot`` is the robot YAML name (``contract/robot/<family>/<robot>.yaml``); ``init_pose`` is its joint-name →
     angle table in DEGREES (the loader converts to radians), held by the standalone runner's PD.
     ``base_pos`` defaults to the world origin (right for a fixed-base arm on the ground); a floating-base
     robot passes ``fixed_base=False`` and its standing height.

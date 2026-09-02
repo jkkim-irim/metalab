@@ -14,7 +14,7 @@ from ... import _assets as assets
 from . import _base as base
 
 
-# --- robot: full-body ALLEX (both arms) — robot/allex.yaml --------------------------------------------
+# --- robot: full-body ALLEX (both arms) — robot/allex/allex.yaml --------------------------------------------
 class ROBOT:
     name = "allex"
     base_pos = [0.0, 0.0, 0.585]

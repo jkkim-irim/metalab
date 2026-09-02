@@ -118,7 +118,7 @@ class SCENE:
 
 
 # --- action groups: WHAT the policy commands (18 dims = arm 7 + hand 11) -----------------------------
-# Listed explicitly so the action vector is readable here instead of only in robot/allex_right.yaml. The
+# Listed explicitly so the action vector is readable here instead of only in robot/allex/allex_right.yaml. The
 # finger ABADs are deliberately NOT action dims — they stay PD-held at their init pose (the hand grasps with
 # MCP/PIP + thumb), which is what keeps the dim at 18. Order IS the action order.
 # Sim2Real: per-env random command delay (post-EMA ring buffer, resampled at reset) — the real controller has
@@ -184,7 +184,7 @@ class EVENTS:
     reset_joints_by_offset = Event(events.reset_joints_by_offset, "reset", joints="@joints.ctrl",
                                position_range=[-0.1, 0.1])
     object_friction    = Event(events.set_shape_friction, "reset", target="object", mu_range=[0.5, 0.5])
-    # `exclude` keeps the nail shells at the mu the robot yaml pinned them to (robot/allex_right.yaml
+    # `exclude` keeps the nail shells at the mu the robot yaml pinned them to (robot/allex/allex_right.yaml
     # `nail_friction`); drop it and they are randomized with the rest of the hand.
     robot_friction     = Event(events.set_shape_friction, "reset", target="robot",  mu_range=[1.5, 1.5],
                                exclude="@bodies.nail")

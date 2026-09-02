@@ -72,18 +72,15 @@ def load_yaml(path: Path) -> dict[str, Any]:
     return data
 
 
-def load_component(category: str, name: str, schema: type[T], **overrides: Any) -> T:
-    """Read ``sim/metalab/contract/<category>/<name>.yaml`` and validate against ``schema``. overrides = top-key overwrite."""
-    path = _ENVS_DIR / category / f"{name}.yaml"
-    if not path.exists():
-        raise FileNotFoundError(f"component not found: {path}")
-    data = load_yaml(path)
-    data.update(overrides)
-    return schema.model_validate(data)  # fail-loud
-
-
 def load_robot(name: str, **overrides: Any) -> RobotSpec:
-    return load_component("robot", name, RobotSpec, **overrides)
+    """Read ``sim/metalab/contract/robot/<family>/<name>.yaml`` (unique across families) and validate as
+    :class:`RobotSpec`. overrides = top-key overwrite."""
+    hits = sorted((_ENVS_DIR / "robot").glob(f"*/{name}.yaml"))
+    assert len(hits) == 1, \
+        f"robot '{name}': expected exactly one contract/robot/*/{name}.yaml, found {[str(h) for h in hits]}"
+    data = load_yaml(hits[0])
+    data.update(overrides)
+    return RobotSpec.model_validate(data)  # fail-loud
 
 
 def _with_equality_followers(robot: RobotSpec, init_pose: dict[str, float]) -> dict[str, float]:
@@ -266,8 +263,8 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
     assert isinstance(ts, TaskSpec), \
         f"task module {mod.__name__} must define build_task()->TaskSpec or " \
         f"TASK: TaskSpec — got {type(ts).__name__}"
-    # The task's robot dict = {"name": robot/<name>.yaml} + RobotSpec overlays (base placement etc.), so the
-    # task file shows the full spawn in one place (load_component top-key overwrite).
+    # The task's robot dict = {"name": robot/<family>/<name>.yaml} + RobotSpec overlays (base placement etc.), so the
+    # task file shows the full spawn in one place (load_robot top-key overwrite).
     # `scene` is the authoring container for the world; validate it here and unpack into the flat pieces the
     # rest of this function (and EnvSpec) already speak. Unknown keys fail loud — a typo in a contract must
     # not silently drop a table or a camera.
@@ -292,7 +289,7 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
 
     rcfg = dict(scene["robot"])
     rname = rcfg.pop("name", None)
-    assert rname, f"task '{name}': robot={{...}} needs a 'name' key (robot/<name>.yaml)"
+    assert rname, f"task '{name}': robot={{...}} needs a 'name' key (robot/<family>/<name>.yaml)"
     pose_deg = rcfg.pop("init_pose", {}) or {}       # authored in DEGREES for readability
     robot = load_robot(rname, **{k: v for k, v in rcfg.items() if v is not None})
     robot.init_pose = _with_equality_followers(robot, {j: math.radians(v) for j, v in pose_deg.items()})
@@ -304,7 +301,7 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
     if gate is not None and gate.contact_count > 0:
         assert len(robot.fingertips) >= gate.contact_count, (
             f"task '{name}': GATE.contact_count={gate.contact_count} but robot({rname}) declares "
-            f"{len(robot.fingertips)} fingertips — add them to robot/{rname}.yaml `fingertips:`")
+            f"{len(robot.fingertips)} fingertips — add them to the robot/*/{rname}.yaml `fingertips:`")
     if gate is not None and gate.contact_fingers:
         unknown = [b for b in gate.contact_fingers if b not in robot.fingertips]
         assert not unknown, (
