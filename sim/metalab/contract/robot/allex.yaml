@@ -1,5 +1,42 @@
 control_mode: motor
 
+motor:
+  params: sim/metalab/contract/robot/allex/robot_model.json
+  maps: sim/metalab/contract/robot/allex/mj_mapping
+  groups:
+    - {kind: hand, params_key: thumb_r, model: thumb.json,
+       joints: [R_Thumb_Yaw_Joint, R_Thumb_CMC_Joint, R_Thumb_MCP_Joint]}
+    - {kind: hand, params_key: index_r, model: finger.json,
+       joints: [R_Index_ABAD_Joint, R_Index_MCP_Joint, R_Index_PIP_Joint]}
+    - {kind: hand, params_key: middle_r, model: finger.json,
+       joints: [R_Middle_ABAD_Joint, R_Middle_MCP_Joint, R_Middle_PIP_Joint]}
+    - {kind: hand, params_key: ring_r, model: finger.json,
+       joints: [R_Ring_ABAD_Joint, R_Ring_MCP_Joint, R_Ring_PIP_Joint]}
+    - {kind: hand, params_key: little_r, model: finger.json,
+       joints: [R_Little_ABAD_Joint, R_Little_MCP_Joint, R_Little_PIP_Joint]}
+    - {kind: shoulder, params_key: arm_r, model: shoulder.json, gain_slice: [0, 3],
+       joints: [R_Shoulder_Pitch_Joint, R_Shoulder_Roll_Joint, R_Shoulder_Yaw_Joint]}
+    - {kind: arm, params_key: arm_r, model: elbow.json, gain_slice: [3, 5],
+       joints: [R_Elbow_Joint, R_Wrist_Yaw_Joint]}
+    - {kind: arm, params_key: arm_r, model: wrist.json, gain_slice: [5, 7],
+       joints: [R_Wrist_Roll_Joint, R_Wrist_Pitch_Joint]}
+    - {kind: hand, params_key: thumb_l, model: thumb.json,
+       joints: [L_Thumb_Yaw_Joint, L_Thumb_CMC_Joint, L_Thumb_MCP_Joint]}
+    - {kind: hand, params_key: index_l, model: finger.json,
+       joints: [L_Index_ABAD_Joint, L_Index_MCP_Joint, L_Index_PIP_Joint]}
+    - {kind: hand, params_key: middle_l, model: finger.json,
+       joints: [L_Middle_ABAD_Joint, L_Middle_MCP_Joint, L_Middle_PIP_Joint]}
+    - {kind: hand, params_key: ring_l, model: finger.json,
+       joints: [L_Ring_ABAD_Joint, L_Ring_MCP_Joint, L_Ring_PIP_Joint]}
+    - {kind: hand, params_key: little_l, model: finger.json,
+       joints: [L_Little_ABAD_Joint, L_Little_MCP_Joint, L_Little_PIP_Joint]}
+    - {kind: shoulder, params_key: arm_l, model: shoulder.json, gain_slice: [0, 3],
+       joints: [L_Shoulder_Pitch_Joint, L_Shoulder_Roll_Joint, L_Shoulder_Yaw_Joint]}
+    - {kind: arm, params_key: arm_l, model: elbow.json, gain_slice: [3, 5],
+       joints: [L_Elbow_Joint, L_Wrist_Yaw_Joint]}
+    - {kind: arm, params_key: arm_l, model: wrist.json, gain_slice: [5, 7],
+       joints: [L_Wrist_Roll_Joint, L_Wrist_Pitch_Joint]}
+
 asset:
   mjcf: sim/metalab/assets/robots/proto_v4/mjcf/ALLEX.xml
 fixed_base: true

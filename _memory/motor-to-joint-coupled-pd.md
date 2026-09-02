@@ -4,7 +4,7 @@ description: "control_mode:motor 모터공간 coupled PD — rated_torque ≠ to
 type: project
 ---
 
-`sim/metalab/actuation/` — 실HW 모터공간 coupled PD, 양 엔진, 16그룹/44관절.
+`sim/metalab/control/`(커널·로더) + `sim/metalab/contract/robot/allex/`(맵·게인 데이터) — 실HW 모터공간 coupled PD, 양 엔진, 16그룹/44관절.
 
 - 구조: `loaders.py`(numpy-only) / `motor_coupling.py`(newton warp, substep-rate) / `coupled_pd_torch.py`(genesis 미러). parity 는 **단일 numpy 오라클**로 고정(warp≡torch≡oracle). genesis 는 warp fast path(`_GenesisWarpOwner`, torch 스트림 정렬 필수)로 커플링 40→2.3ms.
 - fold: `τ_m = k_φΔφ − k_dφ̇ + G⁻ᵀτ_g → clamp → τ_q = Gᵀτ_m`(arm-slice 만). readout = τ_q(중력 포함 = 모터전류 의미) → **obs 분포 변화, 재학습 필요**.

@@ -14,10 +14,12 @@ from __future__ import annotations
 from collections.abc import Callable
 import math
 import os
+from pathlib import Path
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from sim.metalab.contract.asset_path import resolve_asset
 from sim.metalab.conventions import GRAVITY
 
 # Type aliases — fixed-length tuples let Pydantic validate length too (fail-loud).
@@ -137,60 +139,31 @@ class GravCompSpec(_Data):
 
 
 class MotorCouplingSpec(_Data):
-    """Motor-to-joint coupled PD contract — one coupled group (robot HW fact).
-
-    The group's joints are driven by PD in MOTOR space (firmware J2M map, τ_q = Gᵀ·τ_m) instead of the
-    native diagonal PD, on newton the backend replaces it at physics-substep rate; genesis keeps native
-    PD. ``METALAB_MOTOR_COUPLING=0`` disables at build time. Three structural ``kind``s (→ which
-    kernel/loader the backend dispatches to):
-
-    - **hand**     — 3-DOF, lower-triangular (finger ABAD/MCP/PIP, thumb Yaw/CMC/MCP). Gains keyed directly.
-    - **arm**      — 2-DOF, FULL 2×2 (wrist Roll/Pitch ballscrew; elbow+wristYaw differential pulley).
-                     Gains SLICE the 7-DOF arm group (``arm_slice``: elbow (3, 5), wrist (5, 7)).
-    - **shoulder** — 3-DOF, DIAGONAL per-joint scalar ratio (shoulder Pitch/Roll/Yaw) — a degenerate
-                     lower-triangular map driven by the hand kernel. Gains SLICE the arm group ((0, 3)).
-
-    Not authored in YAML — :meth:`RobotSpec.coupled_groups` derives these from ``control_mode``."""
-
     kind: Literal["hand", "arm", "shoulder"] = "hand"
-    params_key: str          # motor gains key in robot_model.json ("index_r"…"little_l" / "arm_r"/"arm_l")
-    joints: list[str]        # active joints in fit-variable order: 3 (hand/shoulder) or 2 (arm)
-    model_file: Optional[str] = None            # transmission json (None → finger.json)
-    arm_slice: Optional[tuple[int, int]] = None  # arm/shoulder kinds: [start, end) into the 7-DOF arm gains
+    params_key: str
+    joints: list[str]
+    model: str
+    gain_slice: Optional[tuple[int, int]] = None
 
     @model_validator(mode="after")
     def _shape(self) -> "MotorCouplingSpec":
         need = 2 if self.kind == "arm" else 3
         assert len(self.joints) == need, f"{self.kind} group needs {need} joints — got {len(self.joints)}"
-        assert (self.arm_slice is not None) == (self.kind != "hand"), \
-            f"{self.params_key}: arm_slice must be set iff the gains slice the 7-DOF arm (kind != 'hand')"
+        assert (self.gain_slice is not None) == (self.kind != "hand"), \
+            f"{self.params_key}: gain_slice must be set iff the gains slice a larger motor group (kind != 'hand')"
         return self
 
 
-# Canonical coupling groups for ``control_mode: motor``. Every group keys its own motor gains in
-# robot_model.json by ``<part>_<hand>``. All four fingers on both hands share one transmission
-# (finger.json); both thumbs share another (thumb.json) — the thumb is a different mechanism (Yaw
-# decoupled, higher-order CMC/MCP) so it can't reuse the finger map. Fit-variable order per part:
-# fingers ABAD/MCP/PIP, thumb Yaw/CMC/MCP (the thumb IP joint is an equality follower, not coupled).
-_FINGER_NAMES = ("Index", "Middle", "Ring", "Little")
-_FINGER_ROLES = ("ABAD", "MCP", "PIP")
-_THUMB_ROLES = ("Yaw", "CMC", "MCP")
-_THUMB_MODEL = "thumb.json"                       # basename → resolved under mj_mapping/ by load_hand_group
-# Arm-sliced groups: gains slice the arm_{r,l} 7-DOF group at the motor indices.
-# - shoulder Pitch/Roll/Yaw (per-joint scalar ratio, DIAGONAL 3-DOF map shoulder.json) = motors 0-2.
-# - elbow+wristYaw (differential pulley, CONSTANT 2×2 map elbow.json) = motors 3,4.
-# - wrist Roll+Pitch (ballscrew, nonlinear FULL 2×2 map wrist.json) = motors 5,6.
-# Both arms share each map. Fit-variable order per map: shoulder [Pitch, Roll, Yaw],
-# elbow [Elbow, Yaw], wrist [Roll, Pitch].
-_SHOULDER_ROLES = ("Pitch", "Roll", "Yaw")
-_SHOULDER_MODEL = "shoulder.json"
-_ARM_SHOULDER_SLICE = (0, 3)
-_ELBOW_MODEL = "elbow.json"
-_ARM_ELBOW_SLICE = (3, 5)
-_WRIST_ROLES = ("Roll", "Pitch")
-_WRIST_MODEL = "wrist.json"
-_ARM_WRIST_SLICE = (5, 7)
-_HANDS = (("R", "r"), ("L", "l"))
+class MotorSpec(_Data):
+    params: str
+    maps: str
+    groups: list[MotorCouplingSpec] = Field(min_length=1)
+
+    def params_path(self) -> Path:
+        return resolve_asset(self.params)
+
+    def model_path(self, group: MotorCouplingSpec) -> Path:
+        return resolve_asset(f"{self.maps}/{group.model}")
 
 
 class NailFrictionSpec(_Data):
@@ -276,56 +249,30 @@ class RobotSpec(_Data):
     gravcomp: Optional[GravCompSpec] = None
     # Control mode (robot HW fact): "joint" = native diagonal PD on every joint (default); "motor" = PD
     # solved in MOTOR space through the firmware transmission (J2M map + analytic Jacobian G:
-    # tau_q = G^T . tau_m, single clamp on the motor-space sum), then mapped back to joints. Covers thumb +
-    # 4 fingers + shoulder + elbow/wristYaw + wrist Roll/Pitch = the whole active hand and arm; see
-    # `coupled_groups` for the exact groups (allex_right: 8 groups / 22 joints). Implemented on BOTH engines
+    # tau_q = G^T . tau_m, single clamp on the motor-space sum), then mapped back to joints. The groups,
+    # transmission maps and motor gains are declared in the robot's `motor:` block. Implemented on BOTH engines
     # (newton warp kernel, genesis torch mirror against the same oracle — sim/metalab/tests/
     # test_motor_coupling.py pins the parity). METALAB_MOTOR_COUPLING=0 forces "joint" at build time.
     control_mode: Literal["joint", "motor"] = "joint"
+    motor: Optional[MotorSpec] = None
     # NOTE: init_pose is owned by the **task (EnvSpec.init_pose)**, not the robot — it varies per task.
 
     def active_joints(self) -> set[str]:
         return {n for n, v in self.joints.items() if v == 1}
 
     def coupled_groups(self) -> list[MotorCouplingSpec]:
-        """Groups to drive with motor-space coupled PD — empty unless ``control_mode`` is "motor".
-        Per hand: **hand** groups (thumb + 4 fingers, 3-DOF, thumb.json/finger.json), then the
-        **shoulder** group (diagonal 3-DOF, shoulder.json), then the **arm** groups (elbow+wristYaw
-        constant 2×2 elbow.json, then wrist Roll/Pitch full 2×2 wrist.json) — together the full 7-DOF
-        arm. Each group is emitted only if all its joints are active (so right-only contracts yield
-        just the R_ groups). Order per hand = thumb, index, middle, ring, little, shoulder, elbow,
-        wrist."""
         if self.control_mode != "motor":
             return []
+        assert self.motor is not None, "control_mode: motor needs a `motor:` block (params, maps, groups)"
         active = self.active_joints()
-
-        def group(kind: str, params_key: str, joints: list[str], model_file, arm_slice=None):
-            need = 2 if kind == "arm" else 3
-            n = sum(j in active for j in joints)
-            assert n in (0, need), (   # partial-active = misconfig (can't couple a fixed-DOF transmission)
-                f"control_mode=motor: {params_key} has {n}/{need} joints active — need all or none")
-            return MotorCouplingSpec(kind=kind, params_key=params_key, joints=joints,
-                                     model_file=model_file, arm_slice=arm_slice) if n == need else None
-
-        groups: list[Optional[MotorCouplingSpec]] = []
-        for side, hand in _HANDS:
-            groups.append(group("hand", f"thumb_{hand}",
-                                 [f"{side}_Thumb_{r}_Joint" for r in _THUMB_ROLES], _THUMB_MODEL))
-            for name in _FINGER_NAMES:
-                groups.append(group("hand", f"{name.lower()}_{hand}",
-                                    [f"{side}_{name}_{r}_Joint" for r in _FINGER_ROLES], None))
-            groups.append(group("shoulder", f"arm_{hand}",
-                                 [f"{side}_Shoulder_{r}_Joint" for r in _SHOULDER_ROLES], _SHOULDER_MODEL,
-                                 _ARM_SHOULDER_SLICE))
-            groups.append(group("arm", f"arm_{hand}",
-                                 [f"{side}_Elbow_Joint", f"{side}_Wrist_Yaw_Joint"], _ELBOW_MODEL,
-                                 _ARM_ELBOW_SLICE))
-            groups.append(group("arm", f"arm_{hand}",
-                                 [f"{side}_Wrist_{r}_Joint" for r in _WRIST_ROLES], _WRIST_MODEL, _ARM_WRIST_SLICE))
-        resolved = [g for g in groups if g is not None]
-        assert resolved, (
-            "control_mode: motor matched no coupling groups — the motor transmission map covers ALLEX "
-            "joint names only. Set control_mode: joint for this robot.")
+        resolved = []
+        for g in self.motor.groups:
+            n = sum(j in active for j in g.joints)
+            assert n in (0, len(g.joints)), (
+                f"control_mode=motor: {g.params_key}/{g.model} has {n}/{len(g.joints)} joints active — need all or none")
+            if n:
+                resolved.append(g)
+        assert resolved, "control_mode: motor — no coupled group has all its joints active; set control_mode: joint"
         return resolved
 
     @model_validator(mode="after")
@@ -346,7 +293,9 @@ class RobotSpec(_Data):
             assert not gc_unknown, f"gravcomp has inactive/unknown joints (check robot mask): {sorted(gc_unknown)}"
             dup = set(self.gravcomp.actuator_joints) & set(self.gravcomp.passive_joints)
             assert not dup, f"joint listed in both actuator & passive gravcomp: {sorted(dup)}"
-        self.coupled_groups()   # control_mode=motor: fail loud on any partial-active finger
+        assert (self.motor is not None) == (self.control_mode == "motor"), \
+            "`motor:` block and control_mode: motor go together (drop one or add the other)"
+        self.coupled_groups()
         return self
 
     def motor_coupling_on(self) -> bool:

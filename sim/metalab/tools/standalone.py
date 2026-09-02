@@ -46,7 +46,6 @@ import time
 
 import torch
 
-from sim.metalab.actuation.loaders import DEFAULT_PARAMS_FILE
 from sim.metalab.dashboard import standalone_monitor as monitor
 from sim.metalab.dashboard.control_server import TrajControlServer
 from sim.metalab.dashboard.page import DESCRIBE_CACHE_REL
@@ -107,12 +106,11 @@ _ROM_FALLBACK_DEG = 180.0   # span given to a joint the model declares no usable
 _GAIN_WATCH_S = 1.0         # how often the runner re-fingerprints robot_model.json (edit detection)
 
 
-def _gain_fingerprint() -> str:
+def _gain_fingerprint(path: Path | None) -> str:
     """Content hash of ``robot_model.json``. Content, not mtime: editors touch/rewrite files without
     changing anything, and a false "gains edited" banner is worse than a 1 Hz 16 KB read. Missing file
     (a task with no motor coupling) → empty string, i.e. never dirty."""
-    p = Path(DEFAULT_PARAMS_FILE)
-    return hashlib.sha1(p.read_bytes()).hexdigest() if p.is_file() else ""
+    return hashlib.sha1(path.read_bytes()).hexdigest() if path is not None and path.is_file() else ""
 
 
 def _rom_deg(lo_rad: float, hi_rad: float) -> dict:
@@ -320,7 +318,8 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
     # Motor-gain hot reload: gains are edited in robot_model.json while a run is up (wrist/finger tuning).
     # Applying them mid-flight would step the control law under a moving robot, so the file is only WATCHED
     # here — the dashboard says "edited, pending" and the next reset is what swaps them in.
-    gain_hash = _gain_fingerprint()                # fingerprint of what the buffers currently hold
+    gain_file = spec.robot.motor.params_path() if spec.robot.motor is not None else None
+    gain_hash = _gain_fingerprint(gain_file)       # fingerprint of what the buffers currently hold
     gain_dirty = False                             # file differs from it → banner on the dashboard
     gain_next_check = 0.0
     # Gain-consistency warnings for what the buffers hold (e.g. a differential group whose two motors no
@@ -352,8 +351,8 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
         nonlocal traj, dense_gpu, cur, group_label, gain_hash, gain_dirty, gain_warn
         if gain_dirty:                             # edited robot_model.json lands HERE — see the watcher
             changed = b.reload_motor_gains()
-            gain_hash, gain_dirty, gain_warn = _gain_fingerprint(), False, b.motor_gain_warnings()
-            print(f"[standalone] motor gains reloaded from {Path(DEFAULT_PARAMS_FILE).name}: "
+            gain_hash, gain_dirty, gain_warn = _gain_fingerprint(gain_file), False, b.motor_gain_warnings()
+            print(f"[standalone] motor gains reloaded from {gain_file.name}: "
                   f"{', '.join(changed) if changed else 'no gain group changed'}", flush=True)
         b.reset_idx(all_mask)
         traj, dense_gpu, group_label = None, None, None
@@ -387,9 +386,9 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
             # Gain-edit watch (1 Hz, both branches — a tuning edit while the sim is paused must show too).
             if time.monotonic() >= gain_next_check:
                 gain_next_check = time.monotonic() + _GAIN_WATCH_S
-                dirty = _gain_fingerprint() != gain_hash
+                dirty = _gain_fingerprint(gain_file) != gain_hash
                 if dirty != gain_dirty:              # log the transition once, not every poll
-                    print(f"[standalone] {Path(DEFAULT_PARAMS_FILE).name} "
+                    print(f"[standalone] {gain_file.name} "
                           f"{'edited — reset to apply the new motor gains' if dirty else 'back to the loaded gains'}",
                           flush=True)
                 gain_dirty = dirty

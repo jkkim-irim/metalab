@@ -17,12 +17,12 @@ from pathlib import Path
 import numpy as np
 
 _REPO = Path(__file__).resolve().parents[3]
-_FINGER_JSON = _REPO / "sim/metalab/actuation/mj_mapping/finger.json"   # shared firmware J2M
-_THUMB_JSON = _REPO / "sim/metalab/actuation/mj_mapping/thumb.json"      # shared thumb J2M
-_PARAMS_JSON = _REPO / "sim/metalab/actuation/robot_model.json"
-_WRIST_JSON = _REPO / "sim/metalab/actuation/mj_mapping/wrist.json"      # shared wrist J2M
-_ELBOW_JSON = _REPO / "sim/metalab/actuation/mj_mapping/elbow.json"      # shared elbow J2M
-_SHOULDER_JSON = _REPO / "sim/metalab/actuation/mj_mapping/shoulder.json"  # shared shoulder J2M
+_FINGER_JSON = _REPO / "sim/metalab/contract/robot/allex/mj_mapping/finger.json"   # shared firmware J2M
+_THUMB_JSON = _REPO / "sim/metalab/contract/robot/allex/mj_mapping/thumb.json"      # shared thumb J2M
+_PARAMS_JSON = _REPO / "sim/metalab/contract/robot/allex/robot_model.json"
+_WRIST_JSON = _REPO / "sim/metalab/contract/robot/allex/mj_mapping/wrist.json"      # shared wrist J2M
+_ELBOW_JSON = _REPO / "sim/metalab/contract/robot/allex/mj_mapping/elbow.json"      # shared elbow J2M
+_SHOULDER_JSON = _REPO / "sim/metalab/contract/robot/allex/mj_mapping/shoulder.json"  # shared shoulder J2M
 _JOINTS = ["R_Index_ABAD_Joint", "R_Index_MCP_Joint", "R_Index_PIP_Joint"]
 _THUMB_JOINTS = ["R_Thumb_Yaw_Joint", "R_Thumb_CMC_Joint", "R_Thumb_MCP_Joint"]
 _WRIST_JOINTS = ["R_Wrist_Roll_Joint", "R_Wrist_Pitch_Joint"]
@@ -196,7 +196,7 @@ def _coupled_pd_oracle_check(group_name, joints, model_file, poly, k_phi, k_d, s
     import torch
     import warp as wp
 
-    from sim.metalab.actuation.motor_coupling import MotorCoupledPDHand, load_hand_group
+    from sim.metalab.control.motor_coupling import MotorCoupledPDHand, load_hand_group
     wp.init()
 
     n = 256
@@ -292,7 +292,7 @@ def _coupled_pd_arm_oracle_check(joints, json_path, arm_slice, seed):
     import torch
     import warp as wp
 
-    from sim.metalab.actuation.motor_coupling import MotorCoupledPDArm, load_arm_group
+    from sim.metalab.control.motor_coupling import MotorCoupledPDArm, load_arm_group
     wp.init()
     grp = load_arm_group("arm_r", joints, model_file=json_path, params_file=_PARAMS_JSON,
                          arm_slice=arm_slice)
@@ -386,7 +386,7 @@ def test_coupled_pd_gravcomp_folds_into_motor_clamp():
         return
     import torch
 
-    from sim.metalab.actuation.motor_coupling import (
+    from sim.metalab.control.motor_coupling import (
         MotorCoupledPDArm,
         MotorCoupledPDHand,
         load_arm_group,
@@ -467,7 +467,7 @@ def test_torque_components_split_the_applied_torque():
         return
     import torch
 
-    from sim.metalab.actuation.motor_coupling import (
+    from sim.metalab.control.motor_coupling import (
         MotorCoupledPDArm,
         MotorCoupledPDHand,
         load_arm_group,
@@ -558,7 +558,7 @@ def test_clamp_bounds_motor_torque_to_envelope():
         return
     import torch
 
-    from sim.metalab.actuation.motor_coupling import MotorCoupledPDHand, load_hand_group
+    from sim.metalab.control.motor_coupling import MotorCoupledPDHand, load_hand_group
 
     got = _index_r_inputs()
     if got is None:
@@ -631,7 +631,7 @@ def test_shared_finger_map_backs_multiple_groups():
     coefficients + q envelope but their OWN motor gains (robot_model.json[<finger>_<hand>]). Also
     checks the role-order guard fails loud on mis-ordered joints."""
     try:
-        from sim.metalab.actuation.motor_coupling import load_hand_group
+        from sim.metalab.control.motor_coupling import load_hand_group
     except ModuleNotFoundError:
         print("SKIP test_shared_finger_map (torch/warp not installed)")
         return
@@ -660,7 +660,7 @@ def test_shared_thumb_map_backs_both_hands():
     transmission with their own gains; the Yaw envelope spans both signs (L/R-symmetric union) and
     the role guard is Yaw/CMC/MCP."""
     try:
-        from sim.metalab.actuation.motor_coupling import load_hand_group
+        from sim.metalab.control.motor_coupling import load_hand_group
     except ModuleNotFoundError:
         print("SKIP test_shared_thumb_map (torch/warp not installed)")
         return
@@ -695,7 +695,7 @@ def test_reload_gains_swaps_live_buffers():
 
     import torch
 
-    from sim.metalab.actuation.motor_coupling import MotorCoupledPDHand, load_hand_group
+    from sim.metalab.control.motor_coupling import MotorCoupledPDHand, load_hand_group
 
     wp.init()
     with tempfile.TemporaryDirectory() as td:
@@ -749,7 +749,7 @@ def test_tau_lim_envelope_contains_the_kernel_torque():
         print("SKIP test_tau_lim_envelope (no finger.json)")
         return
     poly = got[0]
-    from sim.metalab.actuation.motor_coupling import MotorCoupledPDHand, load_hand_group
+    from sim.metalab.control.motor_coupling import MotorCoupledPDHand, load_hand_group
     wp.init()
 
     n = 32

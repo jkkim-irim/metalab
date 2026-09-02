@@ -5,10 +5,6 @@ from pathlib import Path
 
 import numpy as np
 
-_HERE = Path(__file__).resolve().parent
-DEFAULT_PARAMS_FILE = _HERE / "robot_model.json"
-DEFAULT_MODEL_DIR = _HERE / "mj_mapping"
-
 MODELS_PER_GROUP_HAND = 3
 _MODEL_ORDER_HAND = (("m1", 1), ("m2", 2), ("m3", 3))
 MODELS_PER_GROUP_ARM = 2
@@ -87,12 +83,9 @@ def _terms_coeffs(node: dict, dim: int) -> tuple[np.ndarray, np.ndarray]:
     return padded, coeffs
 
 
-def load_hand_group(params_key: str, joints: list[str], model_file=None, params_file=None,
+def load_hand_group(params_key: str, joints: list[str], model_file, params_file,
                     gain_slice: tuple[int, int] | None = None) -> dict:
-    model_file = Path(model_file) if model_file else DEFAULT_MODEL_DIR / "finger.json"
-    if not model_file.is_absolute():
-        model_file = DEFAULT_MODEL_DIR / model_file
-    params_file = Path(params_file) if params_file else DEFAULT_PARAMS_FILE
+    model_file, params_file = Path(model_file), Path(params_file)
     with open(model_file) as f:
         poly = json.load(f)
     name = f"{params_key}_{poly['part']}" if gain_slice else params_key
@@ -138,12 +131,9 @@ def load_hand_group(params_key: str, joints: list[str], model_file=None, params_
             "gravcomp_fold": gain_slice is not None}
 
 
-def load_arm_group(params_key: str, joints: list[str], model_file=None, params_file=None,
-                     arm_slice: tuple[int, int] = (5, 7)) -> dict:
-    model_file = Path(model_file) if model_file else DEFAULT_MODEL_DIR / "wrist.json"
-    if not model_file.is_absolute():
-        model_file = DEFAULT_MODEL_DIR / model_file
-    params_file = Path(params_file) if params_file else DEFAULT_PARAMS_FILE
+def load_arm_group(params_key: str, joints: list[str], model_file, params_file,
+                     arm_slice: tuple[int, int]) -> dict:
+    model_file, params_file = Path(model_file), Path(params_file)
     with open(model_file) as f:
         poly = json.load(f)
     part = poly["part"]
@@ -187,6 +177,17 @@ def load_arm_group(params_key: str, joints: list[str], model_file=None, params_f
                          "slice": list(arm_slice), "n": 2},
             "dim": 2, "part": part,
             "gravcomp_fold": True}
+
+
+def load_coupled_groups(robot) -> tuple[list[dict], list[dict]]:
+    hand, arm = [], []
+    for g in robot.coupled_groups():
+        model, params = robot.motor.model_path(g), robot.motor.params_path()
+        if g.kind == "arm":
+            arm.append(load_arm_group(g.params_key, g.joints, model, params, arm_slice=g.gain_slice))
+        else:
+            hand.append(load_hand_group(g.params_key, g.joints, model, params, gain_slice=g.gain_slice))
+    return hand, arm
 
 
 def _pack(groups: list[dict], models_per_group: int = MODELS_PER_GROUP_HAND) -> dict[str, np.ndarray]:

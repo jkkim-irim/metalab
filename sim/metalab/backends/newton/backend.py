@@ -8,17 +8,13 @@ import numpy as np
 import torch
 import warp as wp
 
-from sim.metalab.actuation.coupled_pd import CoupledPDMixin
-from sim.metalab.actuation.motor_coupling import (
-    MotorCoupledPDArm,
-    MotorCoupledPDHand,
-    load_arm_group,
-    load_hand_group,
-)
 from sim.metalab.api.transforms import quat_conj, quat_mul, quat_rotate, wxyz_to_xyzw, xyzw_to_wxyz
 from sim.metalab.backends.newton import gravcomp as _gravcomp
 from sim.metalab.backends.newton.mjw_object_scale import install as _install_mjw_object_scale
 from sim.metalab.backends.newton.viewer import NewtonViewer
+from sim.metalab.control.coupled_pd import CoupledPDMixin
+from sim.metalab.control.loaders import load_coupled_groups
+from sim.metalab.control.motor_coupling import MotorCoupledPDArm, MotorCoupledPDHand
 
 
 @wp.kernel
@@ -282,21 +278,15 @@ class NewtonBackend(CoupledPDMixin):
         self._coupled_col_cache: dict[tuple, tuple[list, list]] = {}
         if not handles.get("motor_coupling_on"):
             return
-        cg = spec.robot.coupled_groups()
-        hand = [g for g in cg if g.kind in ("hand", "shoulder")]
-        arm = [g for g in cg if g.kind == "arm"]
+        gh, ga = load_coupled_groups(spec.robot)
         gc_buf = self.solver.mjw_data.qfrc_gravcomp if self._gc_on else None
-        if hand:
-            gh = [load_hand_group(g.params_key, g.joints, model_file=g.model_file,
-                                  gain_slice=g.arm_slice) for g in hand]
+        if gh:
             nh = [j for grp in gh for j in grp["joints"]]
             self._coupled_owners.append(
                 MotorCoupledPDHand(gh, self._coord_idx(nh), self._dof_idx(nh), self.num_envs, self.device,
                                    gravcomp=gc_buf,
                                    gc_dof=self._jt_mjc_dofs(nh) if gc_buf is not None else None))
-        if arm:
-            ga = [load_arm_group(g.params_key, g.joints, model_file=g.model_file, arm_slice=g.arm_slice)
-                  for g in arm]
+        if ga:
             na = [j for grp in ga for j in grp["joints"]]
             self._coupled_owners.append(
                 MotorCoupledPDArm(ga, self._coord_idx(na), self._dof_idx(na), self.num_envs, self.device,

@@ -5,9 +5,9 @@ import os
 import genesis as gs
 import torch
 
-from sim.metalab.actuation.coupled_pd import CoupledPDMixin, TorchCoupledPD
-from sim.metalab.actuation.loaders import load_arm_group, load_hand_group
 from sim.metalab.backends.genesis.viewer import GenesisViewer
+from sim.metalab.control.coupled_pd import CoupledPDMixin, TorchCoupledPD
+from sim.metalab.control.loaders import load_coupled_groups
 
 
 class GenesisBackend(CoupledPDMixin):
@@ -72,15 +72,9 @@ class GenesisBackend(CoupledPDMixin):
         self._coupled_col_cache: dict = {}
         if not (spec.robot.control_mode == "motor" and os.environ.get("METALAB_MOTOR_COUPLING", "1") != "0"):
             return
-        buckets: dict = {"hand3": [], "arm2": []}
-        for g in spec.robot.coupled_groups():
-            if g.kind in ("hand", "shoulder"):
-                buckets["hand3"].append(load_hand_group(g.params_key, g.joints,
-                                                        model_file=g.model_file, gain_slice=g.arm_slice))
-            else:
-                buckets["arm2"].append(load_arm_group(g.params_key, g.joints,
-                                                      model_file=g.model_file, arm_slice=g.arm_slice))
-        for groups in (g for g in buckets.values() if g):
+        for groups in load_coupled_groups(spec.robot):
+            if not groups:
+                continue
             owner = TorchCoupledPD(groups, self.num_envs, self.device)
             names = owner.joints
             dofs = self._dofs(names)
