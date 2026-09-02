@@ -4,7 +4,6 @@
 # Python bytecode — never committed (review #37: stray __pycache__ rode the sim/metalab regroup).
 __pycache__/
 *.py[cod]
-sim/metalab/assets/data/spline/
 
 # Editor / GUI / run artifacts — never committed.
 .vscode/
@@ -12,7 +11,7 @@ imgui.ini
 /_logs/
 
 # Generated standalone trajectory exports (zipped recordings).
-sim/metalab/assets/data/trajectory/*.zip
+sim/metalab/assets/data/trajectory/**/*.zip
 
 # wandb run cache — local artifacts of whatever ran last on this machine (debug logs + run dirs).
 # Runs are already published to wandb; the local copy is per-machine and must not enter history.
