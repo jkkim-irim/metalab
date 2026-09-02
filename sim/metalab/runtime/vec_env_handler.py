@@ -9,7 +9,7 @@ server owns a duck-typed VecEnv rather than a handler, so this wraps it: the hot
 the loop writes into the shared CUDA-IPC buffers, and the cold methods pass straight through. The
 per-step ``data_log`` / ``rerun_scene`` hooks (the record path) fire here since they need the just-computed
 dones + task_success — and firing both from this ONE call site is what keeps a recorded frame and a plotted
-series row on the same policy step (see runtime/rollout_log.py).
+series row on the same policy step (see dashboard/rollout_log.py).
 """
 from __future__ import annotations
 

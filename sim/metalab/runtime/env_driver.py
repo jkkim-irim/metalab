@@ -3,7 +3,7 @@
 Runs each step via the contract's action/obs/reward/terminate, satisfying the VecEnv interface the trainer
 expects (num_envs·num_actions·device·max_episode_length·episode_length_buf·get_observations·step·reset·seed)
 in a **duck-typed** way. Does not import ``learning.rl`` — the trainer consumes this EnvDriver directly as its VecEnv (in-process).
-The engine hides behind :class:`sim.metalab.runtime.backend.SimBackend`.
+The engine hides behind :class:`sim.metalab.api.backend.SimBackend`.
 
 Terms (obs/reward/terminate) are pure functions that read via ``backend`` as ``env`` (composed by the contract).
 Includes events (DR)/curriculum/action-delay hooks: reset events run in the order
@@ -20,12 +20,16 @@ import time
 from tensordict import TensorDict
 import torch
 
-from sim.metalab.api import shaping
-from sim.metalab.api.contact import contact_mask
-from sim.metalab.api.shaping import hold_count
 from sim.metalab.runtime import snapshot as snap
-from sim.metalab.runtime.backend import assert_backend
-from sim.metalab.runtime.telemetry import NO_DASHBOARD, LiveDashboard
+from sim.metalab.api.backend import assert_backend
+from sim.metalab.dashboard.telemetry import NO_DASHBOARD, LiveDashboard
+
+
+def _hold_count(count: torch.Tensor, ok: torch.Tensor, mode: str) -> torch.Tensor:
+    if mode == "cumulative":
+        return count + ok.to(count.dtype)
+    assert mode == "consecutive", f"hold_count: unknown mode {mode!r} (consecutive | cumulative)"
+    return torch.where(ok, count + 1, torch.zeros_like(count))
 
 
 class EnvDriver:
@@ -214,12 +218,10 @@ class EnvDriver:
         self._obs_noise_groups = set(spec.obs_noise_groups)
 
     def _init_task_state(self) -> None:
-        """Per-episode task state: the fixed goal, the eval GATE's counters, the LIFT phase gate, the object
-        latches and the val/SR tallies.
+        """Per-episode task state: the fixed goal, the eval GATE's counters, the object latches and the
+        val/SR tallies.
 
-        ``lifted`` is driver-owned because it used to be published by the lifting reward, which made a reward
-        term a hard dependency of reward/terminate/event/obs phase gating — deleting that term silently pinned
-        it False everywhere. No tolerance is kept here: every bar is a knob of the predicate call that tests
+        No tolerance is kept here: every bar is a knob of the predicate call that tests
         it (``_curr_bars`` / ``_gate_bars``), so there is no runtime value a term could read behind the
         contract's back."""
         spec = self.spec
@@ -233,10 +235,7 @@ class EnvDriver:
         self.gate = spec.gate
         self._gate_hold = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         self.gate_passed = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
-        self.gate_near = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         self._contact_steps: dict[tuple, torch.Tensor] = {}
-        self._lifted_default = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
-        self.lifted = self._lifted_default.clone()
         self.palm_body = spec.robot.frames.get("palm") if spec.gate is not None else None
         if spec.gate is not None and spec.gate.palm_distance > 0.0:
             assert self.palm_body is not None, (
@@ -256,7 +255,6 @@ class EnvDriver:
         # what "level 0 already is the END criteria" means for an eval recipe.
         self._curr_bars = dict(self._gate_bars)
         self._curr_hold_steps = 1 if spec.gate is None else spec.gate.hold_steps
-        self.curriculum_near = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         self.curriculum_hold = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         # Episode latch at the CURRICULUM's bar: the level-up SR, and what ends the episode
         # (``terminate.curriculum_passed`` reads it).
@@ -523,19 +521,6 @@ class EnvDriver:
     def _all_mask(self) -> torch.Tensor:
         return torch.ones(self.num_envs, dtype=torch.bool, device=self.device)
 
-    def _advance_lifted(self) -> None:
-        """Latch the LIFT phase gate once per policy step: ``lifted |= risen_above(...)``, cleared per env in
-        _post_reset.
-
-        Driver-owned because ``lifted`` is env state, not a reward — the reward terms, the grasp-lost
-        termination and the pull-force event all gate on it, so a contract that drops the lifting REWARD must
-        not lose the gate with it. LATCHED, so the carry phase survives a momentary dip. The judgment itself
-        is :func:`sim.metalab.api.shaping.risen_above`; this counts."""
-        if self.gate is None or self.gate.lift_height <= 0.0 or self.object_init_z is None:
-            return
-        self.lifted |= shaping.risen_above(self.backend.object_pos()[:, 2],
-                                           self.object_init_z, self.gate.lift_height)
-
     def contact_steps(self, force_threshold: float, target: str | None = None) -> torch.Tensor:
         """The ``(N, K)`` consecutive pad-press step counter over ``spec.robot.fingertips`` at this threshold
         and counterpart — created on first read (an obs term asking for it), then advanced once per policy
@@ -556,7 +541,7 @@ class EnvDriver:
         obs term's returned tensor is always the current count). Reset envs are zeroed in _post_reset.
 
         The DRIVER owns only the counter; the predicate is
-        :func:`sim.metalab.api.contact.contact_mask`, the same call the grip reward and the GATE make — so
+        ``force.norm(dim=-1) > threshold``, the same call the grip reward and the GATE make — so
         "5 steps of contact" in the critic's input means what the reward pays for, not merely "touching
         something". ``target`` picks what must be pressed: a counterpart (``"object"``) scopes the read to
         that asset, ``None`` takes the NET force over everything, which on a table-top task is dominated by
@@ -567,7 +552,7 @@ class EnvDriver:
         for (thr, target), buf in self._contact_steps.items():
             f = (self.backend.contact_force(tips) if target is None
                  else self.backend.contact_force_with(tips, target))
-            pressing = contact_mask(f, thr)
+            pressing = f.norm(dim=-1) > thr
             buf.copy_(torch.where(pressing, buf + 1.0, torch.zeros_like(buf)))
 
     def _advance_object_seen(self) -> None:
@@ -600,8 +585,7 @@ class EnvDriver:
         if self.gate is None:
             return
         near = self.gate.predicate(self, **self._curr_bars)
-        self.curriculum_near.copy_(near)
-        self.curriculum_hold = hold_count(self.curriculum_hold, near, self.gate.hold_mode)
+        self.curriculum_hold = _hold_count(self.curriculum_hold, near, self.gate.hold_mode)
         self.curriculum_passed |= self.curriculum_hold >= self._curr_hold_steps
 
     def _advance_gate(self) -> None:
@@ -619,8 +603,7 @@ class EnvDriver:
         if self.gate is None:
             return
         near = self.gate.predicate(self, **self._gate_bars)
-        self.gate_near.copy_(near)
-        self._gate_hold = hold_count(self._gate_hold, near, self.gate.hold_mode)
+        self._gate_hold = _hold_count(self._gate_hold, near, self.gate.hold_mode)
         self.gate_passed = self.gate_passed | (self._gate_hold >= self.gate.hold_steps)
 
     def _post_reset(self, env_ids: torch.Tensor) -> None:
@@ -652,12 +635,9 @@ class EnvDriver:
         for key, buf in self._prev_vel.items():
             buf[env_ids] = self.backend.joint_vel(list(key))[env_ids]
             self._joint_acc_buf[key][env_ids] = 0.0
-        self.lifted[env_ids] = False
         if self.gate is not None:
             self._gate_hold[env_ids] = 0
             self.gate_passed[env_ids] = False
-            self.gate_near[env_ids] = False
-        self.curriculum_near[env_ids] = False
         self.curriculum_hold[env_ids] = 0
         # REBOUND, not cleared in place: `terminate.curriculum_passed` returns this very tensor, and step()
         # still reads that mask after the reset (Termination/<name>, extras["task_success"]). Zeroing the
@@ -783,15 +763,13 @@ class EnvDriver:
 
         The post-physics order is a contract, not a preference:
 
-        1. ``_advance_lifted`` FIRST — it publishes the ``lifted`` phase gate, and the reward terms, the
-           grasp-lost termination and the pull-force event all read it this same step.
-        2. ``_advance_curriculum`` — the level's success latch. BEFORE the rewards, because the success bonus
+        1. ``_advance_curriculum`` — the level's success latch. BEFORE the rewards, because the success bonus
            is paid FOR it: judged after them, the latch would flip on a step whose reward was already scored
            and the episode would reset before the next one, so the bonus could never be paid at all.
-        3. rewards, which read that latch (bonus) and the world (everything else).
-        4. the remaining per-step advances — contact duration, joint acceleration, the perception latch, and
+        2. rewards, which read that latch (bonus) and the world (everything else).
+        3. the remaining per-step advances — contact duration, joint acceleration, the perception latch, and
            the GATE's hold counter + episode latch (``val/SR``), which nothing else this step depends on.
-        5. terminations — the success one reads the latch from 2 — then the reset of whatever finished, then
+        4. terminations — the success one reads the latch from 1 — then the reset of whatever finished, then
            observations.
 
         Each ``_advance_*`` ticks EXACTLY once here, which is the reason those counters live in the driver at
@@ -821,7 +799,6 @@ class EnvDriver:
         self.episode_length_buf += 1
         self.common_step_counter += 1
 
-        self._advance_lifted()
         self._advance_curriculum()
         rew = self._rewards()
         self.last_reward = rew.detach()

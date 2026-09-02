@@ -192,13 +192,13 @@ def discover() -> dict:
 # ---------------------------------------------------------------------------
 # Standalone dashboard preview (/simui) — the tab shows its window even with no run
 # ---------------------------------------------------------------------------
-# The dashboard page is owned by the sim runtime (``drive/dashboard_page.py``, a zero-import
+# The dashboard page is owned by the sim runtime (``dashboard/page.py``, a zero-import
 # module) and normally served by the runner's own control_server. The Launchpad serves the SAME string so
 # the Standalone tab is never an empty placeholder: with no run you get the real page (layout, tabs from
 # the last run's channel set) with no data — enough to see a page edit without booting a sim.
 # Loaded BY FILE PATH, not imported: the Launchpad must stay stdlib-only (that module's package pulls in
 # torch/pydantic), and re-executing it per request means an edit lands on reload with no restart.
-_DASH_PAGE_FILE = SIM / "metalab" / "drive" / "dashboard_page.py"
+_DASH_PAGE_FILE = SIM / "metalab" / "dashboard" / "page.py"
 
 
 def _dashboard_page_module():
@@ -598,7 +598,7 @@ def stop_run(run_id: str) -> dict:
 
 def reset_run(run_id: str) -> dict:
     """Reset a STANDALONE run's sim to its initial state ON DEMAND — SIGUSR1 the runner, whose handler
-    calls backend.reset_idx (contract init pose, NO domain randomization). Only sim.metalab.runtime.standalone
+    calls backend.reset_idx (contract init pose, NO domain randomization). Only sim.metalab.tools.standalone
     installs a SIGUSR1 handler; train/eval do not, so aiming this at them finds no runner (no-op). Root
     pid = this session's tracked Popen else the registry pid; the runner = the descendant whose argv is
     the standalone module."""
@@ -619,7 +619,7 @@ def reset_run(run_id: str) -> dict:
             cmd = (Path("/proc") / str(pid) / "cmdline").read_bytes()
         except OSError:
             continue
-        if b"sim.metalab.runtime.standalone" in cmd:
+        if b"sim.metalab.tools.standalone" in cmd:
             _sig(pid, signal.SIGUSR1); n += 1
     return {"ok": n > 0, "reset": n, "run_id": run_id,
             **({} if n else {"error": "standalone runner not found (only Standalone runs support reset)"})}
@@ -712,7 +712,7 @@ def _sigpg(pgid: int, sig: int) -> None:
         pass
 
 
-_SIM_MARKERS = (b"learning.train", b"learning.eval", b"sim.metalab.runtime.standalone")
+_SIM_MARKERS = (b"learning.train", b"learning.eval", b"sim.metalab.tools.standalone")
 # Launcher script basenames a run's argv can carry. FUNCTIONAL, not cosmetic: the pid matchers below
 # identify our runs by these, so a script rename that misses this tuple silently breaks both run
 # detection and the Stop button. One tuple, two call sites (_alive_pid / _our_run_procs).
@@ -721,7 +721,7 @@ _SCRIPT_MARKERS = (b"metalab_train.sh", b"metalab_eval.sh", b"standalone.sh")
 
 def _our_run_procs() -> list:
     """Live pids whose argv is one of our launched sim commands — matched on EXACT argv fields (a
-    NUL-separated token equal to 'learning.train'/'learning.eval'/'sim.metalab.runtime.standalone', or ending
+    NUL-separated token equal to 'learning.train'/'learning.eval'/'sim.metalab.tools.standalone', or ending
     in one of _SCRIPT_MARKERS), so a shell that merely mentions the string is NOT
     matched. Catches the real trainer/runner even after it setsid'd into its own session and its
     launcher ancestors already exited."""

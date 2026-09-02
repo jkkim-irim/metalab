@@ -31,7 +31,7 @@ _POSE_TERMS = frozenset({"object_state_world", "object_pose",
 _ACTION_VECTOR_TERMS = frozenset({"prev_action_targets"})
 
 #: Terms whose columns are the ROBOT's fingertips, in ``RobotSpec.fingertips`` order. They take no ``bodies``
-#: knob ON PURPOSE — which bodies are pads is a robot fact, not a term knob (api/contact.py).
+#: knob ON PURPOSE — which bodies are pads is a robot fact, not a term knob.
 _FINGERTIP_TERMS = frozenset({"fingertip_contact_steps"})
 
 #: Terms whose columns are the total then one per REWARD term, in contract order. Labelled from the spec

@@ -14,7 +14,7 @@
 # Lives under sim/ (learning-independent). Reuses ONLY the shared engine-venv provisioning helpers
 # (learning/scripts/local/{lib.sh,setup_env.sh}) — engine-venv utilities, not learning logic — to make
 # sure the engine's uv venv exists and to activate it, then runs the engine-agnostic runner
-# sim/metalab/runtime/standalone.py in that venv. Always a single env + GL viewer (hardcoded in the runner).
+# sim/metalab/tools/standalone.py in that venv. Always a single env + GL viewer (hardcoded in the runner).
 #
 # Usage (from anywhere):
 #   sim/standalone.sh --sim newton  --task hammer-lift-teacher
@@ -59,4 +59,4 @@ source "$_VENV/bin/activate"
 log "$SIM · $TASK — env only, GL viewer, default GPU, no policy (venv=$_VENV). Ctrl-C to stop."
 cd "$ROOT"
 
-python -m sim.metalab.runtime.standalone --engine "$SIM" --task "$TASK"
+python -m sim.metalab.tools.standalone --engine "$SIM" --task "$TASK"

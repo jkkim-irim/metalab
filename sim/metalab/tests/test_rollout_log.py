@@ -1,5 +1,5 @@
 """Tests for the record-path artifacts: the rollout log and the HTML report built from it
-(``runtime/rollout_log.PerEnvRolloutLog`` → ``runtime/rollout_report.build_report``).
+(``dashboard/rollout_log.PerEnvRolloutLog`` → ``dashboard/rollout_report.build_report``).
 
 What is under test is the log's own logic — the tab set it derives from a contract's cards, the per-dim
 transpose it writes, the success latch, and the strictness of the JSON a browser has to ``JSON.parse``.
@@ -27,8 +27,8 @@ try:
 except ImportError:                                    # torch-less env → nothing here can run
     torch = None
 
-from sim.metalab.runtime.rollout_log import PerEnvRolloutLog  # noqa: E402
-from sim.metalab.runtime.rollout_report import build_report  # noqa: E402
+from sim.metalab.dashboard.rollout_log import PerEnvRolloutLog  # noqa: E402
+from sim.metalab.dashboard.rollout_report import build_report  # noqa: E402
 
 _JOINTS = ["j0", "j1"]
 _OBS_LABELS = ["a", "b", "c", "d"]
@@ -84,7 +84,7 @@ class _Driver:
                  describe_needs_step: bool = False, gc_joints=(_JOINTS[0],), capabilities=()):
         self.backend = _Backend()
         self.num_envs = self.backend.num_envs
-        # engine-partial backend features, resolved once at load by runtime.backend.assert_backend
+        # engine-partial backend features, resolved once at load by api.backend.assert_backend
         self.capabilities = frozenset(capabilities)
         self.spec = _Spec(gc_joints)               # gravcomp covers ONE of the two action joints by default
         self.num_actions = len(_JOINTS)
@@ -313,7 +313,7 @@ def test_label_width_mismatch_fails_loud():
             raise AssertionError("expected an AssertionError on a labels/width mismatch")
 
 
-# --- the HTML report built from that log (runtime/rollout_report.build_report) --------------------
+# --- the HTML report built from that log (dashboard/rollout_report.build_report) --------------------
 # Only its Python half is checked here — the .rrd wiring, self-containment, fail-loud. The page's sync
 # behaviour is browser behaviour and was verified against a real recording in Chrome (playhead <-> series
 # index in both directions, env/channel tab switching, paused scrubbing).

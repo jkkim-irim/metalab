@@ -1,6 +1,6 @@
 """RL monitor adapter — env_driver snapshots re-shaped into the standalone dashboard schema.
 
-Exercises ``runtime/rl_monitor.py`` against the SHAPES env_driver actually produces
+Exercises ``dashboard/rl_monitor.py`` against the SHAPES env_driver actually produces
 (``snapshot_describe()`` / ``snapshot_rows()``), so the fixtures below are copies of those contracts rather
 than of the adapter's logic. Pure dict -> dict, so no torch / engine / GPU is needed.
 
@@ -13,7 +13,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from sim.metalab.runtime import rl_monitor  # noqa: E402
+from sim.metalab.dashboard import rl_monitor  # noqa: E402
 
 # --- fixtures: exactly what env_driver.snapshot_describe() / snapshot_rows() return ------------------
 DESCRIBE = {

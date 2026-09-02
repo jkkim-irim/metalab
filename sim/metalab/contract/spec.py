@@ -502,10 +502,6 @@ class GateSpec(_Data):
     it. A task whose success has a different shape declares a different one, and the reward term that pays for
     success calls the very same function at the curriculum's bar.
 
-    ``lift_height`` is deliberately NOT one of those conditions: at the gate's own tolerance, being at the
-    goal already implies being off the table (on hammer_lift by 13.5x), so testing it would add nothing. It
-    still belongs here because it is the task's "off the table" definition — see the field.
-
     WHICH bodies count as fingertips is not stated here — it is a property of the hand, so it comes from
     ``RobotSpec.fingertips``. What the gate states is the task decision on top of that list: HOW MANY of them
     must be gripping (``contact_count``) and, when the grasp is built around particular fingers, WHICH ones
@@ -517,13 +513,6 @@ class GateSpec(_Data):
     quantity. Needs a ``goal`` for the keypoint reference; the loader fails loud if either is missing
     while the other is present, or if a grip is required and the robot declares no fingertips."""
 
-    # [m] rise above the SPAWN height that counts as "lifted" — the task's PHASE BOUNDARY, not one of the
-    # success conditions above. The driver latches it per episode and publishes it as the ``lifted`` gate that
-    # the reward / termination / event / obs terms read; on the learning side it is load-bearing, because the
-    # curriculum's loose early tolerance is reachable without leaving the table at all.
-    # 0 = no lift phase at all: ``lifted`` then stays False for the whole episode, which SILENTLY disables
-    # every term gated on it (approach/progress/reach-bonus/grasp-lost/pull-force). Set it, or drop those.
-    lift_height: float = Field(default=0.0, ge=0.0)
     predicate: Callable                                       # sim.metalab.terms.gate — fn(env, **knobs) -> (N,) bool
     goal_dist_tol: float = Field(gt=0.0)                  # [m] keypoint_max_dist to the goal
     hold_steps: int = Field(default=1, ge=1)                  # steps inside the tolerance (see hold_mode)
@@ -611,7 +600,7 @@ class ObsTerm(_Logic):
     ``"@refs"`` resolved, and it stays MUTABLE at runtime, so a knob can be retuned live exactly the way the
     curriculum retunes a reward term. (The predecessor called the term as a FACTORY at load and kept only the
     closure it returned, which froze every knob, erased the function's name from tracebacks, and left the
-    loader guessing ``dim_labels`` from the positional args.) See sim/metalab/terms/obs/common.py."""
+    loader guessing ``dim_labels`` from the positional args.) See sim/metalab/terms/obs.py."""
 
     name: str
     fn: Callable
@@ -632,7 +621,7 @@ class RewardTerm(_Logic):
     args — a flat signature is only readable if every knob is named). It stays MUTABLE at runtime: the
     curriculum retunes a term by writing into this dict, which the next step picks up. Per-env episode state
     goes through ``EnvDriver.buffer`` (driver-owned, auto-reset), so a term needs no init/reset hook and
-    stays a plain function. See sim/metalab/terms/reward/common.py."""
+    stays a plain function. See sim/metalab/terms/reward.py."""
 
     name: str
     fn: Callable
@@ -703,7 +692,7 @@ class TerminateTerm(_Logic):
 
     Same shape as :class:`RewardTerm`, and for the same reasons — ``params`` is the contract's knobs with
     ``"@refs"`` resolved and stays MUTABLE at runtime, so a bar like ``min_height`` could be ramped live the
-    way the curriculum ramps a reward knob. See sim/metalab/terms/terminate/common.py.
+    way the curriculum ramps a reward knob. See sim/metalab/terms/terminate.py.
 
     name = key for per-term done tracking/logging (Termination/<name>) + curriculum
     termination_rate(name)."""
@@ -944,7 +933,7 @@ class Event(_Ref):
 
     def __init__(self, fn: Callable, mode: str = "reset", *, name: str | None = None,
                  train_only: bool = False, requires: str | tuple[str, ...] = (), **knobs: Any):
-        """``requires`` names the engine CAPABILITIES this term needs (``runtime/backend.py``'s
+        """``requires`` names the engine CAPABILITIES this term needs (``api/backend.py``'s
         ``CAPABILITIES``); on a backend without them the driver drops the term and says so, instead of the
         term reaching a write surface the engine does not have. It is the contract's way of stating that a
         DR channel exists only where the engine can honour it — so ONE contract runs on both engines and the

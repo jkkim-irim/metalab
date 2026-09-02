@@ -14,7 +14,7 @@ MetaLab sim 은 **계약서 하나가 단일 소스**이고, 엔진별 스포크
 ## Sim (`sim/metalab`)
 - **단위는 SI, 각도는 rad** — 강성·게인 kp/kv/K_q 도 N·m/rad. 사람에게 보여지는 각도만 deg.
 - **주석은 달지 않는다** — 주석은 리포에서 유일하게 검증 장치가 없어 틀려도 조용히 거짓이 된다. 필요한 주석은 사용자가 직접 요청하는 것만.
-- **MDP(reward·obs·events·terminate)의 수식과 판정은 term 함수 안에만** 쓴다(여러 term 이 공유하는 계산은 `api/` 로 올린다).
+- **MDP(reward·obs·events·terminate)의 수식과 판정은 term 함수 안에만** 쓴다. 여러 term 이 공유하는 판정(성공 거리 등)은 `terms/gate.py` 에 한 번 정의해 import 하고, `api/` 에는 엔진 계약 `SimBackend` 와 좌표 수학만 둔다.
 - **엔진별 진입점은 스포크마다 한 곳**: `backends/<engine>/server.py` + `backend.py`.
 
 ## Training

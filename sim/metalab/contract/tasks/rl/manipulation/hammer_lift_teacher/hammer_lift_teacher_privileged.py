@@ -32,7 +32,6 @@ class REWARD:
 # --- gate: WHAT COUNTS AS SOLVED ----------------------------------------------------------------------
 class GATE:
     predicate = gate.object_at_goal
-    lift_height = 0.1
     goal_dist_tol = 0.01     # [m] keypoint_max_dist to the goal — true 1cm
     hold_steps = 20              # consecutive steps inside tolerance (counter resets the moment it breaks)
     contact_count = 5            # full 5-fingertip grasp while holding

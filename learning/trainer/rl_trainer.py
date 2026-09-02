@@ -66,7 +66,7 @@ def _make_record_callback(task: str, recipe: str, device: str, policy_cfg: dict,
     curriculum-END criteria. Runs on the training GPU (a few envs are tiny next to the training batch).
 
     WHAT GOES TO W&B IS A LINK. The sim writes a rerun ``.rrd`` plus the synced plot report into the recording
-    dir (see sim/metalab/runtime/rollout_report.py), :func:`_publish_report` files that beside this run's
+    dir (see sim/metalab/dashboard/rollout_report.py), :func:`_publish_report` files that beside this run's
     checkpoints, and its path is logged on the checkpoint's own training step — so a checkpoint's replay, its
     per-step series and its ``.pt`` all live in one place. No ``wandb.Video``: the report's 3D pane replays the
     same rollout with a free camera, which the per-env MP4s (one fixed angle, ~32 s of blocking render per

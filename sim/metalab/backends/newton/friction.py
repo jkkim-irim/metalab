@@ -1,17 +1,3 @@
-"""Geometric-mean contact friction for the newton spoke (warp kernel + one wrapped mujoco_warp call).
-
-The rule is defined in :mod:`sim.metalab.runtime.physics.friction`; this is its warp implementation.
-
-WHERE IT HOOKS. mujoco_warp mixes friction inside ``collision()`` and consumes it in ``make_constraint()``,
-both called from ``fwd_position`` — so the only place to correct the value is between those two. Rather than
-copy ``fwd_position``'s body (the legacy isaaclab SolverJK did that, and it carries sleep/island passes that
-change between versions), we wrap the module-level ``make_constraint`` symbol: ``fwd_position`` resolves it
-through the module at call time, so replacing the attribute puts our kernel in front of every call, on every
-substep, for every solver — including inside a captured CUDA graph (a plain wp.launch over fixed buffers).
-
-``install()`` is idempotent and fails loud if mujoco_warp's shape changes (missing symbol, or a
-``geom_friction`` that is no longer (nworld, ngeom)) rather than silently leaving MuJoCo's max() in place.
-"""
 from __future__ import annotations
 
 from mujoco_warp._src import constraint as _mw_constraint
@@ -26,15 +12,14 @@ _installed = False
 
 @wp.kernel(enable_backward=False)
 def geomean_contact_friction(
-    nacon: wp.array(dtype=wp.int32),            # (1,) active contact count this substep
-    contact_geom: wp.array(dtype=wp.vec2i),     # (naconmax,) the two geom ids per contact
-    contact_worldid: wp.array(dtype=wp.int32),  # (naconmax,) which world the contact is in
-    geom_friction: wp.array2d(dtype=wp.vec3),   # (nworld, ngeom) per-geom (slide, torsional, rolling)
-    contact_friction: wp.array(dtype=vec5f),    # OUT: (naconmax,) slide, slide, torsional, roll, roll
+    nacon: wp.array(dtype=wp.int32),
+    contact_geom: wp.array(dtype=wp.vec2i),
+    contact_worldid: wp.array(dtype=wp.int32),
+    geom_friction: wp.array2d(dtype=wp.vec3),
+    contact_friction: wp.array(dtype=vec5f),
 ):
-    """Overwrite the solver's mixed friction with the geometric mean of the two geoms' values."""
     tid = wp.tid()
-    if tid >= nacon[0]:                         # inactive slot — leave it (make_constraint ignores it)
+    if tid >= nacon[0]:
         return
     g = contact_geom[tid]
     w = contact_worldid[tid]
@@ -47,7 +32,6 @@ def geomean_contact_friction(
 
 
 def install() -> None:
-    """Put the geometric-mean kernel in front of every ``make_constraint`` call. Idempotent."""
     global _installed
     if _installed:
         return
@@ -63,6 +47,6 @@ def install() -> None:
                   outputs=[d.contact.friction], device=d.contact.friction.device)
         original(m, d)
 
-    make_constraint.__wrapped__ = original          # keep the original reachable/inspectable
+    make_constraint.__wrapped__ = original
     _mw_constraint.make_constraint = make_constraint
     _installed = True
