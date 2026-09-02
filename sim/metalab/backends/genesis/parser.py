@@ -86,7 +86,7 @@ def build_scene(spec: EnvSpec, num_envs: int | None = None, viz: bool = False, b
 
     ph = spec.physics
     scene = gs.Scene(
-        sim_options=gs.options.SimOptions(dt=ph.dt / ph.substeps, substeps=1),
+        sim_options=gs.options.SimOptions(dt=ph.dt / ph.substeps, substeps=1, gravity=tuple(ph.gravity)),
         rigid_options=gs.options.RigidOptions(enable_self_collision=ph.self_collision, batch_dofs_info=True),
         vis_options=gs.options.VisOptions(),
         show_viewer=viz,
