@@ -174,7 +174,7 @@ def discover_traj_groups() -> list[dict]:
     """Trajectory via-point groups = every '*_group' dir under sim/metalab/assets/data/spline (recursive).
     Each drives the Standalone trajectory player (Play → cubic-Hermite from that dir's CSVs). Returns
     ``[{label, path}]`` sorted by path; ``path`` is repo-relative POSIX (the value handed to the runner),
-    ``label`` is ``<parent>/<name>`` for readability (e.g. ``dumbbell/demo2_dumbbell_group``)."""
+    ``label`` is ``<parent>/<name>`` for readability (e.g. ``allex/dumbbell_motion_group``)."""
     if not TRAJ_DIR.is_dir():
         return []
     return [{"label": f"{d.parent.name}/{d.name}", "path": d.relative_to(REPO).as_posix()}

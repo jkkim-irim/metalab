@@ -29,7 +29,7 @@ Single-env (num_envs=1) on the default GPU with the GL viewer on.
   # in the engine's uv venv (sim/standalone.sh does the env provisioning + activation)
   python -m sim.metalab.tools.standalone --engine newton  --task dumbbell-test
   python -m sim.metalab.tools.standalone --engine genesis --task dumbbell-test \
-      --trajectory sim/metalab/assets/data/spline/allex/dumbbell/demo2_dumbbell_group   # auto-play on start
+      --trajectory sim/metalab/assets/data/spline/allex/dumbbell_motion_group   # auto-play on start
 """
 from __future__ import annotations
 
@@ -516,8 +516,8 @@ def main() -> None:
     ap.add_argument("--engine", required=True, choices=["genesis", "newton"])
     ap.add_argument("--task", required=True)
     ap.add_argument("--trajectory", default=None,
-                    help="Directory of via-point CSVs (e.g. sim/metalab/assets/data/spline/allex/dumbbell/"
-                         "demo2_dumbbell_group) to AUTO-PLAY on start. Otherwise drive it live from the SIM tab.")
+                    help="Directory of via-point CSVs (e.g. sim/metalab/assets/data/spline/allex/"
+                         "dumbbell_motion_group) to AUTO-PLAY on start. Otherwise drive it live from the SIM tab.")
     args = ap.parse_args()
     run(args.engine, args.task, trajectory_dir=args.trajectory)
 

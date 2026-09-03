@@ -12,9 +12,7 @@ The 48 names here are exactly the ALLEX **actuated** joints. Equality followers
 are intentionally omitted — they are driven by their master joints via the MJCF
 ``<equality>`` coupling, not by the CSV.
 
-CSV basenames follow the current robot export convention (``left_arm``, ``right_index``,
-``waist``, …); the legacy names (``Arm_L_theOne``, ``Hand_R_index_wir``, ``theOne_waist``, …)
-are no longer recognized — rename old group dirs' files to play them.
+CSV basenames follow the robot export convention (``left_arm``, ``right_index``, ``waist``, …).
 """
 from __future__ import annotations
 
