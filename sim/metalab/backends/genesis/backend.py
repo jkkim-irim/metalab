@@ -6,8 +6,8 @@ import genesis as gs
 import torch
 
 from sim.metalab.backends.genesis.viewer import GenesisViewer
-from sim.metalab.control.coupled_pd import CoupledPDMixin, TorchCoupledPD
-from sim.metalab.control.loaders import load_coupled_groups
+from sim.metalab.control.motor.coupled_pd import CoupledPDMixin, TorchCoupledPD
+from sim.metalab.control.motor.loaders import load_coupled_groups
 
 
 class GenesisBackend(CoupledPDMixin):

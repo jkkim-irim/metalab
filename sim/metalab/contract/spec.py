@@ -215,6 +215,12 @@ class RobotSpec(_Data):
     # torque still reports what the object pushes back with. A name that collides with an action group (or
     # the derived "ctrl") fails loud in the loader rather than shadowing it.
     joint_groups: dict[str, list[str]] = Field(default_factory=dict)
+    # Via-point CSV groups for spline playback: CSV basename (without .csv) -> joint names IN COLUMN ORDER,
+    # so `<name>.csv`'s k-th joint_ column drives the k-th joint here. OMIT IT to take `action_groups` as the
+    # grouping, which is what a robot whose CSVs are exported per action group wants. Declare it when the export
+    # is cut differently: ALLEX ships one file per finger and per body part (waist/neck are drivable but not
+    # action groups), so its 14 groups are neither a subset nor a superset of `action_groups`.
+    spline_groups: dict[str, list[str]] = Field(default_factory=dict)
     # Frames = MJCF body names (e.g. chest_origin, palm). Native bodies, so no offset.
     frames: dict[str, str] = Field(default_factory=dict)
     # Fingertip bodies (MJCF names), in hand order — a HW fact of this robot, like `frames`, not a task knob:
@@ -260,6 +266,9 @@ class RobotSpec(_Data):
     def active_joints(self) -> set[str]:
         return {n for n, v in self.joints.items() if v == 1}
 
+    def csv_spline_groups(self) -> dict[str, list[str]]:
+        return dict(self.spline_groups or self.action_groups)
+
     def coupled_groups(self) -> list[MotorCouplingSpec]:
         if self.control_mode != "motor":
             return []
@@ -286,6 +295,11 @@ class RobotSpec(_Data):
         for g, names in self.action_groups.items():
             unknown = set(names) - active
             assert not unknown, f"action_groups[{g}] has inactive/unknown joints: {sorted(unknown)}"
+        for g, names in self.spline_groups.items():
+            unknown = set(names) - active
+            assert not unknown, f"spline_groups[{g}] has inactive/unknown joints: {sorted(unknown)}"
+            dup = [j for j in set(names) if names.count(j) > 1]
+            assert not dup, f"spline_groups[{g}] repeats joints: {sorted(dup)}"
         unknown = set(self.joint_mode_param) - active
         assert not unknown, f"joint_mode_param has inactive/unknown joints: {sorted(unknown)}"
         if self.gravcomp is not None:

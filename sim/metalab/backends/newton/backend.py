@@ -12,9 +12,9 @@ from sim.metalab.api.transforms import quat_conj, quat_mul, quat_rotate, wxyz_to
 from sim.metalab.backends.newton import gravcomp as _gravcomp
 from sim.metalab.backends.newton.mjw_object_scale import install as _install_mjw_object_scale
 from sim.metalab.backends.newton.viewer import NewtonViewer
-from sim.metalab.control.coupled_pd import CoupledPDMixin
-from sim.metalab.control.loaders import load_coupled_groups
-from sim.metalab.control.motor_coupling import MotorCoupledPDArm, MotorCoupledPDHand
+from sim.metalab.control.motor.coupled_pd import CoupledPDMixin
+from sim.metalab.control.motor.loaders import load_coupled_groups
+from sim.metalab.control.motor.motor_coupling import MotorCoupledPDArm, MotorCoupledPDHand
 
 
 @wp.kernel

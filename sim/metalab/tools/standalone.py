@@ -46,28 +46,17 @@ import time
 
 import torch
 
+from sim.metalab.control.spline import CsvTrajectory
 from sim.metalab.dashboard import standalone_monitor as monitor
 from sim.metalab.dashboard.control_server import TrajControlServer
 from sim.metalab.dashboard.page import DESCRIBE_CACHE_REL
 from sim.metalab.runtime.signals import restore_default_sigint
-from sim.metalab.trajectory import ALLEX_CSV_JOINT_NAMES, CsvTrajectory
 
 _RAD2DEG = 180.0 / math.pi
 _DEG2RAD = math.pi / 180.0   # dashboard/CSV side is degrees, the engine side is radians
 _SIM = Path(__file__).resolve().parents[2]          # <repo>/sim  (this file: sim/metalab/runtime/)
 _REPO = _SIM.parent                                 # <repo>
 _TRAJ_ROOT = _SIM / "metalab" / "assets" / "data" / "spline"
-
-# Right-hand fingertip contact force: (column label, collision link measured). The MJCF ``R_*_Fingertip``
-# bodies are visual-only (no collision geom), so each fingertip's net contact force is read on its distal
-# collision link — matching the repo's fingertip convention (hammer_lift_teacher `_FINGERTIPS`).
-_R_FINGERTIP_CONTACT = [
-    ("R_Thumb_Fingertip", "R_Thumb_Distal_Link"),
-    ("R_Index_Fingertip", "R_Index_Distal_Link"),
-    ("R_Middle_Fingertip", "R_Middle_Distal_Link"),
-    ("R_Ring_Fingertip", "R_Ring_Distal_Link"),
-    ("R_Little_Fingertip", "R_Little_Distal_Link"),
-]
 
 _reset_requested = False   # set by the SIGUSR1 handler; consumed at the top of the step loop (main thread)
 
@@ -126,14 +115,10 @@ def _rom_deg(lo_rad: float, hi_rad: float) -> dict:
 
 
 def _report_joints(spec) -> list[str]:
-    """Stable joint set driven + reported (targets, plots): CSV-map joints the robot owns, in map order
-    (allex → 48, allex_right → 22). A robot outside the ALLEX CSV map falls back to its action_groups
-    order — only commandable joints are drivable (trajectory playback stays ALLEX-CSV shaped)."""
-    active = spec.robot.active_joints()
-    csv_owned = [j for names in ALLEX_CSV_JOINT_NAMES.values() for j in names if j in active]
-    if csv_owned:
-        return csv_owned
-    return list(dict.fromkeys(j for names in spec.robot.action_groups.values() for j in names))
+    """Stable joint set driven + reported (targets, plots): the robot's spline groups in declaration order
+    (allex → 48, allex_right → 22, franka → 9). Same order the trajectory player drives, so a plot column
+    and a commanded column are the same joint."""
+    return list(dict.fromkeys(j for names in spec.robot.csv_spline_groups().values() for j in names))
 
 
 def _write_joint_csv(path: Path, joints: list[str], times: list[float], rows: list[list[float]]) -> None:
@@ -215,8 +200,8 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
     step_n = b.step_n if "batched_step" in env.capabilities else None
 
     report = _report_joints(spec)                  # driven + reported joints (stable across play/idle)
-    assert report, "no drivable joints (CSV map ∩ active_joints is empty)"
-    available = spec.robot.active_joints()
+    assert report, f"robot({spec.robot.asset['mjcf']}) declares no spline group to drive"
+    spline_groups = spec.robot.csv_spline_groups()
 
     b.reset_idx(all_mask)                          # spawn at the contract init pose (NO domain randomization)
     cur = b.joint_pos(report).clone()              # (N, k) current PD target [rad]; idle = init pose
@@ -286,10 +271,10 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
     cache.write_text(json.dumps(describe))
     srv = TrajControlServer(describe)
 
-    # Right-hand fingertip contact-force channel: net contact force is read on each fingertip's distal collision
-    # link (the fingertip bodies are visual-only). Bodies exist for any ALLEX load regardless of joint mask.
-    fingertip_labels = [lbl for lbl, _ in _R_FINGERTIP_CONTACT]
-    fingertip_links = [lnk for _, lnk in _R_FINGERTIP_CONTACT]
+    # Fingertip contact-force channel: the bodies the ROBOT declares as its fingertips (distal collision
+    # links — the visual ``*_Fingertip`` bodies carry no collision geom). A robot that declares none, like
+    # franka, simply has no contact-force series.
+    fingertip_links = list(spec.robot.fingertips)
 
     # Trajectory recording: accumulate (sim time; actual joint pos [deg]; commanded target [deg]; joint torque
     # [Nm]; fingertip contact-force magnitude [N]) each control step while a trajectory plays; on `finished` write
@@ -363,7 +348,7 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
     def _play(group_path: str, hz) -> None:
         nonlocal traj, traj_cols, dense_gpu, paused, group_label
         gdir = group_path if Path(group_path).is_absolute() else str(_REPO / group_path)
-        traj = CsvTrajectory(gdir, available, control_hz, seed_pose=_seed_dict(), ramp_s=1.0)
+        traj = CsvTrajectory(gdir, spline_groups, control_hz, seed_pose=_seed_dict(), ramp_s=1.0)
         # map the trajectory's (possibly partial, e.g. one finger = 3 joints) joint set → columns of `report`;
         # the rest of `report` keeps holding the init pose while the trajectory drives only its own joints.
         traj_cols = torch.tensor([report.index(j) for j in traj.joint_names], device=b.device)
@@ -488,7 +473,7 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
                               "target_position.csv": (report, rec["tgt"]),
                               "joint_torque.csv": (report, rec["trq"])}
                     if fingertip_links:
-                        series["contact_force.csv"] = (fingertip_labels, rec["cf"])
+                        series["contact_force.csv"] = (fingertip_links, rec["cf"])
                     out = _save_trajectory_log(_REPO, rec["group"], engine, rec["time"], series)
                     rec["saved"] = True
                     print(f"[standalone] trajectory finished — saved {len(rec['time'])} samples "

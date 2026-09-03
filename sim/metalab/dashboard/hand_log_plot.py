@@ -59,14 +59,14 @@ def plot_hand_log(run_dir, joint: str = "R_Index_PIP", fingertip: str | None = N
                   dpi: int = 400, out=None) -> Path:
     """Render the overlay PNG for ``joint`` from the CSVs in ``run_dir``; return the saved path.
 
-    ``fingertip`` defaults to the joint's finger (``R_Index_PIP`` -> ``R_Index_Fingertip``).
+    ``fingertip`` defaults to the joint's finger (``R_Index_PIP`` -> ``R_Index_Distal_Link``).
     ``out`` defaults to ``<run_dir>/<joint>_overlay.png``."""
     run = Path(run_dir)
     ftip = fingertip
-    if ftip is None:                                # derive <side>_<finger>_Fingertip from the joint name
+    if ftip is None:                                # derive <side>_<finger>_Distal_Link from the joint name
         p = joint.split("_")
         assert len(p) >= 2, f"cannot derive fingertip from joint {joint!r}; pass fingertip"
-        ftip = f"{p[0]}_{p[1]}_Fingertip"
+        ftip = f"{p[0]}_{p[1]}_Distal_Link"
 
     tp, pos, jcol = _load(run / "joint_position.csv", joint)
     _,  tgt, _    = _load(run / "target_position.csv", joint)
@@ -114,7 +114,7 @@ def main() -> None:
     ap.add_argument("--joint", default="R_Index_PIP",
                     help="joint column for position/target/torque (exact or unique substring)")
     ap.add_argument("--fingertip", default=None,
-                    help="contact_force column; default = derived from the joint's finger (e.g. R_Index_Fingertip)")
+                    help="contact_force column; default = derived from the joint's finger (e.g. R_Index_Distal_Link)")
     ap.add_argument("--dpi", type=int, default=400, help="PNG resolution (higher = sharper zoom)")
     ap.add_argument("--out", default=None, help="output path (default <run_dir>/<joint>_overlay.png)")
     args = ap.parse_args()

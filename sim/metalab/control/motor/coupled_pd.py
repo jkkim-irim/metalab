@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import warp as wp
 
-from sim.metalab.control.motor_coupling import MotorCoupledPDArm, MotorCoupledPDHand
+from sim.metalab.control.motor.motor_coupling import MotorCoupledPDArm, MotorCoupledPDHand
 
 
 class TorchCoupledPD:

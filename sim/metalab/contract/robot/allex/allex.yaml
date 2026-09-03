@@ -109,6 +109,38 @@ action_groups:
   arm_l:  [L_Shoulder_Pitch_Joint, L_Shoulder_Roll_Joint, L_Shoulder_Yaw_Joint, L_Elbow_Joint, L_Wrist_Yaw_Joint, L_Wrist_Roll_Joint, L_Wrist_Pitch_Joint]
   hand_l: [L_Thumb_Yaw_Joint, L_Thumb_CMC_Joint, L_Thumb_MCP_Joint, L_Index_ABAD_Joint, L_Index_MCP_Joint, L_Index_PIP_Joint, L_Middle_ABAD_Joint, L_Middle_MCP_Joint, L_Middle_PIP_Joint, L_Ring_ABAD_Joint, L_Ring_MCP_Joint, L_Ring_PIP_Joint, L_Little_ABAD_Joint, L_Little_MCP_Joint, L_Little_PIP_Joint]
 
+spline_groups:
+  waist: [Waist_Yaw_Joint, Waist_Lower_Pitch_Joint]
+  neck: [Neck_Pitch_Joint, Neck_Yaw_Joint]
+  left_arm: [
+    L_Shoulder_Pitch_Joint,
+    L_Shoulder_Roll_Joint,
+    L_Shoulder_Yaw_Joint,
+    L_Elbow_Joint,
+    L_Wrist_Yaw_Joint,
+    L_Wrist_Roll_Joint,
+    L_Wrist_Pitch_Joint,
+  ]
+  right_arm: [
+    R_Shoulder_Pitch_Joint,
+    R_Shoulder_Roll_Joint,
+    R_Shoulder_Yaw_Joint,
+    R_Elbow_Joint,
+    R_Wrist_Yaw_Joint,
+    R_Wrist_Roll_Joint,
+    R_Wrist_Pitch_Joint,
+  ]
+  left_thumb: [L_Thumb_Yaw_Joint, L_Thumb_CMC_Joint, L_Thumb_MCP_Joint]
+  left_index: [L_Index_ABAD_Joint, L_Index_MCP_Joint, L_Index_PIP_Joint]
+  left_middle: [L_Middle_ABAD_Joint, L_Middle_MCP_Joint, L_Middle_PIP_Joint]
+  left_ring: [L_Ring_ABAD_Joint, L_Ring_MCP_Joint, L_Ring_PIP_Joint]
+  left_little: [L_Little_ABAD_Joint, L_Little_MCP_Joint, L_Little_PIP_Joint]
+  right_thumb: [R_Thumb_Yaw_Joint, R_Thumb_CMC_Joint, R_Thumb_MCP_Joint]
+  right_index: [R_Index_ABAD_Joint, R_Index_MCP_Joint, R_Index_PIP_Joint]
+  right_middle: [R_Middle_ABAD_Joint, R_Middle_MCP_Joint, R_Middle_PIP_Joint]
+  right_ring: [R_Ring_ABAD_Joint, R_Ring_MCP_Joint, R_Ring_PIP_Joint]
+  right_little: [R_Little_ABAD_Joint, R_Little_MCP_Joint, R_Little_PIP_Joint]
+
 frames:
   chest_origin: Chest_Origin_Link
   palm_r: R_Palm_Link
