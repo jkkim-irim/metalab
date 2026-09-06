@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 
 from sim.metalab.api import transforms
-from sim.metalab.terms.gate import object_goal_dist
+from sim.metalab.terms.gate import body_goal_dist, object_goal_dist
 
 
 def _exp_kernel(err: torch.Tensor, sigma: float) -> torch.Tensor:
@@ -57,6 +57,11 @@ def object_goal_keypoint_tracking(env, std: float = 0.1, lift_threshold: float =
         r = r * (((z - lift_threshold) / (lift_full - lift_threshold)).clamp(0.0, 1.0) if lift_full > 0.0
                  else (z > lift_threshold).float())
     return r
+
+
+def body_goal_proximity(env, body: str, std: float) -> torch.Tensor:   # [m]
+    assert std > 0.0, f"body_goal_proximity: std must be > 0 — got {std}"
+    return _exp_kernel(body_goal_dist(env, body), std)
 
 
 def joint_pose_convergence(env, joint_pose: dict,   # {joint: rad}

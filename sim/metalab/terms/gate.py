@@ -16,6 +16,10 @@ def object_goal_dist(env) -> torch.Tensor:   # [m]
     return torch.linalg.norm(d, dim=-1).max(dim=-1).values
 
 
+def body_goal_dist(env, body: str) -> torch.Tensor:   # [m]
+    return torch.linalg.norm(env.body_pos(body) - env.goal_pos, dim=-1)
+
+
 def object_at_goal(env, goal_dist_tol: float,   # [m]
                    palm_distance: float = 0.0,   # [m]
                    contact_count: int = 0,
@@ -47,3 +51,17 @@ def object_at_goal(env, goal_dist_tol: float,   # [m]
         err = (q - transforms.const(tuple(joint_pose[j] for j in names), q)).abs().amax(dim=-1)
         at = at & (err <= joint_pose_tolerance)
     return at
+
+
+def body_at_goal(env, goal_dist_tol: float,   # [m]
+                 palm_distance: float = 0.0,
+                 contact_count: int = 0,
+                 contact_fingers: tuple[str, ...] = (),
+                 force_threshold: float = 1.0e-3,
+                 joint_pose: dict | None = None,
+                 joint_pose_tolerance: float = 0.0) -> torch.Tensor:
+    assert env.palm_body is not None, "body_at_goal needs a robot frame named 'palm' (the body that must reach the goal)"
+    assert palm_distance == 0.0 and contact_count == 0 and not contact_fingers and joint_pose_tolerance == 0.0, (
+        "body_at_goal judges the palm position only — GATE.palm_distance / contact_count / contact_fingers / "
+        "joint_pose_tolerance are object-grasp conditions it does not evaluate")
+    return body_goal_dist(env, env.palm_body) <= goal_dist_tol

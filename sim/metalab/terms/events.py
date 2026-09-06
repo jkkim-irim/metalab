@@ -23,6 +23,17 @@ def reset_object_pose(env, env_ids, active_position, x_range, y_range, yaw_range
     env.set_object_pose(env_ids, pos, quat)
 
 
+def reset_goal_position(env, env_ids, x_range, y_range, z_range):   # [m]
+    k, dev = int(env_ids.numel()), env_ids.device
+    if k == 0:
+        return
+    assert env.goal_pos is not None, "reset_goal_position needs a contract `goal` block (it owns env.goal_pos)"
+    bounds = torch.tensor([tuple(x_range), tuple(y_range), tuple(z_range)], dtype=torch.float32, device=dev)
+    assert (bounds[:, 0] <= bounds[:, 1]).all(), \
+        f"each range needs lo <= hi — got x={tuple(x_range)} y={tuple(y_range)} z={tuple(z_range)}"
+    env.goal_pos[env_ids] = torch.rand(k, 3, device=dev) * (bounds[:, 1] - bounds[:, 0]) + bounds[:, 0]
+
+
 def reset_joints_by_offset(env, env_ids, joints, position_range, velocity_range=(0.0, 0.0)):
     k = int(env_ids.numel())
     if k == 0:

@@ -129,6 +129,16 @@ def hand_contact_force(env, bodies: list[str], target: str = "object",
     return f.reshape(f.shape[0], -1)
 
 
+def goal_position(env) -> torch.Tensor:
+    assert env.goal_pos is not None, "goal_position needs a contract `goal` block"
+    return env.goal_pos
+
+
+def body_goal_error(env, body: str) -> torch.Tensor:
+    assert env.goal_pos is not None, "body_goal_error needs a contract `goal` block"
+    return env.goal_pos - env.body_pos(body)
+
+
 def episode_step(env) -> torch.Tensor:
     return (env.episode_length_buf.float() / max(1, env.max_episode_length)).unsqueeze(-1)
 
