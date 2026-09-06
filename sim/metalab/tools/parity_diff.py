@@ -17,13 +17,18 @@ def load(path: Path) -> tuple[dict[str, np.ndarray], dict]:
     return arrays, meta
 
 
-def diff(a_path: Path, b_path: Path) -> str:
+def load_pair(a_path: Path, b_path: Path) -> tuple[dict[str, np.ndarray], dict, dict[str, np.ndarray], dict]:
     a, ma = load(a_path)
     b, mb = load(b_path)
     mismatch = [k for k in _MUST_MATCH if ma.get(k) != mb.get(k)]
     assert not mismatch, (
         f"recordings are not comparable, meta differs in {mismatch}: "
         + "; ".join(f"{k}: {ma.get(k)!r} vs {mb.get(k)!r}" for k in mismatch))
+    return a, ma, b, mb
+
+
+def diff(a_path: Path, b_path: Path) -> str:
+    a, ma, b, mb = load_pair(a_path, b_path)
     dt = float(ma["dt"])
 
     lines = [
