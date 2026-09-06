@@ -9,9 +9,10 @@
 # Usage:
 #   sim/metalab/parity.sh --task parity-joint-torque             # genesis + newton → diff .md + plot .png
 #   sim/metalab/parity.sh --task parity-joint-torque --sim newton  # record one engine only, no comparison
-#   sim/metalab/parity.sh --task parity-contact --video           # + offscreen mp4 per engine (newton needs a live X display)
+#   sim/metalab/parity.sh --task parity-contact --video           # + one side-by-side mp4 (newton needs a live X display)
 # Outputs land in _logs/parity/<task>/: <engine>_<mode>_<stamp>.{npz,json}, genesis_vs_newton_<stamp>.md,
-# genesis_vs_newton_<stamp>_NN.png (2 channels per page), video/<engine>_<mode>_<stamp>.mp4
+# genesis_vs_newton_<stamp>_NN.png (2 channels per page), video/genesis_vs_newton_<stamp>.mp4 (left genesis,
+# right newton, each cropped to the middle 640 px around the robot; the per-engine recordings are deleted).
 LOG_TAG=parity
 source "$(dirname "${BASH_SOURCE[0]}")/../../learning/scripts/local/lib.sh"
 
@@ -23,7 +24,7 @@ while [ $# -gt 0 ]; do
     --task)     TASK="$2"; shift 2 ;;
     --task=*)   TASK="${1#*=}"; shift ;;
     --video)    VIDEO=(--video); shift ;;
-    -h|--help)  sed -n '2,14p' "$0"; exit 0 ;;
+    -h|--help)  sed -n '2,15p' "$0"; exit 0 ;;
     *) echo "[parity] unknown arg '$1' (flags: --task --sim --video)" >&2; exit 1 ;;
   esac
 done
@@ -40,7 +41,6 @@ fi
 cd "$ROOT"
 [ ${#VIDEO[@]} -eq 0 ] || resolve_display || exit 2
 
-# record one engine in its venv (subshell keeps the activation local); echoes the written .npz path.
 record(){
   local engine="$1" venv out
   bash "$ROOT/learning/scripts/local/setup_env.sh" --sim "$engine" >&2
@@ -51,6 +51,17 @@ record(){
     python -m sim.metalab.tools.parity_record --engine "$engine" --task "$TASK" "${VIDEO[@]}" | tee /dev/stderr
   )"
   sed -n 's/^\[parity\] wrote \(.*\.npz\)$/\1/p' <<<"$out"
+  sed -n 's/^\[parity\] wrote \(.*\.mp4\)$/\1/p' <<<"$out"
+}
+
+side_by_side(){
+  local a="$1" b="$2" out="$3"
+  ffmpeg -v error -y -i "$a" -i "$b" -filter_complex \
+    "[0:v]crop=640:720:320:0,drawtext=text='genesis':x=16:y=16:fontsize=36:fontcolor=white:font=DejaVuSans[a];\
+     [1:v]crop=640:720:320:0,drawtext=text='newton':x=16:y=16:fontsize=36:fontcolor=white:font=DejaVuSans[b];\
+     [a][b]hstack=inputs=2" -c:v libx264 -crf 18 -pix_fmt yuv420p "$out"
+  rm -f "$a" "$b"
+  echo "[parity] wrote $out"
 }
 
 if [ -n "$SIM" ]; then
@@ -58,11 +69,17 @@ if [ -n "$SIM" ]; then
   exit 0
 fi
 
-A="$(record genesis)"
-B="$(record newton)"
+mapfile -t GA < <(record genesis)
+mapfile -t NB < <(record newton)
+A="${GA[0]:-}"; B="${NB[0]:-}"
 [ -n "$A" ] && [ -n "$B" ] || { echo "[parity] recorder did not report an output path (A='$A' B='$B')" >&2; exit 1; }
 
-OUT="$(dirname "$A")/genesis_vs_newton_$(date +%Y%m%d_%H%M%S)"
+STAMP="$(date +%Y%m%d_%H%M%S)"
+OUT="$(dirname "$A")/genesis_vs_newton_$STAMP"
 source "$(engine_venv genesis)/bin/activate"
 python -m sim.metalab.tools.parity_diff "$A" "$B" --out "$OUT.md"
 python -m sim.metalab.tools.parity_plot "$A" "$B" --out "$OUT.png"
+if [ ${#VIDEO[@]} -gt 0 ]; then
+  [ -n "${GA[1]:-}" ] && [ -n "${NB[1]:-}" ] || { echo "[parity] --video set but no mp4 reported (${GA[*]} / ${NB[*]})" >&2; exit 1; }
+  side_by_side "${GA[1]}" "${NB[1]}" "$(dirname "$A")/video/genesis_vs_newton_$STAMP.mp4"
+fi
