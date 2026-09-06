@@ -138,7 +138,7 @@ def discover_standalone_recipes() -> dict[str, list[str]]:
 
 
 # The task-contract sections that are TUNED between runs — the recipe a run was trained with.
-_RECIPE_CLASSES = ("PHYSICS", "ACTION", "REWARD", "EVENTS", "TERMINATE", "GATE", "CURRICULUM")
+_RECIPE_CLASSES = ("PHYSICS", "ACTION", "REWARD", "EVENTS", "TERMINATE", "GATE", "CURRICULUM", "COMMAND")
 
 
 def _task_recipe(task: str, recipe: str, mode: str) -> dict:
@@ -150,7 +150,9 @@ def _task_recipe(task: str, recipe: str, mode: str) -> dict:
     termination) and the chosen recipe (reward / gate / curriculum), read in that order. A standalone
     GROUP splits the same way — its ``_base.py`` holds the scene, the contract holds what differs."""
     stem = task.replace("-", "_")
-    if mode == "standalone":
+    if mode == "parity":
+        paths = [STANDALONE_DIR / "parity_test" / "_base.py", STANDALONE_DIR / "parity_test" / f"{stem}.py"]
+    elif mode == "standalone":
         contract = (recipe or task).replace("-", "_")
         group = STANDALONE_DIR / stem
         paths = ([group / "_base.py", group / f"{contract}.py"] if group.is_dir()
@@ -186,6 +188,7 @@ def discover() -> dict:
             "task_recipes": discover_task_recipes(),
             "standalone_tasks": discover_standalone_tasks(),
             "standalone_recipes": discover_standalone_recipes(),
+            "parity_tasks": _contracts_in(STANDALONE_DIR / "parity_test"),
             "traj_groups": discover_traj_groups(), "repo": str(REPO)}
 
 
@@ -290,6 +293,7 @@ _SCRIPT = {
     "train":      "learning/scripts/local/metalab_train.sh",
     "eval":       "learning/scripts/local/metalab_eval.sh",
     "standalone": "sim/metalab/standalone.sh",
+    "parity":     "sim/metalab/parity.sh",
 }   # mode → the maintained script it shells out to.
 
 _runs: dict = {}                             # run_id -> {proc, logf, meta}  (this session's launches)
@@ -340,15 +344,15 @@ def _build(params: dict) -> tuple[str, list, dict]:
     engine, task = params.get("engine"), params.get("task")
     recipe = (params.get("recipe") or "").strip()
     d = discover()
-    if engine not in d["engines"]:
+    if mode != "parity" and engine not in d["engines"]:
         raise ValueError(f"알 수 없는 엔진: {engine!r}")
-    valid_tasks = d["standalone_tasks"] if mode == "standalone" else d["tasks"]
+    valid_tasks = {"standalone": d["standalone_tasks"], "parity": d["parity_tasks"]}.get(mode, d["tasks"])
     if task not in valid_tasks:
         raise ValueError(f"알 수 없는 태스크: {task!r} (mode={mode})")
     # Second axis: a task FAMILY (train/eval) or a contract GROUP (standalone) is a shared core, not a
     # runnable contract, so it needs a recipe; a single-file contract must not be given one. Same rule
     # as the loader.
-    avail = (d["standalone_recipes"] if mode == "standalone" else d["task_recipes"]).get(task, [])
+    avail = {"standalone": d["standalone_recipes"], "parity": {}}.get(mode, d["task_recipes"]).get(task, [])
     if avail and recipe not in avail:
         raise ValueError(f"태스크 {task!r} 의 레시피를 골라야 합니다 — {', '.join(avail)} "
                          f"(받은 값: {recipe!r})")
@@ -366,6 +370,9 @@ def _build(params: dict) -> tuple[str, list, dict]:
         raise ValueError(f"알 수 없는 구동 방식: {ctrl!r} (motor|joint)")
     env: dict = {"METALAB_MOTOR_COUPLING": "1" if ctrl == "motor" else "0"}
     flags = ["--sim", engine, "--task", task] + (["--recipe", recipe] if recipe else [])
+
+    if mode == "parity":
+        return _SCRIPT[mode], ["--task", task] + (["--video"] if adv.get("video") else []), env
 
     if mode == "standalone":   # env-only GUI run: --sim/--task only. Runs on the default (display) GPU so
         # The group is a UI shelf, not part of the contract's name — standalone.sh and the loader both
@@ -445,7 +452,8 @@ def launch(params: dict) -> dict:
     Executed as `bash <abs script>` (robust to cwd/exec-bit); the displayed command stays relative."""
     script, flags, env = _build(params)
     now = datetime.now()
-    run_id = now.strftime("%Y%m%d-%H%M%S") + f"-{params['engine']}-{params['task']}-{params['mode']}"
+    engine = "genesis+newton" if params["mode"] == "parity" else params["engine"]
+    run_id = now.strftime("%Y%m%d-%H%M%S") + f"-{engine}-{params['task']}-{params['mode']}"
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
     logpath = LOGS_DIR / f"{run_id}.log"
     logf = open(logpath, "wb")
@@ -455,7 +463,7 @@ def launch(params: dict) -> dict:
     proc = subprocess.Popen(exec_argv, cwd=str(REPO), env=full_env, stdout=logf,
                             stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
     meta = {"run_id": run_id, "mode": params["mode"],
-            "engine": params["engine"], "task": params["task"],
+            "engine": engine, "task": params["task"],
             "task_recipe": (params.get("recipe") or ""),
             # the form state as clicked — lets a card click restore the whole launcher (algo/knobs/adv)
             # for one-click reproduce/re-launch, not just show the command.
@@ -712,11 +720,11 @@ def _sigpg(pgid: int, sig: int) -> None:
         pass
 
 
-_SIM_MARKERS = (b"learning.train", b"learning.eval", b"sim.metalab.tools.standalone")
+_SIM_MARKERS = (b"learning.train", b"learning.eval", b"sim.metalab.tools.standalone", b"sim.metalab.tools.parity_record")
 # Launcher script basenames a run's argv can carry. FUNCTIONAL, not cosmetic: the pid matchers below
 # identify our runs by these, so a script rename that misses this tuple silently breaks both run
 # detection and the Stop button. One tuple, two call sites (_alive_pid / _our_run_procs).
-_SCRIPT_MARKERS = (b"metalab_train.sh", b"metalab_eval.sh", b"standalone.sh")
+_SCRIPT_MARKERS = (b"metalab_train.sh", b"metalab_eval.sh", b"standalone.sh", b"parity.sh")
 
 
 def _our_run_procs() -> list:
@@ -1177,6 +1185,7 @@ details[open] summary::before{content:"▾ "}
     <button data-v="train" class="on">학습 · Train</button>
     <button data-v="eval">검증 · Eval</button>
     <button data-v="standalone">시뮬레이션 · Standalone</button>
+    <button data-v="parity">패리티 · Parity</button>
   </div></div>
 <div class="field"><label>3 · Task · Recipe (자동 탐색: sim/metalab/contract/tasks/rl/ 아래 family 폴더 = task, 그 안의 *.py = recipe)</label>
   <div class="selrow">
@@ -1210,6 +1219,7 @@ details[open] summary::before{content:"▾ "}
     <button data-v="all" class="on">전체</button>
     <button data-v="local">학습·검증</button>
     <button data-v="standalone">Standalone</button>
+    <button data-v="parity">Parity</button>
   </div>
   <div class="rcchips" id="rcstatus"></div>
 </div>
@@ -1301,6 +1311,12 @@ const SPEC={
     knobs:[],
     adv:[],
     advhint:"환경만 생성해 GL 뷰어로 실행 — 정책·학습 없음(초기 포즈 유지). num_envs=1·GL·디스플레이 GPU 고정(compute+뷰어 같은 GPU, 노브 없음). Stop/Ctrl-C 로 종료."
+  },
+  parity:{
+    script:"sim/metalab/parity.sh",
+    knobs:[],
+    adv:[["video","--video","좌우 분할 mp4 녹화 (genesis | newton)"]],
+    advhint:"같은 계약서 COMMAND 궤적을 genesis → newton 순으로 headless 기록하고 diff .md + 채널별 PNG 를 _logs/parity/<task>/ 에 남깁니다. 두 엔진을 모두 돌리므로 Backends 선택은 무시됩니다."
   }
 };
 
@@ -1385,12 +1401,16 @@ function buildCmd(){
   const sp=curSpec(), e=state.engine, t=state.task;
   if(!e||!t) return {env:[],parts:[]};
   const val=k=>{const el=$("k_"+k);return el?el.value.trim():"";};
+  let env=[["METALAB_MOTOR_COUPLING",state.ctrl==="joint"?"0":"1"]];
+  if(state.mode==="parity"){
+    const parts=[[sp.script],["--task",t]];
+    sp.adv.forEach(([k,fl])=>{if(state.adv[k])parts.push([fl]);});
+    return {env,parts};
+  }
   // Standalone: the group is a UI shelf, so the chosen contract IS --task and no --recipe is sent
   // (standalone.sh and the loader both take the contract stem). Mirrors _build on the server.
   let parts=[[sp.script],["--sim",e],["--task",state.mode==="standalone"?(state.recipe||t):t]];
   if(state.recipe&&state.mode!=="standalone") parts.push(["--recipe",state.recipe]);
-  // Drive mode first (applies to every mode — the engines read it at build time, default 1).
-  let env=[["METALAB_MOTOR_COUPLING",state.ctrl==="joint"?"0":"1"]];
   if(state.mode==="train"){
     if(state.algo==="sapg"){
       const epb=val("envs_per_block")||"512", nb=val("num_blocks")||"4", sc=val("ir_coef_scale"), ed=val("embed_dim")||"32";
@@ -1430,9 +1450,10 @@ function selectCtrl(c){state.ctrl=c;
   [...$("ctrl").children].forEach(b=>b.classList.toggle("on",b.dataset.v===c));render();}
 // task combobox source: Standalone lists the tasks/standalone/<group>/ folders, Train/Eval the tasks/rl/ family
 // folders. Both modes therefore have the same two axes — pick the group/family, then what is inside it.
-function taskList(){return (state.mode==="standalone"?(DESC&&DESC.standalone_tasks):(DESC&&DESC.tasks))||[];}
+function taskList(){if(!DESC)return[];return (state.mode==="standalone"?DESC.standalone_tasks:state.mode==="parity"?DESC.parity_tasks:DESC.tasks)||[];}
 // recipe combobox source: the *.py inside the selected group/family. Empty for a single-file contract.
-function recipeList(){const m=(state.mode==="standalone"?(DESC&&DESC.standalone_recipes):(DESC&&DESC.task_recipes))||{};
+function recipeList(){if(state.mode==="parity")return[];
+  const m=(state.mode==="standalone"?(DESC&&DESC.standalone_recipes):(DESC&&DESC.task_recipes))||{};
   return m[state.task]||[];}
 
 function populateTasks(){const ts=taskList();
@@ -1453,6 +1474,7 @@ function selectMode(m){state.mode=m;
   [...$("mode").children].forEach(b=>b.classList.toggle("on",b.dataset.v===m));
   const af=$("algofield"); if(af) af.style.display=(m==="train")?"":"none";   // algorithm selector: train mode only
   const rb=$("reset"); if(rb) rb.hidden=(m!=="standalone");   // 'Reset Simulator' button: standalone only
+  [...$("engines").children].forEach(b=>b.disabled=(m==="parity"));
   populateTasks();renderKnobs();renderAdv();render();}   // switch the task combobox to this mode's list
 
 fetch("/api/discover").then(r=>r.json()).then(d=>{DESC=d;
@@ -1568,7 +1590,7 @@ function heartbeat(){if(EXITING)return;            // the server is on its way o
 // run cards: grouped mode(학습·검증/Standalone) → status filter → date. Click a card → show its launch
 // info (mode/params/sha for reproduce) + tail its log. Non-running cards get ✕.
 let RCFILTER={mode:"all",status:"all"}, RUNS_CACHE=[];
-function cardMode(m){ return m.mode==="standalone" ? "standalone" : "local"; }
+function cardMode(m){ return m.mode==="standalone"||m.mode==="parity" ? m.mode : "local"; }
 function renderStatusChips(){
   const inMode=RUNS_CACHE.filter(m=>RCFILTER.mode==="all"||cardMode(m)===RCFILTER.mode);
   if(RCFILTER.status!=="all" && !inMode.some(m=>(m.status||"?")===RCFILTER.status)) RCFILTER.status="all";
@@ -1666,6 +1688,7 @@ function restoreForm(m){
   [...$("ctrl").children].forEach(b=>b.classList.toggle("on",b.dataset.v===state.ctrl));
   const af=$("algofield"); if(af) af.style.display=(state.mode==="train")?"":"none";
   const rb=$("reset"); if(rb) rb.hidden=(state.mode!=="standalone");
+  [...$("engines").children].forEach(b=>b.disabled=(state.mode==="parity"));
   const a=$("algo"); if(a) a.value=state.algo;
   populateTasks();                                  // task list for this mode
   renderKnobs(); renderAdv();                       // build inputs FROM state.knob/adv (prefills values)
