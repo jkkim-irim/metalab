@@ -198,10 +198,10 @@ class RLTrainer:
                             "(gl|rtx; none = headless). Forwarded to the sim's launcher.")
         p.add_argument("--log_root",
                        default=os.environ.get("RL_LOG_ROOT", os.path.join(os.getcwd(), "_logs", "rl")))
-        p.add_argument("--experiment", default="dexblind",
+        p.add_argument("--experiment", default="",
                        help="which experiment package to train (resolved by convention: "
                             "learning.rl.<experiment>.<task>.experiment — see learning/rl/experiments.py; "
-                            "a wrong name fails loudly at import)")
+                            "empty = the one package that ships <task>; a wrong name fails loudly at import)")
         p.add_argument("--wbt", action="store_true",
                        help="train the sim's whole-body-tracking (WBT) env variant (forwarded as --wbt)")
         p.add_argument("--reference_dir", default="sim_references",

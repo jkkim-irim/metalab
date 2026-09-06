@@ -51,7 +51,7 @@ RECORD_ENVS="${RECORD_ENVS:-4}"       # envs given a series + a report tab. 4 = 
                                       # per object variant: the sim assigns env i variant i % N.
 RECORD_STEPS="${RECORD_STEPS:-600}"   # policy steps per recording (0 = full episode; capped at one episode)
 NO_WANDB="${NO_WANDB:-0}"             # boolean: --no_wandb / NO_WANDB=1 → WANDB_MODE=disabled (no wandb logging)
-EXPERIMENT="${EXPERIMENT:-dexblind}"  # learning.rl.<experiment>.<task>.experiment package (trainer --experiment)
+EXPERIMENT="${EXPERIMENT:-}"          # learning.rl.<experiment>.<task>.experiment package; empty = the one that ships the task
 
 # ── args: every run knob is a --flag; the matching UPPERCASE env var (above) is its default, so the env
 # form still works (`TASK=hammer-lift-teacher metalab_train.sh` == `metalab_train.sh --task hammer-lift-teacher`). --sim picks the
@@ -223,5 +223,5 @@ log "run name = $RUN_NAME  (wandb run · local log dir)"
 
 export SIM=metalab SIM_ENGINE="$SIMULATOR" EVAL_POLICY=actor
 python -m learning.train --trainer rl --task "$TASK" ${RECIPE:+--recipe "$RECIPE"} \
-  --experiment "$EXPERIMENT" "${PASS[@]}" 2>&1 | tee "$TRAIN_LOG"
+  ${EXPERIMENT:+--experiment "$EXPERIMENT"} "${PASS[@]}" 2>&1 | tee "$TRAIN_LOG"
 exit "${PIPESTATUS[0]}"

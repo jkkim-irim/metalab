@@ -135,7 +135,7 @@ cd "$ROOT"
 # SIM selects the sim package for the service spawn (learning/rl/service.py → sim/$SIM/launch.py);
 # SIM_ENGINE (exported above) is MetaLab's own engine knob read by sim/metalab/launch.py.
 export SIM=metalab
-python -m learning.eval.eval_service --policy actor --experiment_pkg dexblind --curriculum_end \
+python -m learning.eval.eval_service --policy actor --curriculum_end \
   --task "$TASK" ${RECIPE:+--recipe "$RECIPE"} --checkpoint "$CKPT" \
   --num_envs "$NUM_ENVS" --episodes "$EPISODES" --steps "$STEPS" --seed "$SEED" \
   --viz "$VIZ" --meta_out "$META_OUT" $EXPORT_FLAG "${RECORD_ARGS[@]}" \

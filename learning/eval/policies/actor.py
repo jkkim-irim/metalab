@@ -412,7 +412,7 @@ def run(argv=None) -> int:
                         "the experiment module is chosen by --task alone.")
     p.add_argument("--experiment_pkg", default="",
                    help="experiment package namespace (learning.rl.<pkg>.<task>.experiment); "
-                        "empty = derived from --experiment (legacy alias hammer-lift -> dexblind)")
+                        "empty = the one package under learning/rl that ships <task>")
     # provenance passthrough — recorded verbatim into the meta json so the metrics carry their lineage
     p.add_argument("--experiment", default="hammer-lift")
     p.add_argument("--eval_sha", default="")
@@ -428,7 +428,7 @@ def run(argv=None) -> int:
     # provenance alias: "hammer-lift" = the dexblind package.
     if args.experiment == "hammer-lift":
         args.experiment = "dexblind"
-    pkg = args.experiment_pkg or args.experiment
+    pkg = args.experiment_pkg
     from learning.rl.experiments import experiment_module
     _exp_mod = experiment_module(pkg, args.task.replace("-", "_"))
     # Task knobs are SIM-OWNED; the experiment module carries only the policy spec (and, for WBT
