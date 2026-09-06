@@ -9,7 +9,7 @@
 # Usage:
 #   sim/metalab/parity.sh --task parity-joint-torque             # genesis + newton → diff .md + plot .png
 #   sim/metalab/parity.sh --task parity-joint-torque --sim newton  # record one engine only, no comparison
-# Outputs land in _logs/parity/<task>/: <engine>_<mode>_<stamp>.{npz,json}, genesis_vs_newton_<stamp>.{md,png}
+# Outputs land in _logs/parity/<task>/: <engine>_<mode>_<stamp>.{npz,json}, genesis_vs_newton_<stamp>.md, genesis_vs_newton_<stamp>_NN.png (2 channels per page)
 LOG_TAG=parity
 source "$(dirname "${BASH_SOURCE[0]}")/../../learning/scripts/local/lib.sh"
 
