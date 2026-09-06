@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
-# parity.sh — record one engine's StateAdapter reads under a sinusoidal joint command (headless, no viewer).
+# parity.sh — record one engine's reads under the contract's COMMAND (headless, no viewer).
 #
 # Provisions/activates the engine venv (same helpers as standalone.sh) and runs
-# sim/metalab/tools/parity_record.py. Extra flags pass through to the recorder.
+# sim/metalab/tools/parity_record.py. The trajectory (joints, amplitude, frequency, bodies, or the MDP action)
+# is declared as COMMAND in the parity_test contract file, so both engines get bit-identical input.
 #
-# Usage (run each line once per engine, then diff the two files):
-#   B=panda0_gripper,panda0_leftfinger,panda0_rightfinger
-#   sim/metalab/parity.sh --sim newton --task parity-joint-torque --joints panda0_joint1,panda0_joint2,panda0_joint3,panda0_joint4,panda0_joint5,panda0_joint6,panda0_joint7 --amp-deg 5 --freq-hz 0.25 --bodies $B
-#   sim/metalab/parity.sh --sim newton --task parity-contact      --joints panda0_joint2 --amp-deg 4 --freq-hz 0.5 --bodies $B
-#   sim/metalab/parity.sh --sim newton --task parity-objects      --joints panda0_joint1 --amp-deg 0 --bodies $B
-#   sim/metalab/parity.sh --sim newton --task parity-mdp --mode mdp      # EnvDriver.step: obs/reward/done
+# Usage (run once per engine, then diff the two files):
+#   sim/metalab/parity.sh --sim newton  --task parity-joint-torque
+#   sim/metalab/parity.sh --sim genesis --task parity-joint-torque
 #   python -m sim.metalab.tools.parity_diff _logs/parity/<task>/<a>.npz _logs/parity/<task>/<b>.npz [--out diff.md]
 LOG_TAG=parity
 source "$(dirname "${BASH_SOURCE[0]}")/../../learning/scripts/local/lib.sh"
@@ -21,7 +19,7 @@ while [ $# -gt 0 ]; do
     --sim=*)    SIM="${1#*=}"; shift ;;
     --task)     TASK="$2"; shift 2 ;;
     --task=*)   TASK="${1#*=}"; shift ;;
-    -h|--help)  sed -n '2,11p' "$0"; exit 0 ;;
+    -h|--help)  sed -n '2,10p' "$0"; exit 0 ;;
     *)          EXTRA+=("$1"); shift ;;
   esac
 done

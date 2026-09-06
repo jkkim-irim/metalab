@@ -21,4 +21,15 @@ OBJECTS = [
     },
 ]
 
+
+class COMMAND:
+    mode = "backend"
+    joints = ["panda0_joint2"]
+    bodies = base.GRIPPER_BODIES
+    amp_deg = 4.0
+    freq_hz = 0.5
+    seconds = 8.0
+    ramp_s = 1.0
+
+
 TASK = base.build_task("parity_contact", objects=OBJECTS)

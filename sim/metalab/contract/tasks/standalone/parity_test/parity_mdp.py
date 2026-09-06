@@ -56,6 +56,15 @@ class TERMINATE:
     object_velocity_exceeded = Done(terminate.object_velocity_exceeded)
 
 
+class COMMAND:
+    mode = "mdp"
+    action_amp = 0.5
+    seed = 0
+    freq_hz = 0.5
+    seconds = 8.0
+    ramp_s = 1.0
+
+
 TASK = base.build_task(
     "parity_mdp", objects=OBJECTS,
     physics={**base.values(base.PHYSICS), "gravity": [0.0, 0.0, 0.0]},

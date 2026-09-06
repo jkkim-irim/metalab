@@ -206,7 +206,7 @@ def task_recipes(name: str) -> list[str]:
     return [f.stem[len(name) + 1:] for f in files]
 
 
-def _standalone_module(name: str) -> str:
+def standalone_module(name: str) -> str:
     """Standalone contract name → its dotted module path, found under ``tasks/standalone/<group>/``.
 
     Scene-only contracts are filed by group (``manipulation/``, ``physics_test/``) rather than sitting
@@ -257,7 +257,7 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
         except ModuleNotFoundError as e:
             if e.name != modname:
                 raise
-            mod = importlib.import_module(_standalone_module(name))
+            mod = importlib.import_module(standalone_module(name))
     builder = getattr(mod, "build_task", None)
     ts = builder() if builder is not None else getattr(mod, "TASK", None)
     assert isinstance(ts, TaskSpec), \

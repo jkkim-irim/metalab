@@ -9,6 +9,10 @@ class PHYSICS:
     decimation = 2
 
 
+GRIPPER_BODIES = ["panda0_gripper", "panda0_leftfinger", "panda0_rightfinger"]
+
+ARM_JOINTS = [f"panda0_joint{i}" for i in range(1, 8)]
+
 INIT_POSE = {
     "panda0_joint1": 0.0,
     "panda0_joint2": 0.0,

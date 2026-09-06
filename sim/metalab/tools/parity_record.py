@@ -11,14 +11,29 @@ import subprocess
 import numpy as np
 import torch
 
+from sim.metalab.contract.loader import standalone_module
+from sim.metalab.contract.spec import values
+
 _REPO = Path(__file__).resolve().parents[3]
 _OUT_ROOT = _REPO / "_logs" / "parity"
 _ENGINES = ("genesis", "newton")
+_BACKEND_KEYS = {"mode", "joints", "bodies", "amp_deg", "freq_hz", "seconds", "ramp_s"}
+_MDP_KEYS = {"mode", "action_amp", "seed", "freq_hz", "seconds", "ramp_s"}
 
 
 def _build(engine: str, task: str):
     server = importlib.import_module(f"sim.metalab.backends.{engine}.server")
     return server.build_env(task=task.replace("-", "_"), num_envs=1, device="cuda:0", viz=None, telemetry=False)
+
+
+def command(task: str) -> dict:
+    mod = importlib.import_module(standalone_module(task.replace("-", "_")))
+    cmd = values(getattr(mod, "COMMAND", None))
+    assert isinstance(cmd, dict), f"{mod.__name__}: a parity contract declares a COMMAND block next to TASK"
+    want = {"backend": _BACKEND_KEYS, "mdp": _MDP_KEYS}.get(cmd.get("mode"))
+    assert want is not None, f"{mod.__name__}.COMMAND.mode must be 'backend' or 'mdp' (got {cmd.get('mode')!r})"
+    assert set(cmd) == want, f"{mod.__name__}.COMMAND for mode {cmd['mode']!r} needs exactly {sorted(want)}, got {sorted(cmd)}"
+    return cmd
 
 
 def _git_rev() -> str:
@@ -35,16 +50,17 @@ def sinusoid(t: float, center: list[float], amp: list[float], freq_hz: float, ph
     return [c + a * g * math.sin(2.0 * math.pi * freq_hz * t + p) for c, a, p in zip(center, amp, phase)]
 
 
-def record(engine: str, task: str, joints: list[str], bodies: list[str], amp_deg: float, freq_hz: float,
+def record(engine: str, task: str, *, joints: list[str], bodies: list[str], amp_deg: float, freq_hz: float,
            seconds: float, ramp_s: float) -> Path:
     env = _build(engine, task)
     b, spec = env.backend, env.spec
     assert b.num_envs == 1, f"parity recording expects num_envs=1 (got {b.num_envs})"
     active = set(spec.robot.active_joints())
     names = [j for j in spec.robot.joints if j in active]
-    drive = joints or names
+    drive = list(joints)
+    assert drive, "COMMAND.joints must name at least one joint to drive"
     unknown = [j for j in drive if j not in names]
-    assert not unknown, f"--joints names {unknown}, which are not active joints of this robot: {names}"
+    assert not unknown, f"COMMAND.joints names {unknown}, which are not active joints of this robot: {names}"
 
     decim = spec.physics.decimation
     dt = decim / spec.physics.hz
@@ -57,7 +73,7 @@ def record(engine: str, task: str, joints: list[str], bodies: list[str], amp_deg
     for j, c, a, low, high in zip(names, center, amp, lo.cpu().tolist(), hi.cpu().tolist()):
         assert low <= c - a and c + a <= high, (
             f"{j}: sinusoid [{c - a:.4f}, {c + a:.4f}] rad leaves the joint range [{low:.4f}, {high:.4f}] "
-            f"(center = init pose {c:.4f}, amp = {a:.4f}); lower --amp-deg or drop it from --joints")
+            f"(center = init pose {c:.4f}, amp = {a:.4f}); lower COMMAND.amp_deg or drop it from COMMAND.joints")
 
     reads = {
         "joint_pos": lambda: b.joint_pos(names),
@@ -114,12 +130,12 @@ def record(engine: str, task: str, joints: list[str], bodies: list[str], amp_deg
     return _save(engine, task, arrays, meta)
 
 
-def record_mdp(engine: str, task: str, action_amp: float, freq_hz: float, seconds: float, ramp_s: float,
-               seed: int) -> Path:
+def record_mdp(engine: str, task: str, *, action_amp: float, seed: int, freq_hz: float, seconds: float,
+               ramp_s: float) -> Path:
     env = _build(engine, task)
     spec = env.spec
     assert env.num_envs == 1, f"parity recording expects num_envs=1 (got {env.num_envs})"
-    assert spec.obs and spec.reward, f"{task}: --mode mdp needs a contract with obs and reward terms"
+    assert spec.obs and spec.reward, f"{task}: COMMAND.mode='mdp' needs a contract with obs and reward terms"
     dt = env.step_dt
     steps = round(seconds / dt)
     dim = env.num_actions
@@ -174,37 +190,19 @@ def _save(engine: str, task: str, arrays: dict[str, np.ndarray], meta: dict) -> 
     return path
 
 
-def _csv(s: str) -> list[str]:
-    return [x for x in s.split(",") if x]
-
-
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Record one engine under a sinusoidal command (headless, num_envs=1) to "
-                    "_logs/parity/<task>/<engine>_<mode>_<stamp>.npz for parity_diff. "
-                    "--mode backend drives joint targets and records every SimBackend read; "
-                    "--mode mdp drives EnvDriver.step with a sinusoidal action and records obs/reward/done.")
+        description="Record one engine under the contract's COMMAND (headless, num_envs=1) to "
+                    "_logs/parity/<task>/<engine>_<mode>_<stamp>.npz for parity_diff/parity_plot. "
+                    "COMMAND.mode='backend' drives joint targets and records every SimBackend read; "
+                    "COMMAND.mode='mdp' drives EnvDriver.step with a sinusoidal action and records obs/reward/done.")
     ap.add_argument("--engine", required=True, choices=_ENGINES)
-    ap.add_argument("--task", required=True, help="standalone contract name (e.g. franka)")
-    ap.add_argument("--mode", default="backend", choices=("backend", "mdp"))
-    ap.add_argument("--joints", type=_csv, default=[],
-                    help="[backend] comma-separated joints to drive (default: every active joint); undriven joints hold the init pose")
-    ap.add_argument("--bodies", type=_csv, default=[],
-                    help="[backend] comma-separated body names to record pose/velocity/contact for (default: none)")
-    ap.add_argument("--amp-deg", type=float, default=10.0, help="[backend] sinusoid amplitude about the init pose [deg]")
-    ap.add_argument("--action-amp", type=float, default=0.5, help="[mdp] sinusoid amplitude in normalized action units")
-    ap.add_argument("--seed", type=int, default=0, help="[mdp] torch seed for the contract's reset events")
-    ap.add_argument("--freq-hz", type=float, default=0.5, help="sinusoid frequency [Hz]")
-    ap.add_argument("--seconds", type=float, default=8.0, help="recording length [s]")
-    ap.add_argument("--ramp-s", type=float, default=1.0, help="amplitude ramps 0 to 1 over this time [s]; 0 = none")
+    ap.add_argument("--task", required=True, help="parity_test contract name (e.g. parity-joint-torque)")
     args = ap.parse_args()
-    if args.mode == "mdp":
-        assert not args.joints and not args.bodies, "--joints/--bodies apply to --mode backend only"
-        path = record_mdp(args.engine, args.task, args.action_amp, args.freq_hz, args.seconds, args.ramp_s,
-                          args.seed)
-    else:
-        path = record(args.engine, args.task, args.joints, args.bodies, args.amp_deg, args.freq_hz,
-                      args.seconds, args.ramp_s)
+    cmd = command(args.task)
+    mode = cmd.pop("mode")
+    fn = record_mdp if mode == "mdp" else record
+    path = fn(args.engine, args.task, **cmd)
     print(f"[parity] wrote {path.relative_to(_REPO)}", flush=True)
 
 
