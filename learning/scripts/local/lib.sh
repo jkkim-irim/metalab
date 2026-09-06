@@ -61,6 +61,7 @@ resolve_display(){
 _TASKS_DIR="$ROOT/sim/metalab/contract/tasks"
 _RL_DIR="$_TASKS_DIR/rl"
 _STANDALONE_DIR="$_TASKS_DIR/standalone"
+_PARITY_DIR="$_TASKS_DIR/parity"
 family_dir(){                     # $1 = task (dash or underscore) → its family dir (rl/<t> or rl/<group>/<t>), empty if none
   local t="${1//-/_}" d hits=()
   for d in "$_RL_DIR/$t" "$_RL_DIR"/*/"$t"; do
@@ -88,6 +89,14 @@ list_standalone_tasks(){           # tasks/standalone/[<group>/]*.py — the CON
     [ ! -f "$p" ] || [ "${n#_}" != "$n" ] || out+=("${n//_/-}")
   done
   [ ${#out[@]} -eq 0 ] || printf '%s\n' "${out[@]//_/-}" | sort
+}
+list_parity_tasks(){               # tasks/parity/*.py — the contract stems parity.sh --task accepts
+  local p n out=()
+  for p in "$_PARITY_DIR"/*.py; do
+    n="$(basename "$p" .py)"
+    [ ! -f "$p" ] || [ "${n#_}" != "$n" ] || out+=("${n//_/-}")
+  done
+  [ ${#out[@]} -eq 0 ] || printf '%s\n' "${out[@]}" | sort
 }
 list_recipes(){                    # $1 = task (dash or underscore) → its recipes, empty if single-file
   local t="${1//-/_}" p n out=() fam

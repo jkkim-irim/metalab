@@ -61,6 +61,7 @@ T = TypeVar("T", bound=BaseModel)
 _TASKS_DIR = Path(__file__).parent / "tasks"
 _RL_DIR = _TASKS_DIR / "rl"
 _STANDALONE_DIR = _TASKS_DIR / "standalone"
+_PARITY_DIR = _TASKS_DIR / "parity"
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -222,6 +223,13 @@ def standalone_module(name: str) -> str:
     return "sim.metalab.contract.tasks.standalone." + ".".join(hits[0].relative_to(d).with_suffix("").parts)
 
 
+def parity_module(name: str) -> str:
+    """Parity contract name → its dotted module path under ``tasks/parity/`` (flat, one file per scene)."""
+    f = _PARITY_DIR / f"{name}.py"
+    assert f.is_file() and not name.startswith("_"), f"parity contract '{name}' not found under {_PARITY_DIR}"
+    return f"sim.metalab.contract.tasks.parity.{name}"
+
+
 def load_task(name: str, recipe: str | None = None, num_envs: int | None = None) -> EnvSpec:
     """(task, recipe) → resolved EnvSpec.
 
@@ -257,7 +265,8 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
         except ModuleNotFoundError as e:
             if e.name != modname:
                 raise
-            mod = importlib.import_module(standalone_module(name))
+            mod = importlib.import_module(parity_module(name) if (_PARITY_DIR / f"{name}.py").is_file()
+                                          else standalone_module(name))
     builder = getattr(mod, "build_task", None)
     ts = builder() if builder is not None else getattr(mod, "TASK", None)
     assert isinstance(ts, TaskSpec), \

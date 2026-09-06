@@ -2,7 +2,7 @@
 # parity.sh — record the SAME contract on genesis and newton, then diff + plot the pair (headless, no viewer).
 #
 # The trajectory (joints, amplitude, frequency, bodies, or the MDP action) is the COMMAND block of the
-# parity_test contract, so both engines get bit-identical input. Each engine runs in its own uv venv
+# sim/metalab/contract/tasks/parity/<task>.py contract, so both engines get bit-identical input. Each engine runs in its own uv venv
 # (provisioned/activated with the same helpers as standalone.sh) via sim/metalab/tools/parity_record.py;
 # the two .npz files are then compared with parity_diff (markdown) and parity_plot (png).
 #
@@ -34,8 +34,8 @@ case "$SIM" in
   *)  echo "[parity] --sim must be genesis|newton (got '$SIM')" >&2; exit 2 ;;
 esac
 if [ -z "$TASK" ]; then
-  echo "[parity] --task is required (a parity_test contract name). Available:" >&2
-  list_standalone_tasks | sed 's/^/  - /' >&2 || true
+  echo "[parity] --task is required (a tasks/parity contract name). Available:" >&2
+  list_parity_tasks | sed 's/^/  - /' >&2 || true
   exit 2
 fi
 cd "$ROOT"

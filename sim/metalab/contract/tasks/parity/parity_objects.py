@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ... import _assets as assets
+from .. import _assets as assets
 from . import _base as base
 
 TABLE_TOP = 0.70

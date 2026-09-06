@@ -11,7 +11,7 @@ import subprocess
 import numpy as np
 import torch
 
-from sim.metalab.contract.loader import standalone_module
+from sim.metalab.contract.loader import parity_module
 from sim.metalab.contract.spec import values
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -41,7 +41,7 @@ def _stamp() -> str:
 
 
 def command(task: str) -> dict:
-    mod = importlib.import_module(standalone_module(task.replace("-", "_")))
+    mod = importlib.import_module(parity_module(task.replace("-", "_")))
     cmd = values(getattr(mod, "COMMAND", None))
     assert isinstance(cmd, dict), f"{mod.__name__}: a parity contract declares a COMMAND block next to TASK"
     want = {"backend": _BACKEND_KEYS, "mdp": _MDP_KEYS}.get(cmd.get("mode"))
@@ -223,7 +223,7 @@ def main() -> None:
                     "COMMAND.mode='backend' drives joint targets and records every SimBackend read; "
                     "COMMAND.mode='mdp' drives EnvDriver.step with a sinusoidal action and records obs/reward/done.")
     ap.add_argument("--engine", required=True, choices=_ENGINES)
-    ap.add_argument("--task", required=True, help="parity_test contract name (e.g. parity-joint-torque)")
+    ap.add_argument("--task", required=True, help="tasks/parity contract name (e.g. parity-joint-torque)")
     ap.add_argument("--video", action="store_true",
                     help="also record an offscreen mp4 from the contract's scene.camera to _logs/parity/<task>/video/")
     args = ap.parse_args()

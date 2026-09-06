@@ -37,6 +37,7 @@ REPO = SIM.parent                                   # <repo>
 TASKS_DIR = SIM / "metalab" / "contract" / "tasks"
 RL_DIR = TASKS_DIR / "rl"                  # Train/Eval contracts
 STANDALONE_DIR = TASKS_DIR / "standalone"  # scene-only contracts (no learning)
+PARITY_DIR = TASKS_DIR / "parity"          # genesis↔newton parity scenes (parity.sh)
 TRAJ_DIR = SIM / "metalab" / "assets" / "data" / "spline"      # via-point CSV groups ('*_group' dirs)
 
 
@@ -151,7 +152,7 @@ def _task_recipe(task: str, recipe: str, mode: str) -> dict:
     GROUP splits the same way — its ``_base.py`` holds the scene, the contract holds what differs."""
     stem = task.replace("-", "_")
     if mode == "parity":
-        paths = [STANDALONE_DIR / "parity_test" / "_base.py", STANDALONE_DIR / "parity_test" / f"{stem}.py"]
+        paths = [PARITY_DIR / "_base.py", PARITY_DIR / f"{stem}.py"]
     elif mode == "standalone":
         contract = (recipe or task).replace("-", "_")
         group = STANDALONE_DIR / stem
@@ -188,7 +189,7 @@ def discover() -> dict:
             "task_recipes": discover_task_recipes(),
             "standalone_tasks": discover_standalone_tasks(),
             "standalone_recipes": discover_standalone_recipes(),
-            "parity_tasks": _contracts_in(STANDALONE_DIR / "parity_test"),
+            "parity_tasks": _contracts_in(PARITY_DIR),
             "traj_groups": discover_traj_groups(), "repo": str(REPO)}
 
 

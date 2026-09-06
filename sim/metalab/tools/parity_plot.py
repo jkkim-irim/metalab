@@ -10,7 +10,7 @@ import numpy as np
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from sim.metalab.contract.loader import standalone_module  # noqa: E402
+from sim.metalab.contract.loader import parity_module  # noqa: E402
 from sim.metalab.tools.parity_diff import load_pair  # noqa: E402
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -58,7 +58,7 @@ def _label(key: str) -> str:
 
 
 def _command_lines(ma: dict) -> list[str]:
-    contract = _REPO / (standalone_module(ma["task"].replace("-", "_")).replace(".", "/") + ".py")
+    contract = _REPO / (parity_module(ma["task"].replace("-", "_")).replace(".", "/") + ".py")
     lines = [f"궤적: {contract.relative_to(_REPO)} 의 COMMAND"]
     if ma["mode"] == "mdp":
         lines.append(f"  EnvDriver.step 에 정규화 행동 사인파 — 진폭 {ma['action_amp']}, {ma['freq_hz']} Hz, "
