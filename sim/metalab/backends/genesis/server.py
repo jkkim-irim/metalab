@@ -15,7 +15,7 @@ from sim.metalab.runtime import rerun_recording, service  # noqa: E402
 
 def build_env(task: str, recipe: str | None = None, num_envs: int | None = None,
               device: str = "cuda:0", viz: str = "none",
-              telemetry: bool | None = None, rrd_path: str | None = None):
+              telemetry: bool | None = None, rrd_path: str | None = None, video: bool = False):
     import genesis as gs
 
     from sim.metalab.backends.genesis import parser
@@ -26,7 +26,7 @@ def build_env(task: str, recipe: str | None = None, num_envs: int | None = None,
     num_envs = spec.num_envs
     backend_dev = gs.cpu if str(device).startswith("cpu") else gs.gpu
     handles = parser.build_scene(
-        spec, num_envs=num_envs, viz=(viz not in (None, "none")), backend=backend_dev)
+        spec, num_envs=num_envs, viz=(viz not in (None, "none")), backend=backend_dev, video=video)
     backend = GenesisBackend(spec, handles, num_envs=num_envs)
     max_ep = max(1, round(spec.episode_length_s / (spec.physics.dt * spec.physics.decimation)))
     tele = (viz not in (None, "none")) if telemetry is None else telemetry

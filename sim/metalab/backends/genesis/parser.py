@@ -79,7 +79,11 @@ def _apply_contact_params(spec: EnvSpec, handles: dict) -> None:
             geom.set_sol_params(sp)
 
 
-def build_scene(spec: EnvSpec, num_envs: int | None = None, viz: bool = False, backend=None) -> dict:
+VIDEO_RES = (1280, 720)
+
+
+def build_scene(spec: EnvSpec, num_envs: int | None = None, viz: bool = False, backend=None,
+                video: bool = False) -> dict:
     gs.init(backend=backend if backend is not None else gs.gpu, logging_level="warning")
     _patches.apply()
     _patches.apply_round_robin_variants()
@@ -141,6 +145,12 @@ def build_scene(spec: EnvSpec, num_envs: int | None = None, viz: bool = False, b
         scene.viewer.add_plugin(
             gs.vis.viewer_plugins.MouseInteractionPlugin(use_force=True, color=(0.1, 0.6, 0.8, 0.6))
         )
+
+    if video:
+        cam = spec.camera
+        assert cam is not None, f"{spec.name}: video recording needs scene.camera (eye/lookat/fov) in the contract"
+        handles["camera"] = scene.add_camera(res=VIDEO_RES, pos=tuple(cam.eye), lookat=tuple(cam.lookat),
+                                             fov=cam.fov, GUI=False)
 
     scene.build(
         n_envs=num_envs if num_envs is not None else spec.num_envs,

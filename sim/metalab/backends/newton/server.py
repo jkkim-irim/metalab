@@ -14,7 +14,7 @@ from sim.metalab.runtime import service  # noqa: E402
 
 def build_env(task: str, recipe: str | None = None, num_envs: int | None = None,
               device: str = "cuda:0", viz: str = "none",
-              telemetry: bool | None = None, rrd_path: str | None = None):
+              telemetry: bool | None = None, rrd_path: str | None = None, video: bool = False):
     from sim.metalab.backends.newton import parser
     from sim.metalab.backends.newton.backend import NewtonBackend
     from sim.metalab.contract.loader import load_task

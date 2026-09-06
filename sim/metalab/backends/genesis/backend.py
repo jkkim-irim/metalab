@@ -17,6 +17,7 @@ class GenesisBackend(CoupledPDMixin):
         self.robot = handles["robot"]
         self.objects = handles["objects"]
         self.fixtures = handles.get("fixtures", {})
+        self.camera = handles.get("camera")
         self.num_envs = int(num_envs)
         self.device = gs.device
         self._substeps = int(handles.get("substeps", 1))

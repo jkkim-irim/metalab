@@ -9,6 +9,12 @@ class PHYSICS:
     decimation = 2
 
 
+class CAMERA:
+    eye = [1.9, -1.5, 1.4]
+    lookat = [0.5, 0.0, 0.6]
+    fov = 40.0
+
+
 GRIPPER_BODIES = ["panda0_gripper", "panda0_leftfinger", "panda0_rightfinger"]
 
 ARM_JOINTS = [f"panda0_joint{i}" for i in range(1, 8)]
@@ -36,6 +42,7 @@ def build_task(name: str, *, objects=(), contact_params=None, physics=None, **md
             "fixed_base": True,
             "init_pose": dict(INIT_POSE),
         },
+        "camera": values(CAMERA),
     }
     if objects:
         scene["objects"] = list(objects)

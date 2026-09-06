@@ -9,19 +9,22 @@
 # Usage:
 #   sim/metalab/parity.sh --task parity-joint-torque             # genesis + newton → diff .md + plot .png
 #   sim/metalab/parity.sh --task parity-joint-torque --sim newton  # record one engine only, no comparison
-# Outputs land in _logs/parity/<task>/: <engine>_<mode>_<stamp>.{npz,json}, genesis_vs_newton_<stamp>.md, genesis_vs_newton_<stamp>_NN.png (2 channels per page)
+#   sim/metalab/parity.sh --task parity-contact --video           # + offscreen mp4 per engine (newton needs a live X display)
+# Outputs land in _logs/parity/<task>/: <engine>_<mode>_<stamp>.{npz,json}, genesis_vs_newton_<stamp>.md,
+# genesis_vs_newton_<stamp>_NN.png (2 channels per page), video/<engine>_<mode>_<stamp>.mp4
 LOG_TAG=parity
 source "$(dirname "${BASH_SOURCE[0]}")/../../learning/scripts/local/lib.sh"
 
-SIM=""; TASK=""
+SIM=""; TASK=""; VIDEO=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --sim)      SIM="$2"; shift 2 ;;
     --sim=*)    SIM="${1#*=}"; shift ;;
     --task)     TASK="$2"; shift 2 ;;
     --task=*)   TASK="${1#*=}"; shift ;;
-    -h|--help)  sed -n '2,12p' "$0"; exit 0 ;;
-    *) echo "[parity] unknown arg '$1' (flags: --task --sim)" >&2; exit 1 ;;
+    --video)    VIDEO=(--video); shift ;;
+    -h|--help)  sed -n '2,14p' "$0"; exit 0 ;;
+    *) echo "[parity] unknown arg '$1' (flags: --task --sim --video)" >&2; exit 1 ;;
   esac
 done
 
@@ -35,6 +38,7 @@ if [ -z "$TASK" ]; then
   exit 2
 fi
 cd "$ROOT"
+[ ${#VIDEO[@]} -eq 0 ] || resolve_display || exit 2
 
 # record one engine in its venv (subshell keeps the activation local); echoes the written .npz path.
 record(){
@@ -44,9 +48,9 @@ record(){
   log "$engine · $TASK — headless parity recording (venv=$venv)" >&2
   out="$(
     source "$venv/bin/activate"
-    python -m sim.metalab.tools.parity_record --engine "$engine" --task "$TASK" | tee /dev/stderr
+    python -m sim.metalab.tools.parity_record --engine "$engine" --task "$TASK" "${VIDEO[@]}" | tee /dev/stderr
   )"
-  sed -n 's/^\[parity\] wrote //p' <<<"$out"
+  sed -n 's/^\[parity\] wrote \(.*\.npz\)$/\1/p' <<<"$out"
 }
 
 if [ -n "$SIM" ]; then

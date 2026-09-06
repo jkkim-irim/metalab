@@ -21,9 +21,23 @@ _BACKEND_KEYS = {"mode", "joints", "bodies", "amp_deg", "freq_hz", "seconds", "r
 _MDP_KEYS = {"mode", "action_amp", "seed", "freq_hz", "seconds", "ramp_s"}
 
 
-def _build(engine: str, task: str):
+def _build(engine: str, task: str, video: bool):
     server = importlib.import_module(f"sim.metalab.backends.{engine}.server")
-    return server.build_env(task=task.replace("-", "_"), num_envs=1, device="cuda:0", viz=None, telemetry=False)
+    return server.build_env(task=task.replace("-", "_"), num_envs=1, device="cuda:0", viz=None, telemetry=False,
+                            video=video)
+
+
+def _recorder(engine: str, backend, task: str, mode: str, stamp: str, fps: float):
+    mod = importlib.import_module(f"sim.metalab.backends.{engine}.video")
+    return mod.VideoRecorder(backend, _out_dir(task) / "video" / f"{engine}_{mode}_{stamp}.mp4", fps)
+
+
+def _out_dir(task: str) -> Path:
+    return _OUT_ROOT / task.replace("-", "_")
+
+
+def _stamp() -> str:
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 def command(task: str) -> dict:
@@ -50,9 +64,10 @@ def sinusoid(t: float, center: list[float], amp: list[float], freq_hz: float, ph
     return [c + a * g * math.sin(2.0 * math.pi * freq_hz * t + p) for c, a, p in zip(center, amp, phase)]
 
 
-def record(engine: str, task: str, *, joints: list[str], bodies: list[str], amp_deg: float, freq_hz: float,
-           seconds: float, ramp_s: float) -> Path:
-    env = _build(engine, task)
+def record(engine: str, task: str, video: bool, *, joints: list[str], bodies: list[str], amp_deg: float,
+           freq_hz: float, seconds: float, ramp_s: float) -> Path:
+    stamp = _stamp()
+    env = _build(engine, task, video)
     b, spec = env.backend, env.spec
     assert b.num_envs == 1, f"parity recording expects num_envs=1 (got {b.num_envs})"
     active = set(spec.robot.active_joints())
@@ -101,6 +116,7 @@ def record(engine: str, task: str, *, joints: list[str], bodies: list[str], amp_
     all_mask = torch.ones(b.num_envs, dtype=torch.bool, device=b.device)
     step_n = b.step_n if "batched_step" in env.capabilities else None
     b.reset_idx(all_mask)
+    rec = _recorder(engine, b, task, "backend", stamp, 1.0 / dt) if video else None
 
     series: dict[str, list[torch.Tensor]] = {k: [] for k in reads}
     targets: list[list[float]] = []
@@ -117,6 +133,10 @@ def record(engine: str, task: str, *, joints: list[str], bodies: list[str], amp_
         targets.append(q)
         for k, fn in reads.items():
             series[k].append(fn()[0].detach().clone())
+        if rec is not None:
+            rec.capture()
+    if rec is not None:
+        print(f"[parity] wrote {rec.close().relative_to(_REPO)}", flush=True)
 
     arrays = {k: torch.stack(v).cpu().numpy() for k, v in series.items()}
     arrays["target"] = np.asarray(targets, dtype=np.float32)
@@ -127,12 +147,13 @@ def record(engine: str, task: str, *, joints: list[str], bodies: list[str], amp_
         "amp_deg": amp_deg, "freq_hz": freq_hz, "ramp_s": ramp_s, "seconds": seconds,
         "hz": spec.physics.hz, "substeps": spec.physics.substeps, "decimation": decim, "dt": dt, "steps": steps,
     }
-    return _save(engine, task, arrays, meta)
+    return _save(engine, task, stamp, arrays, meta)
 
 
-def record_mdp(engine: str, task: str, *, action_amp: float, seed: int, freq_hz: float, seconds: float,
-               ramp_s: float) -> Path:
-    env = _build(engine, task)
+def record_mdp(engine: str, task: str, video: bool, *, action_amp: float, seed: int, freq_hz: float,
+               seconds: float, ramp_s: float) -> Path:
+    stamp = _stamp()
+    env = _build(engine, task, video)
     spec = env.spec
     assert env.num_envs == 1, f"parity recording expects num_envs=1 (got {env.num_envs})"
     assert spec.obs and spec.reward, f"{task}: COMMAND.mode='mdp' needs a contract with obs and reward terms"
@@ -145,6 +166,7 @@ def record_mdp(engine: str, task: str, *, action_amp: float, seed: int, freq_hz:
 
     env.seed(seed)
     env.reset()
+    rec = _recorder(engine, env.backend, task, "mdp", stamp, 1.0 / dt) if video else None
     series: dict[str, list[torch.Tensor]] = {}
 
     def put(key: str, v: torch.Tensor) -> None:
@@ -164,6 +186,10 @@ def record_mdp(engine: str, task: str, *, action_amp: float, seed: int, freq_hz:
             put(f"reward_term.{t.name}", env.last_reward_terms[0, j])
         put("done", dones[0].to(torch.uint8))
         put("time_out", extras["time_outs"][0].to(torch.uint8))
+        if rec is not None:
+            rec.capture()
+    if rec is not None:
+        print(f"[parity] wrote {rec.close().relative_to(_REPO)}", flush=True)
 
     arrays = {k: torch.stack(v).cpu().numpy() for k, v in series.items()}
     arrays["action"] = np.asarray(actions, dtype=np.float32)
@@ -177,13 +203,13 @@ def record_mdp(engine: str, task: str, *, action_amp: float, seed: int, freq_hz:
         "hz": spec.physics.hz, "substeps": spec.physics.substeps, "decimation": spec.physics.decimation,
         "dt": dt, "steps": steps,
     }
-    return _save(engine, task, arrays, meta)
+    return _save(engine, task, stamp, arrays, meta)
 
 
-def _save(engine: str, task: str, arrays: dict[str, np.ndarray], meta: dict) -> Path:
-    out_dir = _OUT_ROOT / task.replace("-", "_")
+def _save(engine: str, task: str, stamp: str, arrays: dict[str, np.ndarray], meta: dict) -> Path:
+    out_dir = _out_dir(task)
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{engine}_{meta['mode']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.npz"
+    path = out_dir / f"{engine}_{meta['mode']}_{stamp}.npz"
     np.savez(path, **arrays)
     meta["channels"] = {k: list(v.shape) for k, v in arrays.items()}
     path.with_suffix(".json").write_text(json.dumps(meta, indent=1))
@@ -198,11 +224,13 @@ def main() -> None:
                     "COMMAND.mode='mdp' drives EnvDriver.step with a sinusoidal action and records obs/reward/done.")
     ap.add_argument("--engine", required=True, choices=_ENGINES)
     ap.add_argument("--task", required=True, help="parity_test contract name (e.g. parity-joint-torque)")
+    ap.add_argument("--video", action="store_true",
+                    help="also record an offscreen mp4 from the contract's scene.camera to _logs/parity/<task>/video/")
     args = ap.parse_args()
     cmd = command(args.task)
     mode = cmd.pop("mode")
     fn = record_mdp if mode == "mdp" else record
-    path = fn(args.engine, args.task, **cmd)
+    path = fn(args.engine, args.task, args.video, **cmd)
     print(f"[parity] wrote {path.relative_to(_REPO)}", flush=True)
 
 
