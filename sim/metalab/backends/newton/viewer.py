@@ -202,6 +202,10 @@ def log_world_labels(viewer, height: float = 0.9) -> int:
     return 0 if offs is None else _log_world_labels(offs.numpy(), height)
 
 
+GOAL_MARKER_PATH = "/metalab/goal"
+GOAL_MARKER_RADIUS = 0.02   # [m]
+GOAL_MARKER_COLOR = (1.0, 0.35, 0.1)
+
 CONTACT_ARROW_PATH = "/metalab/contact_normals"
 CONTACT_ARROW_M_PER_N = 0.0015
 CONTACT_ARROW_MAX_M = 0.18
@@ -251,6 +255,8 @@ class NewtonViewer:
         self._rerun_dt = float(rerun_dt)
         self._rerun_step = 0
         self._rerun_offsets = None
+        self._world_offsets: dict[int, torch.Tensor] = {}
+        self._goal_pos: torch.Tensor | None = None
         self._num_envs = int(num_envs)
         self._device = device
         self.origin_axes = (OriginAxes(gl, obj_body_idx)
@@ -269,13 +275,33 @@ class NewtonViewer:
         for sync in self._scale_syncs:
             sync.refresh()
 
-    def rerun_world_offsets(self) -> torch.Tensor:
-        if self._rerun_offsets is None:
-            o = getattr(self.rerun, "world_offsets", None)
+    def world_offsets(self, viewer) -> torch.Tensor:
+        offs = self._world_offsets.get(id(viewer))
+        if offs is None:
+            o = getattr(viewer, "world_offsets", None)
             arr = (np.zeros((self._num_envs, 3), np.float32) if o is None
                    else np.asarray(o.numpy()).reshape(-1, 3)[:self._num_envs])
-            self._rerun_offsets = torch.as_tensor(arr, dtype=torch.float32, device=self._device)
-        return self._rerun_offsets
+            offs = torch.as_tensor(arr, dtype=torch.float32, device=self._device)
+            self._world_offsets[id(viewer)] = offs
+        return offs
+
+    def rerun_world_offsets(self) -> torch.Tensor:
+        return self.world_offsets(self.rerun)
+
+    def set_goal_markers(self, pos: torch.Tensor) -> None:
+        self._goal_pos = pos
+
+    def _log_goal(self, viewer) -> None:
+        if self._goal_pos is None:
+            return
+        pts = (self._goal_pos + self.world_offsets(viewer)).contiguous()
+        if viewer is self.rerun:
+            rr.log(GOAL_MARKER_PATH, rr.Points3D(positions=pts.detach().cpu().numpy(), radii=GOAL_MARKER_RADIUS,
+                                                 colors=[tuple(int(c * 255) for c in GOAL_MARKER_COLOR)]))
+        else:
+            colors = wp.full(pts.shape[0], wp.vec3(*GOAL_MARKER_COLOR), dtype=wp.vec3, device=viewer.device)
+            viewer.log_points(GOAL_MARKER_PATH, wp.from_torch(pts, dtype=wp.vec3),
+                              radii=GOAL_MARKER_RADIUS, colors=colors)
 
     def emit(self, state, sim_time: float, contact_arrows, advance: bool = False) -> None:
         for v, axes in ((self.gl, self.origin_axes), (self.rerun, None)):
@@ -287,6 +313,7 @@ class NewtonViewer:
             v.log_state(state)
             if v is self.rerun:
                 log_contact_arrows(contact_arrows())
+            self._log_goal(v)
             if axes is not None:
                 axes.draw(state)
             v.end_frame()

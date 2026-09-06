@@ -67,19 +67,46 @@ def test_obs_terms_expose_goal_and_error():
     assert torch.allclose(err, torch.tensor([[0.0, 0.0, 0.0], [0.0, 0.0, -0.1]]))
 
 
-def test_reset_goal_position_writes_only_the_reset_envs_inside_the_box():
+def test_sample_goal_position_writes_only_the_given_envs_inside_the_box():
     e = _env()
     before = e.goal_pos.clone()
     torch.manual_seed(0)
-    events.reset_goal_position(e, torch.tensor([1]), x_range=[0.3, 0.6], y_range=[-0.2, 0.2], z_range=[0.2, 0.5])
+    events.sample_goal_position(e, torch.tensor([1]), x_range=[0.3, 0.6], y_range=[-0.2, 0.2], z_range=[0.2, 0.5])
     assert torch.equal(e.goal_pos[0], before[0])
     g = e.goal_pos[1]
     assert 0.3 <= g[0] <= 0.6 and -0.2 <= g[1] <= 0.2 and 0.2 <= g[2] <= 0.5
 
 
-def test_reset_goal_position_rejects_an_inverted_range():
+def test_sample_goal_position_rejects_an_inverted_range():
     with pytest.raises(AssertionError):
-        events.reset_goal_position(_env(), torch.tensor([0]), x_range=[0.6, 0.3], y_range=[0, 0], z_range=[0, 0])
+        events.sample_goal_position(_env(), torch.tensor([0]), x_range=[0.6, 0.3], y_range=[0, 0], z_range=[0, 0])
+
+
+class _TimedEnv(_Env):
+    step_dt = 0.1
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self._bufs = {}
+
+    def buffer(self, key, shape=(), fill=0.0, dtype=torch.float32):
+        if key not in self._bufs:
+            self._bufs[key] = torch.full((self.goal_pos.shape[0], *shape), fill, dtype=dtype)
+        return self._bufs[key]
+
+
+def test_sample_goal_position_interval_fires_at_first_call_then_waits():
+    e = _TimedEnv(goal=[[0.0, 0.0, 0.0]], palm=[[0.0, 0.0, 0.0]])
+    ids = torch.tensor([0])
+    box = dict(x_range=[1.0, 1.0], y_range=[1.0, 1.0], z_range=[1.0, 1.0])
+    events.sample_goal_position(e, ids, interval_range_s=[0.5, 0.5], **box)
+    assert torch.equal(e.goal_pos[0], torch.tensor([1.0, 1.0, 1.0]))
+    e.goal_pos[0] = 0.0
+    for _ in range(4):
+        events.sample_goal_position(e, ids, interval_range_s=[0.5, 0.5], **box)
+        assert torch.equal(e.goal_pos[0], torch.tensor([0.0, 0.0, 0.0]))
+    events.sample_goal_position(e, ids, interval_range_s=[0.5, 0.5], **box)
+    assert torch.equal(e.goal_pos[0], torch.tensor([1.0, 1.0, 1.0]))
 
 
 if __name__ == "__main__":

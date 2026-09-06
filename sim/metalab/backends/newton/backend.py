@@ -588,6 +588,9 @@ class NewtonBackend(CoupledPDMixin):
     def render_frame(self):
         self.viewer.emit(self.state_0, self._sim_time, self._fingertip_contact_arrows)
 
+    def set_goal_markers(self, pos: torch.Tensor) -> None:
+        self.viewer.set_goal_markers(pos)
+
     def _run_substeps(self, host_ops: bool = False):
         a, b = self.state_0, self.state_1
         for _ in range(self._substeps):

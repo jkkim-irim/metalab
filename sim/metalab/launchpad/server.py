@@ -87,20 +87,19 @@ def discover_tasks() -> list[str]:
 def discover_task_recipes() -> dict[str, list[str]]:
     """task -> its recipe names — the Launchpad's recipe combobox, and the value of ``--recipe``.
 
-    A recipe is ``tasks/rl/<family>/<family>_<recipe>.py``; the entry is the SUFFIX ('only-ycb'), since
-    the family prefix is already the task. '_*.py' (the shared _base) is a library, not a recipe. The
-    prefix is enforced, not just matched — mirrors sim/metalab/contract/loader.py:task_recipes, and a
-    differently named file would otherwise vanish from this list instead of failing."""
+    A recipe is ``tasks/rl/<family>/<recipe>.py`` (the older ``<family>_<recipe>.py`` spelling still
+    reads as the same recipe). '_*.py' (the shared _base) is a library, not a recipe. Mirrors
+    sim/metalab/contract/loader.py:task_recipes."""
     out = {}
     for d in _task_families():
         names = []
         for f in sorted(d.glob("*.py")):
             if f.stem.startswith("_"):
                 continue
-            assert f.stem.startswith(f"{d.name}_"), \
-                f"recipe {f} must be named {d.name}_<recipe>.py (the family name is the prefix)"
-            names.append(f.stem[len(d.name) + 1:].replace("_", "-"))
-        out[d.name.replace("_", "-")] = names
+            rec = f.stem[len(d.name) + 1:] if f.stem.startswith(f"{d.name}_") else f.stem
+            assert rec not in names, f"task family {d.name}: recipe {rec!r} is spelled twice in {d}"
+            names.append(rec)
+        out[d.name.replace("_", "-")] = [n.replace("_", "-") for n in names]
     return out
 
 

@@ -9,13 +9,27 @@ import rerun as rr
 
 from sim.metalab.runtime import rerun_recording
 
+GOAL_MARKER_RADIUS = 0.02   # [m]
+GOAL_MARKER_COLOR = (1.0, 0.35, 0.1, 0.9)
+
 
 class GenesisViewer:
     def __init__(self, scene):
         self._scene = scene
         self._paused = False
         self._step_once = False
+        self._goal_node = None
         self._install_pause_keybind()
+
+    def set_goal_markers(self, pos) -> None:
+        if self.gl is None:
+            return
+        n = pos.shape[0]
+        offs = np.asarray(self._scene.envs_offset, dtype=np.float32).reshape(-1, 3)[:n]
+        pts = pos.detach().cpu().numpy().astype(np.float32) + offs
+        if self._goal_node is not None:
+            self._scene.clear_debug_object(self._goal_node)
+        self._goal_node = self._scene.draw_debug_spheres(pts, radius=GOAL_MARKER_RADIUS, color=GOAL_MARKER_COLOR)
 
     @property
     def gl(self):

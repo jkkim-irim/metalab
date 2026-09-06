@@ -191,20 +191,30 @@ def _rl_family_dir(name: str) -> Path | None:
     return hits[0] if hits else None
 
 
-def task_recipes(name: str) -> list[str]:
-    """The recipe names of task family ``name`` (see :func:`_rl_family_dir`), or [] when it is not one.
+def _recipe_stems(name: str) -> dict[str, str]:
+    """recipe name -> module stem for task family ``name`` (see :func:`_rl_family_dir`), or {} when it is
+    not one.
 
-    A recipe file is ``<family dir>/<name>_<recipe>.py``; ``_*.py`` (the shared ``_base``) is a
-    library, not a recipe. The prefix is enforced, not just matched — a differently named file would
-    otherwise drop out of every list silently and its contract would be unreachable."""
+    A recipe file is ``<family dir>/<recipe>.py``; ``_*.py`` (the shared ``_base``) is a library, not a
+    recipe. The older ``<family>_<recipe>.py`` form still resolves to the same recipe name, so both
+    spellings of one recipe in a folder fail here instead of shadowing each other."""
     d = _rl_family_dir(name)
     if d is None:
-        return []
-    files = [f for f in sorted(d.glob("*.py")) if not f.stem.startswith("_")]
-    for f in files:
-        assert f.stem.startswith(f"{name}_"), \
-            f"recipe {f} must be named {name}_<recipe>.py (the family name is the prefix)"
-    return [f.stem[len(name) + 1:] for f in files]
+        return {}
+    out: dict[str, str] = {}
+    for f in sorted(d.glob("*.py")):
+        if f.stem.startswith("_"):
+            continue
+        rec = f.stem[len(name) + 1:] if f.stem.startswith(f"{name}_") else f.stem
+        assert rec not in out, \
+            f"task family '{name}': recipe {rec!r} is spelled twice — {out[rec]}.py and {f.stem}.py"
+        out[rec] = f.stem
+    return out
+
+
+def task_recipes(name: str) -> list[str]:
+    """The recipe names of task family ``name``, or [] when it is not one."""
+    return list(_recipe_stems(name))
 
 
 def standalone_module(name: str) -> str:
@@ -254,7 +264,7 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
         rec = recipe.replace("-", "_")
         assert rec in avail, f"task '{name}': unknown recipe {recipe!r} — have {', '.join(avail)}"
         mod = importlib.import_module(
-            ".".join(("sim", "metalab", "contract") + fam.relative_to(_ENVS_DIR).parts + (f"{name}_{rec}",)))
+            ".".join(("sim", "metalab", "contract") + fam.relative_to(_ENVS_DIR).parts + (_recipe_stems(name)[rec],)))
     else:
         # Single-file contract. The guard re-raises a REAL import error inside a task module (only
         # "module absent" falls through to tasks/standalone/, which is kept out of the train/eval list).

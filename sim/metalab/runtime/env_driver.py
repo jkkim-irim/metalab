@@ -513,6 +513,8 @@ class EnvDriver:
                 self._cur_evt_term = t.name
                 t.fn(env, self._all_ids, **t.params)
             self._cur_evt_term = None
+        if self.goal_pos is not None:
+            self.backend.set_goal_markers(self.goal_pos)
         if "batched_step" in self.capabilities:
             self.backend.step_n(self.spec.physics.decimation)
         else:

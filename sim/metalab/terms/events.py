@@ -23,15 +23,28 @@ def reset_object_pose(env, env_ids, active_position, x_range, y_range, yaw_range
     env.set_object_pose(env_ids, pos, quat)
 
 
-def reset_goal_position(env, env_ids, x_range, y_range, z_range):   # [m]
+def sample_goal_position(env, env_ids, x_range, y_range, z_range,   # [m]
+                         interval_range_s=(0.0, 0.0)):   # [s]
     k, dev = int(env_ids.numel()), env_ids.device
     if k == 0:
         return
-    assert env.goal_pos is not None, "reset_goal_position needs a contract `goal` block (it owns env.goal_pos)"
+    assert env.goal_pos is not None, "sample_goal_position needs a contract `goal` block (it owns env.goal_pos)"
     bounds = torch.tensor([tuple(x_range), tuple(y_range), tuple(z_range)], dtype=torch.float32, device=dev)
     assert (bounds[:, 0] <= bounds[:, 1]).all(), \
         f"each range needs lo <= hi — got x={tuple(x_range)} y={tuple(y_range)} z={tuple(z_range)}"
-    env.goal_pos[env_ids] = torch.rand(k, 3, device=dev) * (bounds[:, 1] - bounds[:, 0]) + bounds[:, 0]
+    lo, hi = float(interval_range_s[0]), float(interval_range_s[1])
+    if (lo, hi) == (0.0, 0.0):
+        fire = torch.ones(k, dtype=torch.bool, device=dev)
+    else:
+        assert 0.0 < lo <= hi, \
+            f"interval_range_s={interval_range_s} must be (0,0)=every call or 0 < lo <= hi [s]"
+        wait = env.buffer("next_fire_steps", dtype=torch.long)   # [steps]
+        left = wait[env_ids] - 1
+        fire = left <= 0
+        draw = (torch.empty(k, device=dev).uniform_(lo, hi) / env.step_dt).round().long().clamp(min=1)
+        wait[env_ids] = torch.where(fire, draw, left)
+    new = torch.rand(k, 3, device=dev) * (bounds[:, 1] - bounds[:, 0]) + bounds[:, 0]
+    env.goal_pos[env_ids] = torch.where(fire.unsqueeze(-1), new, env.goal_pos[env_ids])
 
 
 def reset_joints_by_offset(env, env_ids, joints, position_range, velocity_range=(0.0, 0.0)):

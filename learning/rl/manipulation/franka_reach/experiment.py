@@ -8,9 +8,9 @@ from __future__ import annotations
 
 NUM_STEPS_PER_ENV = 24
 
-# Steps per full episode (5.0 s at 60 Hz) — the contract states rewards per step, so a term paid every
-# step totals weight x 300; 1/300 puts the critic target back on the scale PPO's value branch is sized for.
-EPISODE_STEPS = 300
+# Steps per full episode (15.0 s at 60 Hz) — the contract states rewards per step, so a term paid every
+# step totals weight x 900; 1/900 puts the critic target back on the scale PPO's value branch is sized for.
+EPISODE_STEPS = 900
 
 EXP: dict = {
     "seed": 42,

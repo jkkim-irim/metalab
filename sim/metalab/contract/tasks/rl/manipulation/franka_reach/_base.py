@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from sim.metalab.contract.spec import Done, Event, Obs, TaskSpec, values
-from sim.metalab.terms import events, obs, terminate
+from sim.metalab.contract.spec import Event, Obs, TaskSpec, values
+from sim.metalab.terms import events, obs
 
 
 class PHYSICS:
@@ -55,22 +55,18 @@ class OBS:
 
 
 class EVENTS:
-    reset_goal_position = Event(events.reset_goal_position, "reset",
-                                x_range=GOAL_X, y_range=GOAL_Y, z_range=GOAL_Z)
+    sample_goal_position = Event(events.sample_goal_position, "interval",
+                                 x_range=GOAL_X, y_range=GOAL_Y, z_range=GOAL_Z, interval_range_s=[3.0, 5.0])
     reset_joints_by_offset = Event(events.reset_joints_by_offset, "reset", joints="@joints.arm",
                                    position_range=[-0.1, 0.1])
 
 
-class TERMINATE:
-    goal_reached = Done(terminate.curriculum_passed, truncation=True)
-
-
-def build_task(name: str, *, reward, gate, action=None, events=None, terminate=None) -> TaskSpec:
+def build_task(name: str, *, reward, gate, action=None, events=None) -> TaskSpec:
     return TaskSpec(
         name=name,
         num_envs=4096,
         env_spacing=1.5,
-        episode_length_s=5.0,
+        episode_length_s=15.0,
         physics=PHYSICS,
         scene=values(SCENE),
         action=action if action is not None else ACTION,
@@ -79,5 +75,4 @@ def build_task(name: str, *, reward, gate, action=None, events=None, terminate=N
         reward=reward,
         events=events if events is not None else EVENTS,
         gate=gate,
-        terminate=terminate if terminate is not None else TERMINATE,
     )

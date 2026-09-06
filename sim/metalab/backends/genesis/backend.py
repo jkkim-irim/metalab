@@ -304,6 +304,9 @@ class GenesisBackend(CoupledPDMixin):
     def render_frame(self):
         pass
 
+    def set_goal_markers(self, pos: torch.Tensor) -> None:
+        self.viewer.set_goal_markers(pos)
+
     def viewer_step_allowed(self) -> bool:
         return self.viewer.step_allowed()
 

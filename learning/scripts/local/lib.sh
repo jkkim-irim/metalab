@@ -55,17 +55,26 @@ resolve_display(){
 # ── task · recipe (two axes; mirrors sim/metalab/contract/loader.py) ─────────────────────────────
 # Contracts live on two shelves: RL ones under tasks/rl/ (what Train/Eval run) and scene-only ones under
 # tasks/standalone/. A TASK is a family folder tasks/rl/<task>/ (or a single-file tasks/rl/<task>.py); a
-# RECIPE is one tasks/rl/<task>/<task>_<recipe>.py beside the shared _base.py. A family is not runnable
+# RECIPE is one tasks/rl/<task>/<recipe>.py beside the shared _base.py (the older <task>_<recipe>.py
+# spelling still reads as the same recipe). A family is not runnable
 # by itself, so both axes are required for one — resolved here in bash too, to fail before the
 # venv/engine boot.
 _TASKS_DIR="$ROOT/sim/metalab/contract/tasks"
 _RL_DIR="$_TASKS_DIR/rl"
 _STANDALONE_DIR="$_TASKS_DIR/standalone"
 _PARITY_DIR="$_TASKS_DIR/parity"
+has_recipes(){                    # $1 = dir → true iff it holds a recipe file (a *.py not starting with '_')
+  local f
+  for f in "$1"/*.py; do
+    [ -f "$f" ] || continue
+    case "$(basename "$f")" in _*) ;; *) return 0 ;; esac
+  done
+  return 1
+}
 family_dir(){                     # $1 = task (dash or underscore) → its family dir (rl/<t> or rl/<group>/<t>), empty if none
   local t="${1//-/_}" d hits=()
   for d in "$_RL_DIR/$t" "$_RL_DIR"/*/"$t"; do
-    [ -d "$d" ] && compgen -G "$d/${t}_*.py" >/dev/null && hits+=("$d")
+    [ -d "$d" ] && has_recipes "$d" && hits+=("$d")
   done
   [ ${#hits[@]} -le 1 ] || { echo "task family '$1' is ambiguous: ${hits[*]}" >&2; exit 2; }
   [ ${#hits[@]} -eq 0 ] || echo "${hits[0]}"
@@ -74,7 +83,7 @@ list_tasks(){                      # every runnable --task: rl/[<group>/]<family
   local p n out=()
   for p in "$_RL_DIR"/*/ "$_RL_DIR"/*/*/; do
     n="$(basename "$p")"
-    ! compgen -G "$p/${n}_*.py" >/dev/null || out+=("${n//_/-}")
+    ! has_recipes "$p" || out+=("${n//_/-}")
   done
   for p in "$_RL_DIR"/*.py; do      # '_*.py' is a shared library, not a contract
     n="$(basename "$p" .py)"
@@ -102,9 +111,11 @@ list_recipes(){                    # $1 = task (dash or underscore) → its reci
   local t="${1//-/_}" p n out=() fam
   fam="$(family_dir "$t")"
   [ -n "$fam" ] || return 0
-  for p in "$fam/${t}_"*.py; do
+  for p in "$fam"/*.py; do
     [ -f "$p" ] || continue
-    n="$(basename "$p" .py)"; out+=("${n#"${t}_"}")
+    n="$(basename "$p" .py)"
+    case "$n" in _*) continue ;; esac
+    out+=("${n#"${t}_"}")
   done
   [ ${#out[@]} -eq 0 ] || printf '%s\n' "${out[@]//_/-}" | sort
 }
