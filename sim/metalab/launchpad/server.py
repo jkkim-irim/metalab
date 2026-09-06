@@ -159,7 +159,9 @@ def _task_recipe(task: str, recipe: str, mode: str) -> dict:
                  else [STANDALONE_DIR / f"{contract}.py"])
     elif (fam := next((d for d in [RL_DIR / stem] + sorted(RL_DIR.glob(f"*/{stem}")) if d.is_dir()), None)):
         rec = recipe.replace("-", "_")
-        paths = [fam / "_base.py", fam / f"{stem}_{rec}.py"]
+        cands = [f for f in (fam / f"{rec}.py", fam / f"{stem}_{rec}.py") if f.is_file()]
+        assert len(cands) == 1, f"task {task}: recipe {recipe!r} resolves to {[c.name for c in cands]} in {fam}"
+        paths = [fam / "_base.py", cands[0]]
     else:
         paths = [RL_DIR / f"{stem}.py"]
     out: dict = {}
