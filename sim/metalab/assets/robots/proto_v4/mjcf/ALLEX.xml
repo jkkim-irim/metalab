@@ -1,5 +1,5 @@
 <mujoco model="ALLEX">
-  <!-- ALLEX model_version 0.4.0 (proto-v4) — generated from internal SSoT; do not edit by hand. -->
+  <!-- ALLEX model_version 0.4.0-dev0 (proto-v4) — generated from internal SSoT; do not edit by hand. -->
   <!-- Compiler settings -->
   <compiler angle="radian" autolimits="true" meshdir="../meshes" />
   <option timestep="0.002" integrator="implicitfast" />
@@ -115,7 +115,9 @@
     <mesh name="L_Thumb_Distal_Collision" scale="0.001 0.001 0.001" file="L_Thumb_Distal_Collision.stl"></mesh>    
     <mesh name="L_Thumb_Distal_Collision2" scale="0.001 0.001 0.001" file="L_Thumb_Distal_Collision2.stl"></mesh>
     <mesh name="L_Thumb_Middle_Collision" scale="0.001 0.001 0.001" file="L_Thumb_Middle_Collision.stl"></mesh>    
-    <mesh name="L_Thumb_Proximal_Collision" scale="0.001 0.001 0.001" file="L_Thumb_Proximal_Collision.stl"></mesh>
+    <mesh name="L_Thumb_Proximal_Collision1" scale="0.001 0.001 0.001" file="L_Thumb_Proximal_Collision1.stl"></mesh>
+    <mesh name="L_Thumb_Proximal_Collision2" scale="0.001 0.001 0.001" file="L_Thumb_Proximal_Collision2.stl"></mesh>
+    <mesh name="L_Thumb_Proximal_Collision3" scale="0.001 0.001 0.001" file="L_Thumb_Proximal_Collision3.stl"></mesh>
     <mesh name="L_Thumb_Yaw_Collision" scale="0.001 0.001 0.001" file="L_Thumb_Yaw_Collision.stl"></mesh>
     <mesh name="L_Palm_Back_Collision1" scale="0.001 0.001 0.001" file="L_Palm_Back_Collision1.stl"></mesh>
     <mesh name="L_Palm_Back_Collision2" scale="0.001 0.001 0.001" file="L_Palm_Back_Collision2.stl"></mesh>
@@ -146,7 +148,9 @@
     <mesh name="R_Thumb_Distal_Collision" scale="0.001 0.001 0.001" file="R_Thumb_Distal_Collision.stl"></mesh>    
     <mesh name="R_Thumb_Distal_Collision2" scale="0.001 0.001 0.001" file="R_Thumb_Distal_Collision2.stl"></mesh>
     <mesh name="R_Thumb_Middle_Collision" scale="0.001 0.001 0.001" file="R_Thumb_Middle_Collision.stl"></mesh>
-    <mesh name="R_Thumb_Proximal_Collision" scale="0.001 0.001 0.001" file="R_Thumb_Proximal_Collision.stl"></mesh>
+    <mesh name="R_Thumb_Proximal_Collision1" scale="0.001 0.001 0.001" file="R_Thumb_Proximal_Collision1.stl"></mesh>
+    <mesh name="R_Thumb_Proximal_Collision2" scale="0.001 0.001 0.001" file="R_Thumb_Proximal_Collision2.stl"></mesh>
+    <mesh name="R_Thumb_Proximal_Collision3" scale="0.001 0.001 0.001" file="R_Thumb_Proximal_Collision3.stl"></mesh>
     <mesh name="R_Thumb_Yaw_Collision" scale="0.001 0.001 0.001" file="R_Thumb_Yaw_Collision.stl"></mesh>
     <mesh name="Finger_Roll_Collision" scale="0.001 0.001 0.001" file="Finger_Roll_Collision.stl"></mesh>
     <mesh name="Finger_Distal_Collision" scale="0.001 0.001 0.001" file="Finger_Distal_Collision.stl"></mesh>
@@ -281,7 +285,7 @@
 
                           <body name="L_Wrist_Pitch_Link" pos="0.0135 0 -0.025">
                             <inertial pos="-0.0115 -0.0061 -0.1013" mass="0.97383" quat="0.9998356286 0.004005407735 0.0131161993 0.01185908277" diaginertia="0.001751025141 0.00137983739 0.0005701374694"/>
-                            <joint name="L_Wrist_Pitch_Joint" axis="0 1 0" range="-1.396263 1.396263" armature="0.001392972" frictionloss="0.3" damping="0" actuatorfrcrange="-18 18" actuatorgravcomp="true" />
+                            <joint name="L_Wrist_Pitch_Joint" axis="0 1 0" range="-1.221730 1.221730" armature="0.001392972" frictionloss="0.3" damping="0" actuatorfrcrange="-18 18" actuatorgravcomp="true" />
                             <geom class="collision" mesh="Wrist_Pitch_Collision1"/>
                             <geom class="collision" mesh="Wrist_Pitch_Collision2"/>
                             <geom class="collision" mesh="Wrist_Pitch_Collision3"/>
@@ -313,27 +317,30 @@
                                 <geom class="visual" material="gray" mesh="L_Thumb_Yaw_Gray"/>
 
                                 <body name="L_Thumb_Proximal_Link" pos="0 0.0139985 -0.0323434">
-                                  <inertial pos="-0.0000454521 0.0190620346 0.0080043456" mass="0.030992843" quat="0.50466803 0.49355209 -0.50597526 -0.49568695" diaginertia="2.32456382e-06 4.93604313e-06 6.12243002e-06"/>
+                                  <inertial pos="-0.000077348 0.017404125 0.004784230" mass="0.018213575" quat="0.485752239 0.511876798 -0.490380176 -0.511423689" diaginertia="1.448738819e-06 3.217496330e-06 4.046573269e-06"/>
                                   <joint name="L_Thumb_CMC_Joint" axis="-1 0 0" range="0 1.570796" armature="0.00339975" frictionloss="0.05879" damping="0" actuatorfrcrange="-4.5 4.5" />
-                                  <geom class="collision" mesh="L_Thumb_Proximal_Collision" contype="2" conaffinity="4"/>
+                                  <geom class="collision" mesh="L_Thumb_Proximal_Collision1"/>
+                                  <geom class="collision" mesh="L_Thumb_Proximal_Collision2"/>
+                                  <geom class="collision" mesh="L_Thumb_Proximal_Collision3"/>
                                   <geom class="visual" material="gray" mesh="L_Thumb_Proximal_Gray"/>
                                   <geom class="visual" material="pad" mesh="L_Thumb_Proximal_Pad"/>
                                   <geom class="visual" material="white" mesh="L_Thumb_Proximal_White"/>
 
                                   <body name="L_Thumb_Middle_Link" pos="0 0.04399902 0.00029399">
-                                    <inertial pos="0.000002618821 0.006468415814 0.002006469640" mass="0.007144084" quat="0.70638504 -0.03394324 0.0396098 0.70590303" diaginertia="2.44419393e-07 4.43004550e-07 4.54987785e-07"/>
+                                    <inertial pos="0.000000843 0.006106026 0.002208730" mass="0.008095795" quat="0.706471562 -0.030610504 0.031075122 0.706395969" diaginertia="2.790611384e-07 5.486519012e-07 6.046668554e-07"/>
                                     <joint name="L_Thumb_MCP_Joint" axis="-1 0 0" range="0 1.570796" armature="0.00154476" frictionloss="0.01850" damping="0" actuatorfrcrange="-3 3" />
                                     <geom class="collision" mesh="L_Thumb_Middle_Collision"/>
                                     <geom class="visual" material="gray" mesh="L_Thumb_Middle_Gray"/>
                                     <geom class="visual" material="pad" mesh="L_Thumb_Middle_Pad"/>
 
                                     <body name="L_Thumb_Distal_Link" pos="0 0.019 0">
-                                      <inertial pos="0.000003439 0.005724653 0.002653430" mass="0.00504" quat="0.4993579122 0.5024384358 -0.5010644362 0.4971234499" diaginertia="3.653666766e-07 3.440241684e-07 1.050724157e-07"/>
+                                      <inertial pos="-0.000000101347 0.006316482941 0.003380218440" mass="0.002798397" quat="0.7066291474 0.0259533647 0.0259519416 -0.7066315642" diaginertia="4.709802620e-08 1.468434820e-07 1.686888308e-07"/>
                                       <joint name="L_Thumb_IP_Joint" axis="-1 0 0" frictionloss="0" damping="0" />
-                                      <geom class="collision" mesh="L_Thumb_Distal_Collision" rgba="1 1 1 1"/>
+                                      <geom class="collision" mesh="L_Thumb_Distal_Collision"/>
                                       <geom class="visual" material="gray" mesh="L_Thumb_Distal_Gray"/>
                                       <body name="L_Thumb_Fingertip" pos="0 0.00834238 -0.00823029" quat="0.99306846 -0.1175374 0 0">
-                                        <geom class="collision" mesh="L_Thumb_Distal_Collision2" rgba="1 1 0 1"/>
+                                        <inertial pos="0.000003152981 0.002621854534 0.004738974920" mass="0.001595432" quat="0.7066087680 0.0770806997 0.0747941660 -0.6994057817" diaginertia="3.940992269e-08 4.761544704e-08 7.057446327e-08"/>
+                                        <geom class="collision" mesh="L_Thumb_Distal_Collision2"/>
                                         <geom class="visual" material="pad" mesh="L_Thumb_Distal_Pad"/>
                                       </body>
                                     </body>
@@ -363,12 +370,13 @@
                                     <geom class="visual" material="pad" mesh="Finger_Middle_Pad"/>
 
                                     <body name="L_Index_Distal_Link" pos="0.0019932 0 -0.0188952">
-                                      <inertial pos="-0.002635323 -0.000003528 -0.00600072" mass="0.00504" quat="0.9999814857 -0.0004422177879 0.005771251628 0.001877577352" diaginertia="3.488369153e-07 3.281665762e-07 1.037075906e-07"/>
+                                      <inertial pos="-0.003380218440 -0.000000101347 -0.006316482941" mass="0.002798397" quat="0.7325830090 0.0000019199 -0.6806777027 -0.0000004969" diaginertia="4.709802620e-08 1.468434820e-07 1.686888308e-07"/>
                                       <joint name="L_Index_DIP_Joint" axis="0 -1 0" frictionloss="0" damping="0" />
-                                      <geom class="collision" mesh="Finger_Distal_Collision" rgba="1 1 1 1"/>
+                                      <geom class="collision" mesh="Finger_Distal_Collision"/>
                                       <geom class="visual" material="gray" mesh="Finger_Distal_Gray"/>
                                       <body name="L_Index_Fingertip" pos="0.0082309 0 -0.0083419" quat="0.9930646 0 -0.1175706 0">
-                                        <geom class="collision" mesh="Finger_Distal_Collision2" rgba="1 1 0 1"/>
+                                        <inertial pos="-0.004738974920 0.000025490605 -0.002621732512" mass="0.001595432" quat="0.7789481120 0.0008600361 -0.6270843643 0.0020734649" diaginertia="3.940992322e-08 4.761544752e-08 7.057446326e-08"/>
+                                        <geom class="collision" mesh="Finger_Distal_Collision2"/>
                                         <geom class="visual" material="pad" mesh="Finger_Distal_Pad"/>
                                       </body>
                                     </body>
@@ -398,12 +406,13 @@
                                     <geom class="visual" material="pad" mesh="Finger_Middle_Pad"/>
 
                                     <body name="L_Middle_Distal_Link" pos="0.0019932 0 -0.0188952">
-                                      <inertial pos="-0.002635323 -0.000003528 -0.00600072" mass="0.00504" quat="0.9999814857 -0.0004422177879 0.005771251628 0.001877577352" diaginertia="3.488369153e-07 3.281665762e-07 1.037075906e-07"/>
+                                      <inertial pos="-0.003380218440 -0.000000101347 -0.006316482941" mass="0.002798397" quat="0.7325830090 0.0000019199 -0.6806777027 -0.0000004969" diaginertia="4.709802620e-08 1.468434820e-07 1.686888308e-07"/>
                                       <joint name="L_Middle_DIP_Joint" axis="0 -1 0" frictionloss="0" damping="0" />
-                                      <geom class="collision" mesh="Finger_Distal_Collision" rgba="1 1 1 1"/>
+                                      <geom class="collision" mesh="Finger_Distal_Collision"/>
                                       <geom class="visual" material="gray" mesh="Finger_Distal_Gray"/>
                                       <body name="L_Middle_Fingertip" pos="0.0082309 0 -0.0083419" quat="0.9930646 0 -0.1175706 0">
-                                        <geom class="collision" mesh="Finger_Distal_Collision2" rgba="1 1 0 1"/>
+                                        <inertial pos="-0.004738974920 0.000025490605 -0.002621732512" mass="0.001595432" quat="0.7789481120 0.0008600361 -0.6270843643 0.0020734649" diaginertia="3.940992322e-08 4.761544752e-08 7.057446326e-08"/>
+                                        <geom class="collision" mesh="Finger_Distal_Collision2"/>
                                         <geom class="visual" material="pad" mesh="Finger_Distal_Pad"/>
                                       </body>
                                     </body>
@@ -433,12 +442,13 @@
                                     <geom class="visual" material="pad" mesh="Finger_Middle_Pad"/>
 
                                     <body name="L_Ring_Distal_Link" pos="0.0019932 0 -0.0188952">
-                                      <inertial pos="-0.002635323 -0.000003528 -0.00600072" mass="0.00504" quat="0.9999814857 -0.0004422177879 0.005771251628 0.001877577352" diaginertia="3.488369153e-07 3.281665762e-07 1.037075906e-07"/>
+                                      <inertial pos="-0.003380218440 -0.000000101347 -0.006316482941" mass="0.002798397" quat="0.7325830090 0.0000019199 -0.6806777027 -0.0000004969" diaginertia="4.709802620e-08 1.468434820e-07 1.686888308e-07"/>
                                       <joint name="L_Ring_DIP_Joint" axis="0 -1 0" frictionloss="0" damping="0" />
-                                      <geom class="collision" mesh="Finger_Distal_Collision" rgba="1 1 1 1"/>
+                                      <geom class="collision" mesh="Finger_Distal_Collision"/>
                                       <geom class="visual" material="gray" mesh="Finger_Distal_Gray"/>
                                       <body name="L_Ring_Fingertip" pos="0.0082309 0 -0.0083419" quat="0.9930646 0 -0.1175706 0">
-                                        <geom class="collision" mesh="Finger_Distal_Collision2" rgba="1 1 0 1"/>
+                                        <inertial pos="-0.004738974920 0.000025490605 -0.002621732512" mass="0.001595432" quat="0.7789481120 0.0008600361 -0.6270843643 0.0020734649" diaginertia="3.940992322e-08 4.761544752e-08 7.057446326e-08"/>
+                                        <geom class="collision" mesh="Finger_Distal_Collision2"/>
                                         <geom class="visual" material="pad" mesh="Finger_Distal_Pad"/>
                                       </body>
                                     </body>
@@ -468,12 +478,13 @@
                                     <geom class="visual" material="pad" mesh="Finger_Middle_Pad"/>
 
                                     <body name="L_Little_Distal_Link" pos="0.0019932 0 -0.0188952">
-                                      <inertial pos="-0.002635323 -0.000003528 -0.00600072" mass="0.00504" quat="0.9999814857 -0.0004422177879 0.005771251628 0.001877577352" diaginertia="3.488369153e-07 3.281665762e-07 1.037075906e-07"/>
+                                      <inertial pos="-0.003380218440 -0.000000101347 -0.006316482941" mass="0.002798397" quat="0.7325830090 0.0000019199 -0.6806777027 -0.0000004969" diaginertia="4.709802620e-08 1.468434820e-07 1.686888308e-07"/>
                                       <joint name="L_Little_DIP_Joint" axis="0 -1 0" frictionloss="0" damping="0" />
-                                      <geom class="collision" mesh="Finger_Distal_Collision" rgba="1 1 1 1"/>
+                                      <geom class="collision" mesh="Finger_Distal_Collision"/>
                                       <geom class="visual" material="gray" mesh="Finger_Distal_Gray"/>
                                       <body name="L_Little_Fingertip" pos="0.0082309 0 -0.0083419" quat="0.9930646 0 -0.1175706 0">
-                                        <geom class="collision" mesh="Finger_Distal_Collision2" rgba="1 1 0 1"/>
+                                        <inertial pos="-0.004738974920 0.000025490605 -0.002621732512" mass="0.001595432" quat="0.7789481120 0.0008600361 -0.6270843643 0.0020734649" diaginertia="3.940992322e-08 4.761544752e-08 7.057446326e-08"/>
+                                        <geom class="collision" mesh="Finger_Distal_Collision2"/>
                                         <geom class="visual" material="pad" mesh="Finger_Distal_Pad"/>
                                       </body>
                                     </body>
@@ -544,7 +555,7 @@
 
                           <body name="R_Wrist_Pitch_Link" pos="0.0135 0 -0.025">
                             <inertial pos="-0.0115 -0.0061 -0.1013" mass="0.97383" quat="0.9998356286 -0.004005407735 0.0131161993 -0.01185908277" diaginertia="0.001751025141 0.00137983739 0.0005701374694"/>
-                            <joint name="R_Wrist_Pitch_Joint" axis="0 1 0" range="-1.396263 1.396263" armature="0.001392972" frictionloss="0.3" damping="0" actuatorfrcrange="-18 18" actuatorgravcomp="true" />
+                            <joint name="R_Wrist_Pitch_Joint" axis="0 1 0" range="-1.221730 1.221730" armature="0.001392972" frictionloss="0.3" damping="0" actuatorfrcrange="-18 18" actuatorgravcomp="true" />
                             <geom class="collision" mesh="Wrist_Pitch_Collision1"/>
                             <geom class="collision" mesh="Wrist_Pitch_Collision2"/>
                             <geom class="collision" mesh="Wrist_Pitch_Collision3"/>
@@ -576,28 +587,31 @@
                                 <geom class="visual" material="gray" mesh="R_Thumb_Yaw_Gray"/>
 
                                 <body name="R_Thumb_Proximal_Link" pos="0 -0.0139985 -0.0323434">
-                                  <inertial pos="0.0000454521 -0.0190620346 0.0080043456" mass="0.030992843" quat="0.49355209 0.50466803 -0.49568695 -0.50597526" diaginertia="2.32456382e-06 4.93604313e-06 6.12243002e-06"/>
+                                  <inertial pos="0.000077348 -0.017404125 0.004784230" mass="0.018213575" quat="0.511876798 0.485752239 -0.511423689 -0.490380176" diaginertia="1.448738819e-06 3.217496330e-06 4.046573269e-06"/>
                                   <joint name="R_Thumb_CMC_Joint" axis="1 0 0" range="0 1.570796" armature="0.00339975" frictionloss="0.05879" damping="0" actuatorfrcrange="-4.5 4.5" />
-                                  <geom class="collision" mesh="R_Thumb_Proximal_Collision"/>
+                                  <geom class="collision" mesh="R_Thumb_Proximal_Collision1"/>
+                                  <geom class="collision" mesh="R_Thumb_Proximal_Collision2"/>
+                                  <geom class="collision" mesh="R_Thumb_Proximal_Collision3"/>
                                   <geom class="visual" material="gray" mesh="R_Thumb_Proximal_Gray"/>
                                   <geom class="visual" material="pad" mesh="R_Thumb_Proximal_Pad"/>
                                   <geom class="visual" material="white" mesh="R_Thumb_Proximal_White"/>
 
                                   <body name="R_Thumb_Middle_Link" pos="0 -0.04399902 0.00029399">
-                                    <inertial pos="-0.000002618821 -0.006468415814 0.002006469640" mass="0.007144084" quat="0.0396098 -0.70590303 0.70638504 0.03394324" diaginertia="2.44419393e-07 4.43004550e-07 4.54987785e-07"/>
+                                    <inertial pos="-0.000000843 -0.006106026 0.002208730" mass="0.008095795" quat="0.031075122 -0.706395969 0.706471562 0.030610504" diaginertia="2.790611384e-07 5.486519012e-07 6.046668554e-07"/>
                                     <joint name="R_Thumb_MCP_Joint" axis="1 0 0" range="0 1.570796" armature="0.00154476" frictionloss="0.01850" damping="0" actuatorfrcrange="-3 3" />
                                     <geom class="collision" mesh="R_Thumb_Middle_Collision"/>
                                     <geom class="visual" material="gray" mesh="R_Thumb_Middle_Gray"/>
                                     <geom class="visual" material="pad" mesh="R_Thumb_Middle_Pad"/>
 
                                     <body name="R_Thumb_Distal_Link" pos="0 -0.019 0">
-                                      <inertial pos="0.000003439 -0.005724653 0.002653430" mass="0.00504" quat="0.5024384358 0.4993579122 -0.4971234499 0.5010644362" diaginertia="3.653666766e-07 3.440241684e-07 1.050724157e-07"/>
+                                      <inertial pos="0.000000101347 -0.006316482941 0.003380218440" mass="0.002798397" quat="0.7066291474 -0.0259533647 -0.0259519416 -0.7066315642" diaginertia="4.709802620e-08 1.468434820e-07 1.686888308e-07"/>
                                       <joint name="R_Thumb_IP_Joint" axis="1 0 0" frictionloss="0" damping="0" />
-                                      <geom class="collision" mesh="R_Thumb_Distal_Collision" rgba="1 1 1 1"/>
+                                      <geom class="collision" mesh="R_Thumb_Distal_Collision"/>
                                       <geom class="visual" material="gray" mesh="R_Thumb_Distal_Gray"/>
 
                                       <body name="R_Thumb_Fingertip" pos="0 -0.00834238 -0.00823029" quat="0.99306846 0.1175374 0 0">
-                                        <geom class="collision" mesh="R_Thumb_Distal_Collision2" rgba="1 1 0 1"/>
+                                        <inertial pos="-0.000003152981 -0.002621854534 0.004738974920" mass="0.001595432" quat="0.7066087680 -0.0770806997 -0.0747941660 -0.6994057817" diaginertia="3.940992269e-08 4.761544704e-08 7.057446327e-08"/>
+                                        <geom class="collision" mesh="R_Thumb_Distal_Collision2"/>
                                         <geom class="visual" material="pad" mesh="R_Thumb_Distal_Pad"/>
                                       </body>
                                     </body>
@@ -627,12 +641,13 @@
                                     <geom class="visual" material="pad" mesh="Finger_Middle_Pad"/>
 
                                     <body name="R_Index_Distal_Link" pos="0.0019932 0 -0.0188952">
-                                      <inertial pos="-0.002635323 -0.000003528 -0.00600072" mass="0.00504" quat="0.9999814857 -0.0004422177879 0.005771251628 0.001877577352" diaginertia="3.488369153e-07 3.281665762e-07 1.037075906e-07"/>
+                                      <inertial pos="-0.003380218440 -0.000000101347 -0.006316482941" mass="0.002798397" quat="0.7325830090 0.0000019199 -0.6806777027 -0.0000004969" diaginertia="4.709802620e-08 1.468434820e-07 1.686888308e-07"/>
                                       <joint name="R_Index_DIP_Joint" axis="0 -1 0" frictionloss="0" damping="0" />
-                                      <geom class="collision" mesh="Finger_Distal_Collision" rgba="1 1 1 1"/>
+                                      <geom class="collision" mesh="Finger_Distal_Collision"/>
                                       <geom class="visual" material="gray" mesh="Finger_Distal_Gray"/>
                                       <body name="R_Index_Fingertip" pos="0.0082309 0 -0.0083419" quat="0.9930646 0 -0.1175706 0">
-                                        <geom class="collision" mesh="Finger_Distal_Collision2" rgba="1 1 0 1"/>
+                                        <inertial pos="-0.004738974920 0.000025490605 -0.002621732512" mass="0.001595432" quat="0.7789481120 0.0008600361 -0.6270843643 0.0020734649" diaginertia="3.940992322e-08 4.761544752e-08 7.057446326e-08"/>
+                                        <geom class="collision" mesh="Finger_Distal_Collision2"/>
                                         <geom class="visual" material="pad" mesh="Finger_Distal_Pad"/>
                                       </body>
                                     </body>
@@ -662,12 +677,13 @@
                                     <geom class="visual" material="pad" mesh="Finger_Middle_Pad"/>
 
                                     <body name="R_Middle_Distal_Link" pos="0.0019932 0 -0.0188952">
-                                      <inertial pos="-0.002635323 -0.000003528 -0.00600072" mass="0.00504" quat="0.9999814857 -0.0004422177879 0.005771251628 0.001877577352" diaginertia="3.488369153e-07 3.281665762e-07 1.037075906e-07"/>
+                                      <inertial pos="-0.003380218440 -0.000000101347 -0.006316482941" mass="0.002798397" quat="0.7325830090 0.0000019199 -0.6806777027 -0.0000004969" diaginertia="4.709802620e-08 1.468434820e-07 1.686888308e-07"/>
                                       <joint name="R_Middle_DIP_Joint" axis="0 -1 0" frictionloss="0" damping="0" />
-                                      <geom class="collision" mesh="Finger_Distal_Collision" rgba="1 1 1 1"/>
+                                      <geom class="collision" mesh="Finger_Distal_Collision"/>
                                       <geom class="visual" material="gray" mesh="Finger_Distal_Gray"/>
                                       <body name="R_Middle_Fingertip" pos="0.0082309 0 -0.0083419" quat="0.9930646 0 -0.1175706 0">
-                                        <geom class="collision" mesh="Finger_Distal_Collision2" rgba="1 1 0 1"/>
+                                        <inertial pos="-0.004738974920 0.000025490605 -0.002621732512" mass="0.001595432" quat="0.7789481120 0.0008600361 -0.6270843643 0.0020734649" diaginertia="3.940992322e-08 4.761544752e-08 7.057446326e-08"/>
+                                        <geom class="collision" mesh="Finger_Distal_Collision2"/>
                                         <geom class="visual" material="pad" mesh="Finger_Distal_Pad"/>
                                       </body>
                                     </body>
@@ -697,12 +713,13 @@
                                     <geom class="visual" material="pad" mesh="Finger_Middle_Pad"/>
 
                                     <body name="R_Ring_Distal_Link" pos="0.0019932 0 -0.0188952">
-                                      <inertial pos="-0.002635323 -0.000003528 -0.00600072" mass="0.00504" quat="0.9999814857 -0.0004422177879 0.005771251628 0.001877577352" diaginertia="3.488369153e-07 3.281665762e-07 1.037075906e-07"/>
+                                      <inertial pos="-0.003380218440 -0.000000101347 -0.006316482941" mass="0.002798397" quat="0.7325830090 0.0000019199 -0.6806777027 -0.0000004969" diaginertia="4.709802620e-08 1.468434820e-07 1.686888308e-07"/>
                                       <joint name="R_Ring_DIP_Joint" axis="0 -1 0" frictionloss="0" damping="0" />
-                                      <geom class="collision" mesh="Finger_Distal_Collision" rgba="1 1 1 1"/>
+                                      <geom class="collision" mesh="Finger_Distal_Collision"/>
                                       <geom class="visual" material="gray" mesh="Finger_Distal_Gray"/>
                                       <body name="R_Ring_Fingertip" pos="0.0082309 0 -0.0083419" quat="0.9930646 0 -0.1175706 0">
-                                        <geom class="collision" mesh="Finger_Distal_Collision2" rgba="1 1 0 1"/>
+                                        <inertial pos="-0.004738974920 0.000025490605 -0.002621732512" mass="0.001595432" quat="0.7789481120 0.0008600361 -0.6270843643 0.0020734649" diaginertia="3.940992322e-08 4.761544752e-08 7.057446326e-08"/>
+                                        <geom class="collision" mesh="Finger_Distal_Collision2"/>
                                         <geom class="visual" material="pad" mesh="Finger_Distal_Pad"/>
                                       </body>
                                     </body>
@@ -732,12 +749,13 @@
                                     <geom class="visual" material="pad" mesh="Finger_Middle_Pad"/>
 
                                     <body name="R_Little_Distal_Link" pos="0.0019932 0 -0.0188952">
-                                      <inertial pos="-0.002635323 -0.000003528 -0.00600072" mass="0.00504" quat="0.9999814857 -0.0004422177879 0.005771251628 0.001877577352" diaginertia="3.488369153e-07 3.281665762e-07 1.037075906e-07"/>
+                                      <inertial pos="-0.003380218440 -0.000000101347 -0.006316482941" mass="0.002798397" quat="0.7325830090 0.0000019199 -0.6806777027 -0.0000004969" diaginertia="4.709802620e-08 1.468434820e-07 1.686888308e-07"/>
                                       <joint name="R_Little_DIP_Joint" axis="0 -1 0" frictionloss="0" damping="0" />
-                                      <geom class="collision" mesh="Finger_Distal_Collision" rgba="1 1 1 1"/>
+                                      <geom class="collision" mesh="Finger_Distal_Collision"/>
                                       <geom class="visual" material="gray" mesh="Finger_Distal_Gray"/>
                                       <body name="R_Little_Fingertip" pos="0.0082309 0 -0.0083419" quat="0.9930646 0 -0.1175706 0">
-                                        <geom class="collision" mesh="Finger_Distal_Collision2" rgba="1 1 0 1"/>
+                                        <inertial pos="-0.004738974920 0.000025490605 -0.002621732512" mass="0.001595432" quat="0.7789481120 0.0008600361 -0.6270843643 0.0020734649" diaginertia="3.940992322e-08 4.761544752e-08 7.057446326e-08"/>
+                                        <geom class="collision" mesh="Finger_Distal_Collision2"/>
                                         <geom class="visual" material="pad" mesh="Finger_Distal_Pad"/>
                                       </body>
                                     </body>
@@ -761,58 +779,58 @@
 
   <actuator>
     <!-- Right arm -->
-    <position name="R_Shoulder_Pitch_Position" kp="5000" kv="112.8783" ctrlrange="-3.316126 1.745329" joint="R_Shoulder_Pitch_Joint" />
-    <position name="R_Shoulder_Roll_Position" kp="5000" kv="90.3684" ctrlrange="-3.752458 0.087266" joint="R_Shoulder_Roll_Joint" />
-    <position name="R_Shoulder_Yaw_Position" kp="5000" kv="73.3365" ctrlrange="-1.745329 3.316126" joint="R_Shoulder_Yaw_Joint" />
-    <position name="R_Elbow_Position" kp="2000" kv="41.8896" ctrlrange="-2.792527 0.087266" joint="R_Elbow_Joint" />
-    <position name="R_Wrist_Yaw_Position" kp="750" kv="4.5803" ctrlrange="-0.610865 4.799655" joint="R_Wrist_Yaw_Joint" />
-    <position name="R_Wrist_Roll_Position" kp="600" kv="5.8302" ctrlrange="-0.872665 0.872665" joint="R_Wrist_Roll_Joint" />
-    <position name="R_Wrist_Pitch_Position" kp="500" kv="4.4695" ctrlrange="-1.396263 1.396263" joint="R_Wrist_Pitch_Joint" />
+    <position name="R_Shoulder_Pitch_Position" kp="1619.133787" kv="8.096" ctrlrange="-3.316126 1.745329" joint="R_Shoulder_Pitch_Joint" />
+    <position name="R_Shoulder_Roll_Position" kp="1619.133787" kv="8.096" ctrlrange="-3.752458 0.087266" joint="R_Shoulder_Roll_Joint" />
+    <position name="R_Shoulder_Yaw_Position" kp="1619.133787" kv="8.096" ctrlrange="-1.745329 3.316126" joint="R_Shoulder_Yaw_Joint" />
+    <position name="R_Elbow_Position" kp="742.6806232" kv="3.713" ctrlrange="-2.792527 0.087266" joint="R_Elbow_Joint" />
+    <position name="R_Wrist_Yaw_Position" kp="256.1475734" kv="1.281" ctrlrange="-0.610865 4.799655" joint="R_Wrist_Yaw_Joint" />
+    <position name="R_Wrist_Roll_Position" kp="204.4091094" kv="2.044" ctrlrange="-0.872665 0.872665" joint="R_Wrist_Roll_Joint" />
+    <position name="R_Wrist_Pitch_Position" kp="162.6410951" kv="1.626" ctrlrange="-1.221730 1.221730" joint="R_Wrist_Pitch_Joint" />
     <!-- Right hand -->
-    <position name="R_Thumb_Yaw_Position" kp="40" kv="0.8039" ctrlrange="-2.617994 0" joint="R_Thumb_Yaw_Joint" />
-    <position name="R_Thumb_CMC_Position" kp="40" kv="0.5279" ctrlrange="0 1.570796" joint="R_Thumb_CMC_Joint" />
-    <position name="R_Thumb_MCP_Position" kp="20" kv="0.2492" ctrlrange="0 1.570796" joint="R_Thumb_MCP_Joint" />
-    <position name="R_Index_ABAD_Position" kp="20" kv="0.0969" ctrlrange="-0.523599 0.523599" joint="R_Index_ABAD_Joint" />
-    <position name="R_Index_MCP_Position" kp="40" kv="0.5638" ctrlrange="-0.174532 1.570796" joint="R_Index_MCP_Joint" />
-    <position name="R_Index_PIP_Position" kp="20" kv="0.2491" ctrlrange="0 1.9198622" joint="R_Index_PIP_Joint" />
-    <position name="R_Middle_ABAD_Position" kp="20" kv="0.0969" ctrlrange="-0.523599 0.523599" joint="R_Middle_ABAD_Joint" />
-    <position name="R_Middle_MCP_Position" kp="40" kv="0.5638" ctrlrange="-0.174532 1.570796" joint="R_Middle_MCP_Joint" />
-    <position name="R_Middle_PIP_Position" kp="20" kv="0.2491" ctrlrange="0 1.9198622" joint="R_Middle_PIP_Joint" />
-    <position name="R_Ring_ABAD_Position" kp="20" kv="0.0969" ctrlrange="-0.523599 0.523599" joint="R_Ring_ABAD_Joint" />
-    <position name="R_Ring_MCP_Position" kp="40" kv="0.5638" ctrlrange="-0.174532 1.570796" joint="R_Ring_MCP_Joint" />
-    <position name="R_Ring_PIP_Position" kp="20" kv="0.2491" ctrlrange="0 1.9198622" joint="R_Ring_PIP_Joint" />
-    <position name="R_Little_ABAD_Position" kp="20" kv="0.0965" ctrlrange="-0.523599 0.523599" joint="R_Little_ABAD_Joint" />
-    <position name="R_Little_MCP_Position" kp="40" kv="0.5637" ctrlrange="-0.174532 1.570796" joint="R_Little_MCP_Joint" />
-    <position name="R_Little_PIP_Position" kp="20" kv="0.2491" ctrlrange="0 1.9198622" joint="R_Little_PIP_Joint" />
+    <position name="R_Thumb_Yaw_Position" kp="32.89618828" kv="1.462" ctrlrange="-2.617994 0" joint="R_Thumb_Yaw_Joint" />
+    <position name="R_Thumb_CMC_Position" kp="0.176483425" kv="0.176483425" ctrlrange="0 1.570796" joint="R_Thumb_CMC_Joint" />
+    <position name="R_Thumb_MCP_Position" kp="0.08422321729" kv="0.08422321729" ctrlrange="0 1.570796" joint="R_Thumb_MCP_Joint" />
+    <position name="R_Index_ABAD_Position" kp="3.777613475" kv="0.063" ctrlrange="-0.523599 0.523599" joint="R_Index_ABAD_Joint" />
+    <position name="R_Index_MCP_Position" kp="4.409195522" kv="0.2334535025" ctrlrange="-0.174532 1.570796" joint="R_Index_MCP_Joint" />
+    <position name="R_Index_PIP_Position" kp="0.07703208186" kv="0.07703208186" ctrlrange="0 1.9198622" joint="R_Index_PIP_Joint" />
+    <position name="R_Middle_ABAD_Position" kp="3.777613475" kv="0.063" ctrlrange="-0.523599 0.523599" joint="R_Middle_ABAD_Joint" />
+    <position name="R_Middle_MCP_Position" kp="4.409195522" kv="0.2334535025" ctrlrange="-0.174532 1.570796" joint="R_Middle_MCP_Joint" />
+    <position name="R_Middle_PIP_Position" kp="0.07703208186" kv="0.07703208186" ctrlrange="0 1.9198622" joint="R_Middle_PIP_Joint" />
+    <position name="R_Ring_ABAD_Position" kp="3.778322628" kv="0.063" ctrlrange="-0.523599 0.523599" joint="R_Ring_ABAD_Joint" />
+    <position name="R_Ring_MCP_Position" kp="5.873299448" kv="0.2334535025" ctrlrange="-0.174532 1.570796" joint="R_Ring_MCP_Joint" />
+    <position name="R_Ring_PIP_Position" kp="0.7703208186" kv="0.07703208186" ctrlrange="0 1.9198622" joint="R_Ring_PIP_Joint" />
+    <position name="R_Little_ABAD_Position" kp="3.778322628" kv="0.063" ctrlrange="-0.523599 0.523599" joint="R_Little_ABAD_Joint" />
+    <position name="R_Little_MCP_Position" kp="5.873299448" kv="0.2334535025" ctrlrange="-0.174532 1.570796" joint="R_Little_MCP_Joint" />
+    <position name="R_Little_PIP_Position" kp="0.7703208186" kv="0.07703208186" ctrlrange="0 1.9198622" joint="R_Little_PIP_Joint" />
     <!-- Left arm -->
-    <position name="L_Shoulder_Pitch_Position" kp="5000" kv="112.7847" ctrlrange="-3.316126 1.745329" joint="L_Shoulder_Pitch_Joint" />
-    <position name="L_Shoulder_Roll_Position" kp="5000" kv="90.3685" ctrlrange="-0.087266 3.752458" joint="L_Shoulder_Roll_Joint" />
-    <position name="L_Shoulder_Yaw_Position" kp="5000" kv="73.3366" ctrlrange="-3.316126 1.745329" joint="L_Shoulder_Yaw_Joint" />
-    <position name="L_Elbow_Position" kp="2000" kv="41.8896" ctrlrange="-2.792527 0.087266" joint="L_Elbow_Joint" />
-    <position name="L_Wrist_Yaw_Position" kp="750" kv="4.5803" ctrlrange="-4.799655 0.610865" joint="L_Wrist_Yaw_Joint" />
-    <position name="L_Wrist_Roll_Position" kp="600" kv="5.8303" ctrlrange="-0.872665 0.872665" joint="L_Wrist_Roll_Joint" />
-    <position name="L_Wrist_Pitch_Position" kp="500" kv="4.4695" ctrlrange="-1.396263 1.396263" joint="L_Wrist_Pitch_Joint" />
+    <position name="L_Shoulder_Pitch_Position" kp="1619.133787" kv="8.096" ctrlrange="-3.316126 1.745329" joint="L_Shoulder_Pitch_Joint" />
+    <position name="L_Shoulder_Roll_Position" kp="1619.133787" kv="8.096" ctrlrange="-0.087266 3.752458" joint="L_Shoulder_Roll_Joint" />
+    <position name="L_Shoulder_Yaw_Position" kp="1619.133787" kv="8.096" ctrlrange="-3.316126 1.745329" joint="L_Shoulder_Yaw_Joint" />
+    <position name="L_Elbow_Position" kp="742.6806232" kv="3.713" ctrlrange="-2.792527 0.087266" joint="L_Elbow_Joint" />
+    <position name="L_Wrist_Yaw_Position" kp="256.1475734" kv="1.281" ctrlrange="-4.799655 0.610865" joint="L_Wrist_Yaw_Joint" />
+    <position name="L_Wrist_Roll_Position" kp="204.4091094" kv="2.044" ctrlrange="-0.872665 0.872665" joint="L_Wrist_Roll_Joint" />
+    <position name="L_Wrist_Pitch_Position" kp="162.6410951" kv="1.626" ctrlrange="-1.221730 1.221730" joint="L_Wrist_Pitch_Joint" />
     <!-- Left hand -->
-    <position name="L_Thumb_Yaw_Position" kp="40" kv="0.8039" ctrlrange="0 2.617994" joint="L_Thumb_Yaw_Joint" />
-    <position name="L_Thumb_CMC_Position" kp="40" kv="0.5279" ctrlrange="0 1.570796" joint="L_Thumb_CMC_Joint" />
-    <position name="L_Thumb_MCP_Position" kp="20" kv="0.2492" ctrlrange="0 1.570796" joint="L_Thumb_MCP_Joint" />
-    <position name="L_Index_ABAD_Position" kp="20" kv="0.0969" ctrlrange="-0.523599 0.523599" joint="L_Index_ABAD_Joint" />
-    <position name="L_Index_MCP_Position" kp="40" kv="0.5638" ctrlrange="-0.174532 1.570796" joint="L_Index_MCP_Joint" />
-    <position name="L_Index_PIP_Position" kp="20" kv="0.2491" ctrlrange="0 1.9198622" joint="L_Index_PIP_Joint" />
-    <position name="L_Middle_ABAD_Position" kp="20" kv="0.0969" ctrlrange="-0.523599 0.523599" joint="L_Middle_ABAD_Joint" />
-    <position name="L_Middle_MCP_Position" kp="40" kv="0.5638" ctrlrange="-0.174532 1.570796" joint="L_Middle_MCP_Joint" />
-    <position name="L_Middle_PIP_Position" kp="20" kv="0.2491" ctrlrange="0 1.9198622" joint="L_Middle_PIP_Joint" />
-    <position name="L_Ring_ABAD_Position" kp="20" kv="0.0969" ctrlrange="-0.523599 0.523599" joint="L_Ring_ABAD_Joint" />
-    <position name="L_Ring_MCP_Position" kp="40" kv="0.5638" ctrlrange="-0.174532 1.570796" joint="L_Ring_MCP_Joint" />
-    <position name="L_Ring_PIP_Position" kp="20" kv="0.2491" ctrlrange="0 1.9198622" joint="L_Ring_PIP_Joint" />
-    <position name="L_Little_ABAD_Position" kp="20" kv="0.0965" ctrlrange="-0.523599 0.523599" joint="L_Little_ABAD_Joint" />
-    <position name="L_Little_MCP_Position" kp="40" kv="0.5637" ctrlrange="-0.174532 1.570796" joint="L_Little_MCP_Joint" />
-    <position name="L_Little_PIP_Position" kp="20" kv="0.2491" ctrlrange="0 1.9198622" joint="L_Little_PIP_Joint" />
+    <position name="L_Thumb_Yaw_Position" kp="32.89618828" kv="1.462" ctrlrange="0 2.617994" joint="L_Thumb_Yaw_Joint" />
+    <position name="L_Thumb_CMC_Position" kp="0.176483425" kv="0.176483425" ctrlrange="0 1.570796" joint="L_Thumb_CMC_Joint" />
+    <position name="L_Thumb_MCP_Position" kp="0.08422321729" kv="0.08422321729" ctrlrange="0 1.570796" joint="L_Thumb_MCP_Joint" />
+    <position name="L_Index_ABAD_Position" kp="3.777613475" kv="0.063" ctrlrange="-0.523599 0.523599" joint="L_Index_ABAD_Joint" />
+    <position name="L_Index_MCP_Position" kp="4.409195522" kv="0.2334535025" ctrlrange="-0.174532 1.570796" joint="L_Index_MCP_Joint" />
+    <position name="L_Index_PIP_Position" kp="0.07703208186" kv="0.07703208186" ctrlrange="0 1.9198622" joint="L_Index_PIP_Joint" />
+    <position name="L_Middle_ABAD_Position" kp="3.777613475" kv="0.063" ctrlrange="-0.523599 0.523599" joint="L_Middle_ABAD_Joint" />
+    <position name="L_Middle_MCP_Position" kp="4.409195522" kv="0.2334535025" ctrlrange="-0.174532 1.570796" joint="L_Middle_MCP_Joint" />
+    <position name="L_Middle_PIP_Position" kp="0.07703208186" kv="0.07703208186" ctrlrange="0 1.9198622" joint="L_Middle_PIP_Joint" />
+    <position name="L_Ring_ABAD_Position" kp="3.778322628" kv="0.063" ctrlrange="-0.523599 0.523599" joint="L_Ring_ABAD_Joint" />
+    <position name="L_Ring_MCP_Position" kp="5.873299448" kv="0.2334535025" ctrlrange="-0.174532 1.570796" joint="L_Ring_MCP_Joint" />
+    <position name="L_Ring_PIP_Position" kp="0.7703208186" kv="0.07703208186" ctrlrange="0 1.9198622" joint="L_Ring_PIP_Joint" />
+    <position name="L_Little_ABAD_Position" kp="3.778322628" kv="0.063" ctrlrange="-0.523599 0.523599" joint="L_Little_ABAD_Joint" />
+    <position name="L_Little_MCP_Position" kp="5.873299448" kv="0.2334535025" ctrlrange="-0.174532 1.570796" joint="L_Little_MCP_Joint" />
+    <position name="L_Little_PIP_Position" kp="0.7703208186" kv="0.07703208186" ctrlrange="0 1.9198622" joint="L_Little_PIP_Joint" />
     <!-- Waist and Head -->
-    <position name="Waist_Yaw_Position" kp="7500" kv="203.9925" ctrlrange="-2.8797933 2.8797933" joint="Waist_Yaw_Joint" />
-    <position name="Waist_Lower_Pitch_Position" kp="2000" kv="165.6678" ctrlrange="-0.5235988 1.0471976" joint="Waist_Lower_Pitch_Joint" />
-    <position name="Neck_Pitch_Position" kp="250" kv="5.2541" ctrlrange="-0.6981317 0.8726646" joint="Neck_Pitch_Joint" />
-    <position name="Neck_Yaw_Position" kp="400" kv="3.3389" ctrlrange="-1.570796 1.570796" joint="Neck_Yaw_Joint" />
+    <position name="Waist_Yaw_Position" kp="7500" kv="25" ctrlrange="-2.8797933 2.8797933" joint="Waist_Yaw_Joint" />
+    <position name="Waist_Lower_Pitch_Position" kp="6250" kv="62.5" ctrlrange="-0.5235988 1.0471976" joint="Waist_Lower_Pitch_Joint" />
+    <position name="Neck_Pitch_Position" kp="240.25" kv="0.3" ctrlrange="-0.6981317 0.8726646" joint="Neck_Pitch_Joint" />
+    <position name="Neck_Yaw_Position" kp="400" kv="0.5" ctrlrange="-1.570796 1.570796" joint="Neck_Yaw_Joint" />
   </actuator>
 
   <equality>
@@ -820,13 +838,13 @@
     <joint name="eq_waist_upper_lower" joint1="Waist_Lower_Pitch_Joint" joint2="Waist_Upper_Pitch_Joint" polycoef="0 -1 0 0 0" active="true" />
     <joint name="eq_waist_dummy_lower" joint1="Waist_Lower_Pitch_Joint" joint2="Waist_Pitch_Dummy_Joint" polycoef="0 1 0 0 0" active="true" />
     <!-- Left hand -->
-    <joint name="eq_l_thumb_ip_mcp" joint1="L_Thumb_IP_Joint" joint2="L_Thumb_MCP_Joint" polycoef="-0.0015 0.6651 0.0186 0.1224 -0.0696" active="true" />
+    <joint name="eq_l_thumb_ip_mcp" joint1="L_Thumb_IP_Joint" joint2="L_Thumb_MCP_Joint" polycoef="-0.003849 0.4269 0.06589 0.136 -0.04621" active="true" />
     <joint name="eq_l_index_dip_pip" joint1="L_Index_DIP_Joint" joint2="L_Index_PIP_Joint" polycoef="-0.003849 0.4269 0.06589 0.136 -0.04621" active="true" />
     <joint name="eq_l_middle_dip_pip" joint1="L_Middle_DIP_Joint" joint2="L_Middle_PIP_Joint" polycoef="-0.003849 0.4269 0.06589 0.136 -0.04621" active="true" />
     <joint name="eq_l_ring_dip_pip" joint1="L_Ring_DIP_Joint" joint2="L_Ring_PIP_Joint" polycoef="-0.003849 0.4269 0.06589 0.136 -0.04621" active="true" />
     <joint name="eq_l_little_dip_pip" joint1="L_Little_DIP_Joint" joint2="L_Little_PIP_Joint" polycoef="-0.003849 0.4269 0.06589 0.136 -0.04621" active="true" />
     <!-- Right hand -->
-    <joint name="eq_r_thumb_ip_mcp" joint1="R_Thumb_IP_Joint" joint2="R_Thumb_MCP_Joint" polycoef="-0.0015 0.6651 0.0186 0.1224 -0.0696" active="true" />
+    <joint name="eq_r_thumb_ip_mcp" joint1="R_Thumb_IP_Joint" joint2="R_Thumb_MCP_Joint" polycoef="-0.003849 0.4269 0.06589 0.136 -0.04621" active="true" />
     <joint name="eq_r_index_dip_pip" joint1="R_Index_DIP_Joint" joint2="R_Index_PIP_Joint" polycoef="-0.003849 0.4269 0.06589 0.136 -0.04621" active="true" />
     <joint name="eq_r_middle_dip_pip" joint1="R_Middle_DIP_Joint" joint2="R_Middle_PIP_Joint" polycoef="-0.003849 0.4269 0.06589 0.136 -0.04621" active="true" />
     <joint name="eq_r_ring_dip_pip" joint1="R_Ring_DIP_Joint" joint2="R_Ring_PIP_Joint" polycoef="-0.003849 0.4269 0.06589 0.136 -0.04621" active="true" />

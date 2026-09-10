@@ -141,14 +141,8 @@ def discover_standalone_recipes() -> dict[str, list[str]]:
 _RECIPE_CLASSES = ("PHYSICS", "ACTION", "REWARD", "EVENTS", "TERMINATE", "GATE", "CURRICULUM", "COMMAND")
 
 
-def _task_recipe(task: str, recipe: str, mode: str) -> dict:
-    """{class name: source text} for the contract sections above, AS OF THIS LAUNCH.
-
-    ``git_sha`` cannot recover them — a `-dirty` tree pins nothing — so the text is copied into the
-    run's registry entry and stays readable after the contract file moves on. Declaration order is
-    kept; for a task FAMILY the sections are split across ``_base.py`` (physics / action / events /
-    termination) and the chosen recipe (reward / gate / curriculum), read in that order. A standalone
-    GROUP splits the same way — its ``_base.py`` holds the scene, the contract holds what differs."""
+def _contract_paths(task: str, recipe: str, mode: str) -> list[Path]:
+    """The source files a (mode, task, recipe) launch is defined by — ``_base.py`` first, then the recipe."""
     stem = task.replace("-", "_")
     if mode == "parity":
         paths = [PARITY_DIR / "_base.py", PARITY_DIR / f"{stem}.py"]
@@ -164,8 +158,42 @@ def _task_recipe(task: str, recipe: str, mode: str) -> dict:
         paths = [fam / "_base.py", cands[0]]
     else:
         paths = [RL_DIR / f"{stem}.py"]
+    return paths
+
+
+_ROBOT_NAME = re.compile(r'(?:\bname\s*=\s*|"name"\s*:\s*|\brobot\s*=\s*)"([^"]+)"')
+
+
+def _robot_names() -> set[str]:
+    """Every robot the repo declares — ``contract/robot/<family>/<robot>.yaml`` stems."""
+    return {p.stem for p in (SIM / "metalab" / "contract" / "robot").glob("*/*.yaml")}
+
+
+def _uses_allex(task: str, recipe: str, mode: str) -> bool:
+    """Does this launch's contract put an ALLEX robot in the scene? Motor-space coupled PD only exists for
+    ALLEX (robot_model.json gains), so the Launchpad offers the Motor drive for these launches only. Only
+    values that name a declared robot count (an object's ``"name": "table"`` does not); the recipe's own
+    robot declaration, when it has one, overrides the base's."""
+    known, robot = _robot_names(), None
+    for path in _contract_paths(task, recipe, mode):
+        if not path.is_file():
+            continue
+        names = [n for n in _ROBOT_NAME.findall(path.read_text()) if n in known]
+        if names:
+            robot = names[-1]
+    return robot is not None and robot.startswith("allex")
+
+
+def _task_recipe(task: str, recipe: str, mode: str) -> dict:
+    """{class name: source text} for the contract sections above, AS OF THIS LAUNCH.
+
+    ``git_sha`` cannot recover them — a `-dirty` tree pins nothing — so the text is copied into the
+    run's registry entry and stays readable after the contract file moves on. Declaration order is
+    kept; for a task FAMILY the sections are split across ``_base.py`` (physics / action / events /
+    termination) and the chosen recipe (reward / gate / curriculum), read in that order. A standalone
+    GROUP splits the same way — its ``_base.py`` holds the scene, the contract holds what differs."""
     out: dict = {}
-    for path in paths:
+    for path in _contract_paths(task, recipe, mode):
         src = path.read_text()
         lines = src.splitlines()
         out.update({n.name: "\n".join(lines[n.lineno - 1:n.end_lineno])
@@ -185,12 +213,28 @@ def discover_traj_groups() -> list[dict]:
             for d in sorted(TRAJ_DIR.rglob("*_group")) if d.is_dir()]
 
 
+def discover_motor_ok() -> dict[str, dict[str, dict[str, bool]]]:
+    """mode -> task -> recipe ('' for a single-file contract) -> may the Motor drive be offered."""
+    tasks, recipes = discover_tasks(), discover_task_recipes()
+    st, srec = discover_standalone_tasks(), discover_standalone_recipes()
+    out: dict = {"train": {}, "standalone": {}, "parity": {}}
+    for t in tasks:
+        out["train"][t] = {r: _uses_allex(t, r, "train") for r in (recipes.get(t) or [""])}
+    for t in st:
+        out["standalone"][t] = {r: _uses_allex(t, r, "standalone") for r in (srec.get(t) or [""])}
+    for t in _contracts_in(PARITY_DIR):
+        out["parity"][t] = {"": _uses_allex(t, "", "parity")}
+    out["eval"] = out["train"]
+    return out
+
+
 def discover() -> dict:
     return {"engines": discover_engines(), "tasks": discover_tasks(),
             "task_recipes": discover_task_recipes(),
             "standalone_tasks": discover_standalone_tasks(),
             "standalone_recipes": discover_standalone_recipes(),
             "parity_tasks": _contracts_in(PARITY_DIR),
+            "motor_ok": discover_motor_ok(),
             "traj_groups": discover_traj_groups(), "repo": str(REPO)}
 
 
@@ -370,6 +414,8 @@ def _build(params: dict) -> tuple[str, list, dict]:
     ctrl = params.get("ctrl", "motor")
     if ctrl not in ("motor", "joint"):
         raise ValueError(f"알 수 없는 구동 방식: {ctrl!r} (motor|joint)")
+    if ctrl == "motor" and not _uses_allex(task, recipe, mode):
+        raise ValueError(f"태스크 {task!r} 는 ALLEX 로봇이 아니라 Motor 구동을 쓸 수 없습니다 — Joint 를 고르세요")
     env: dict = {"METALAB_MOTOR_COUPLING": "1" if ctrl == "motor" else "0"}
     flags = ["--sim", engine, "--task", task] + (["--recipe", recipe] if recipe else [])
 
@@ -1450,6 +1496,13 @@ function selectEngine(e){state.engine=e;
 // motor|joint — mutually exclusive (exactly one 'on'), like the engine/mode/target segments.
 function selectCtrl(c){state.ctrl=c;
   [...$("ctrl").children].forEach(b=>b.classList.toggle("on",b.dataset.v===c));render();}
+// Motor drive exists only for ALLEX robots: for any other launch the Motor button is disabled and the
+// drive is pinned to Joint (mirrors the server's own refusal in _build).
+function motorOk(){const m=(DESC&&DESC.motor_ok&&DESC.motor_ok[state.mode])||{};
+  const t=m[state.task]||{};return !!(t[state.recipe||""]);}
+function applyCtrlAvail(){const ok=motorOk(),mb=$("ctrl").querySelector('[data-v="motor"]');
+  if(mb) mb.disabled=!ok;
+  if(!ok&&state.ctrl==="motor") selectCtrl("joint");}
 // task combobox source: Standalone lists the tasks/standalone/<group>/ folders, Train/Eval the tasks/rl/ family
 // folders. Both modes therefore have the same two axes — pick the group/family, then what is inside it.
 function taskList(){if(!DESC)return[];return (state.mode==="standalone"?DESC.standalone_tasks:state.mode==="parity"?DESC.parity_tasks:DESC.tasks)||[];}
@@ -1465,13 +1518,14 @@ function populateTasks(){const ts=taskList();
 // can be renamed away, and silently launching a different one would be worse than falling back visibly.
 function selectTask(task,recipe){if(!taskList().includes(task))return;
   state.task=task;$("task").value=task;populateRecipes();
-  if(recipe&&recipeList().includes(recipe)){state.recipe=recipe;$("recipe").value=recipe;}}
+  if(recipe&&recipeList().includes(recipe)){state.recipe=recipe;$("recipe").value=recipe;}
+  applyCtrlAvail();}
 // A task FAMILY (or a standalone GROUP) is not runnable by itself, so there is no '(기본)' entry — the
 // first recipe is preselected and one is ALWAYS sent. A single-file contract has none.
 function populateRecipes(){const rs=recipeList(),sel=$("recipe");
   sel.innerHTML=rs.length?rs.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join("")
                          :'<option value="">(레시피 없음)</option>';
-  sel.disabled=!rs.length;state.recipe=rs[0]||"";sel.value=state.recipe;}
+  sel.disabled=!rs.length;state.recipe=rs[0]||"";sel.value=state.recipe;applyCtrlAvail();}
 function selectMode(m){state.mode=m;
   [...$("mode").children].forEach(b=>b.classList.toggle("on",b.dataset.v===m));
   const af=$("algofield"); if(af) af.style.display=(m==="train")?"":"none";   // algorithm selector: train mode only
@@ -1489,7 +1543,7 @@ fetch("/api/discover").then(r=>r.json()).then(d=>{DESC=d;
   state.engine=d.engines[0]||null;
   populateTasks();   // fills from the current mode (train by default → top-level tasks/)
   $("task").onchange=e=>{state.task=e.target.value;populateRecipes();render();};
-  $("recipe").onchange=e=>{state.recipe=e.target.value;render();};
+  $("recipe").onchange=e=>{state.recipe=e.target.value;applyCtrlAvail();render();};
   $("algo").onchange=e=>{state.algo=e.target.value;renderKnobs();render();};
   [...$("mode").children].forEach(b=>b.onclick=()=>selectMode(b.dataset.v));
   [...$("ctrl").children].forEach(b=>b.onclick=()=>selectCtrl(b.dataset.v));
