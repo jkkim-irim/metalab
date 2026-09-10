@@ -1,302 +1,161 @@
-# Writing a task contract — `sim/metalab/contract/tasks/`
+# 태스크 계약서 작성법 — `sim/metalab/contract/tasks/`
 
-**For a coding agent (Claude / Gemini / GPT) or a human.** A task is one declarative Python module
-that builds a single `TASK = TaskSpec(...)`: names, tunables, and term references — **no logic**
-(no `if`/`for`/computation inside the term lists). Obey the rules here and it resolves into a valid
-`EnvSpec` and trains on **both** engines (newton, genesis) unchanged. Anything the schema rejects
-**fails loud at import/load time** — no silent fallbacks.
+태스크 하나 = Python 파일 하나. 로봇·물체·보상·관측·종료·DR 을 **선언만** 하고(`if`/`for`/계산 없음), 로더가
+`TaskSpec` → `EnvSpec` 으로 풀어 **newton · genesis 양쪽에서 같은 환경**을 만든다. 스키마가 거부하는 값은 전부
+**로드 시점에 크게 실패**한다(조용한 기본값 없음).
 
-**Why Python and not YAML?** So that every `fn=` is a real imported symbol: **Go-to-Definition**,
-autocomplete, and "a typo is an import error" all work. That only holds if you follow rule 2 below —
-pass the term's *symbol*, never a name string.
+가장 빠른 길: 비슷한 태스크를 복사해서 고친다. 참고 순서는 `rl/manipulation/franka_reach/`(가장 짧음) →
+`hammer_lift_teacher/` → `hammer_lift_student/`(비대칭 actor/critic, 노이즈, DR, 커리큘럼).
 
-**Fastest path:** copy the closest shipped task and edit it.
+## 1. 폴더와 실행 이름
 
-| Task | What it is |
-|---|---|
-| `rl/hammer_lift_teacher/` | privileged-state teacher — the reference contract, minimal comments |
-| `rl/hammer_lift_student/` | asymmetric actor/critic, obs noise, geometry/mass DR, the fullest `overrides` block |
-| `standalone/*/*.py` | scene-only contracts (no learning) for the Launchpad's Standalone mode |
-
-TWO SHELVES. `rl/` holds what Train/Eval run, `standalone/` the scene-only contracts; `_assets.py` sits
-above both because they share it. A listing of one therefore never has to filter out the other.
-
-- File `tasks/rl/<task>.py` → the module must define `TASK: TaskSpec`. The trainer arg is its kebab stem
-  (`hammer_lift_teacher` → `--task hammer-lift-teacher`; the loader maps `-`→`_` and imports
-  `sim.metalab.contract.tasks.rl.<task>`, falling back to `sim.metalab.contract.tasks.standalone.<task>`).
-  A module may expose `build_task() -> TaskSpec` instead of `TASK`; the loader prefers it. That is the
-  escape hatch for a contract that must compute something — a normal contract does not need it.
-- Schema source of truth: `sim/metalab/contract/spec.py` (`TaskSpec`). Loader: `sim/metalab/contract/loader.py`.
-- Units: **SI + radians** (never degrees), quaternions **`wxyz`** (identity `[1,0,0,0]`), world is z-up.
-  **One exception:** `scene.robot.init_pose` is authored in **DEGREES** — the loader converts it to radians
-  (a 44-joint pose table is unreadable in radians). Everything downstream of the loader is radians.
-
----
-
-## The seven rules
-
-1. **One module → one `TASK = TaskSpec(...)`.** Declarative only. File stem = task name (snake_case).
-   `scene` is required and holds the world (ground, robot placement + init pose, objects, contact params,
-   camera, goal); everything else hangs off `TASK` directly.
-2. **`fn=` is the imported symbol, never a name string** — `from sim.metalab.terms.reward import lifting_reward`
-   → `Rew(lifting_reward, weight=…)`. **obs, reward, terminate and events** are flat functions the driver
-   calls directly (`fn(env, **params)`, events `fn(env, env_ids, **params)`); **curriculum** alone is still a
-   *factory* called once at load, which returns the per-step `fn`. Import each `fn` from the package that
-   **matches its category**
-   (obs→`sim.metalab.terms.obs`, reward→`sim.metalab.terms.reward`, terminate→`sim.metalab.terms.terminate`,
-   events→`sim.metalab.terms.events`, curriculum→`sim.metalab.terms.curriculum`). A term `fn` from the wrong category has
-   the wrong return shape and fails at runtime — there is no registry catching it for you anymore, so
-   the import must be right.
-3. **`@refs` are the only "magic" strings** (see the table below). Everything else is a literal.
-4. **Units:** SI + radians, quaternions `wxyz`, z-up — except `init_pose` (degrees, above).
-5. **Data parts may be plain dicts or class blocks** — pydantic coerces + validates them into their spec
-   types. Only the term lists need imported `fn` symbols.
-6. **Need a term that doesn't exist?** Write the `fn`, re-export it, import it (see "When the contract
-   isn't enough").
-7. **Commented-out terms** are ready-to-enable alternatives. To turn one on, uncomment it **and** add its
-   `fn` to the imports at the top.
-
----
-
-## `@refs` — the only "magic"
-
-A string starting with `@` is resolved by the loader; anything else is a literal. Unknown ref → error
-listing valid keys. All three resolve against the **robot YAML**, which the task does not own — that is
-why they are strings.
-
-| Ref | Resolves to |
-|---|---|
-| `@joints.<group>` | joints of that action group (`robot.action_groups[<group>]`) |
-| `@joints.<read-only group>` | joints of a `robot.joint_groups` entry — observable but NOT commandable |
-| `@joints.ctrl` | **all** controlled joints, in action order |
-| `@frames.<key>` | one MJCF body name (`robot.frames`, e.g. `@frames.palm`, `@frames.chest_origin`) |
-| `@bodies.<key>` | a named body GROUP for terms taking a list (`@bodies.fingertips`) |
-
-`@refs` live inside a term's `kwargs={...}` as strings — the loader resolves them into `term.params` (into
-the factory call, for curriculum). (Plain Python literals you own, like a grasp offset, can also just be a
-module-level python variable referenced directly — the contract is python, so a task-owned literal
-needs no ref table.)
-
----
-
-## Fields (`TaskSpec`)
-
-**R** = required; otherwise the default applies. Unknown keys are rejected. Data-part values shown as
-`{...}` / `[...]` are passed as Python dicts/lists (or class blocks) and validated by pydantic.
-
-**Top level** — `name` **(R)**, `num_envs` (4096), `env_spacing` (1.5 — visualization grid pitch on both
-engines: worlds overlap in physics and only the viewer tiles them), `episode_length_s` (10.0).
-
-**`physics`** **(R)** — `hz` **(R)**, `substeps` (1), `decimation` (1 — physics steps per POLICY step, so the
-policy runs at `hz/decimation`), `gravity` (`[0,0,-9.81]`), `solver_iterations` (100), `friction` (1.0),
-`restitution` (0.0), `self_collision` (**true** — keep it on for hands so fingers don't interpenetrate; to
-save time drop *unused* bodies via the robot `collision` mask, don't disable globally). Engine-specific
-solver/contact knobs go in `overrides`, not here.
-
-**`scene`** **(R)** — the world. Known keys only (anything else fails loud):
-
-- `ground` (true), `ground_name` (`"plane"`) — infinite ground plane at z=0.
-- `robot` **(R)** — `{name (R, → robot/<name>.yaml), base_pos (R), base_quat ([1,0,0,0]), fixed_base,
-  init_pose}`. `init_pose` is a joint-name → **degrees** table: ACTIVE joints get the runtime spawn pose,
-  MASK-0 joints get the weld angle (posed-then-welded). Equality FOLLOWERS (waist dummy/upper, finger
-  IP/DIP) are auto-computed from the MJCF `<equality>` polycoef — do not list them.
-- `objects` (`[]`) — a **list** (order = variant round-robin), each
-  `{name, mass (R), asset:{mjcf:[…]}, parts:[{shape,size,pos,quat}], fixed, variants, init_pos,
-  init_rpy|init_quat, randomize}`. `asset.mjcf` may list several files: env *i* gets variant *i % variants*.
-  `parts` builds procedural geometry instead (the table is a `fixed` box). Authored right here — there is no
-  object YAML.
-- `contact_params` (`{}`) — `{group: {solref, solimp, solmix}}` per group key (`robot`, an object name, a
-  fixture name). Shared knob; genesis implements the same solref/solimp math (`solmix` is newton-only).
-- `camera` (optional) — `{eye, lookat, fov (40)}`. Used by eval recording and the viewers' framing.
-- `goal` (optional) — `pos` **(R)**, `quat` (`[1,0,0,0]`), `keypoint_half_extent` (`[0.05,0.05,0.08]`),
-  `success_tolerance` (0.05). Referenced by keypoint reward/terminate.
-- `robot_friction` (optional) — global override; per-group friction DR is the `set_shape_friction` event.
-
-**`fixtures`** (`[]`, top level) — `{name, kind: "box" (R), size, pos, quat}`. Legacy sibling of a `fixed`
-object with `parts`; new contracts use `scene.objects` (that is what carries mass and contact params).
-
-**`action`** — `{group: {joints, scale (1.0), ema_tau (null), mode (position_to_limits)}}`. Group name must
-exist in `robot.action_groups`; `joints` may narrow it to a subset (omit for the whole group, omit `action`
-entirely for every group the robot declares). Group order sets `@joints.ctrl` and the action-vector layout.
-**`min_delay`/`max_delay` (0)** are declared on the ACTION **block**, not per group — the command delay is one
-controller→robot link, so every group is written with the same per-env lag (redrawn at reset, reported by
-the `action_delay` obs term).
-
-**`gate`** — required **iff** `scene.goal` is set (the loader asserts the pair). The FINAL success bar, i.e.
-what `val/SR` measures, authored as a `GATE = {...}` block between `EVENTS` and `TERMINATE`:
-`success_tolerance` **(R)** [m], `hold_steps` (1), `hold_mode` (`"consecutive"` | `"cumulative"`),
-`contact_count` (0), `force_threshold` (1e-3) [N], `palm_distance` (0.0) [m], `grasp_offset` (`[0,0,0]`) [m],
-`lift_height` (0.0) [m — the `lifted` PHASE boundary, *not* a success condition). The curriculum ramps its own
-`*_start` values UP TO these, so the last level IS the gate; `contact_count` must not exceed the robot's
-`fingertips` count.
-
-**Terms** — `obs`, `reward`, `terminate`, `events`, `curriculum`: lists of term refs (below).
-`obs_groups`: `{group: "all" | [names] | <Obs block>}` (what each group exposes; teacher = `{actor: "all",
-privileged: "all"}`, student wires its `ACTOR_OBS`/`CRITIC_OBS` blocks in directly).
-`obs_history_length`: `{group: H}` (frame-stack, default 1 = off). `obs_noise_groups`: `[group…]` — the
-groups whose terms get their `noise=` applied (IsaacLab's per-group `enable_corruption`), so an asymmetric
-setup lists only `["actor"]` and the critic reads the same terms clean. Noise stays ON in eval/play.
-
-**`overrides`** — `{engine: {...}}` per-engine physics knobs (the other engine ignores its block). The fullest
-annotated newton set — solver/cone/tolerances, `nconmax`/`njmax`, `use_mujoco_contacts`, hull reduction
-(`hull_maxvert`, `object_hull_maxvert`, `hull_reduce_above`), `eq_solref`/`eq_solimp` — is in
-`hammer_lift_student/_base.py`; rationale in `sim/metalab/docs/01_engine_parity.md`.
-
-> Network routing (which group the actor reads), PPO, `max_iterations`, wandb → **not here**, they live
-> in `learning/rl/dexblind/<task>/experiment.py`.
-
----
-
-## Term entry format
-
-ONE entry type per category (all from `sim.metalab.contract.spec`), so every field on it applies:
-
-```python
-Obs(fn, scale=1.0, noise=None, **knobs)      Done(fn, truncation=False, **knobs)
-Rew(fn, weight=…,              **knobs)      Event(fn, "reset"|"interval", **knobs)
-                                             Curr(fn, **ctor_knobs)
+```
+tasks/
+  rl/<group>/<task>/        학습·평가용 family.  _base.py = 공통 뼈대, <recipe>.py = 튠 값
+  standalone/<group>/*.py   씬만 있는 계약서 (런치패드 Standalone 모드, 학습 없음)
+  parity/*.py               newton vs genesis 비교용
+  _assets.py                물체 MJCF 경로 헬퍼 object_mjcf("<이름>")
 ```
 
-`fn` **(R)** is the imported **symbol** (not a string). `weight` is **required** on `Rew` and keyword-only.
-`truncation=True` on a `Done` = bootstrapping done (success / time-limit) — it says how the trainer VALUES
-the done, not how the done is detected, which is why it sits on the entry and not in the function's knobs.
-The knobs are `@ref`-resolved and become `term.params`, handed to the flat function every step — for **obs,
-reward, terminate and events**; `Curr` alone still passes them to a factory at load. Those four therefore
-take **named knobs only**; a positional arg fails loud, because a flat signature is readable only when every
-knob is named (`Obs(obs.object_pose, "@frames.palm", [0,0,0])` said nothing about what either value was, and
-`Done(terminate.object_below_height, 0.8)` did not say the 0.8 was a height). The loader checks the knob
-names against the function signature at LOAD, so a typo or a missing required knob fails at launch instead
-of on the first step — including a required knob the contract simply omitted, which is the half a
-`**kwargs`-taking term used to slip past. An obs entry may also carry `noise=ObsNoise(std=…)` or
-`ObsNoise(pos=…, rot=…)` — see `obs_noise_groups`; `noise` and `scale` are the driver's, never the
-function's.
+- 실행은 `--task <task> --recipe <recipe>` (예: `--task franka_reach --recipe position`). `-` 와 `_` 는 같다.
+- `<recipe>.py` 는 `TASK = build_task(...)` 하나를 내놓고, `build_task` 는 `_base.py` 가 정의한다.
+- `<group>` 은 선반일 뿐 이름에 들어가지 않는다.
 
-The term NAME comes from WHERE the entry is written. A category **block** — a class whose attributes are
-entries (isaaclab's shape) — uses the attribute name, so a name is never written twice and the same `fn` can
-appear under two names (arm/hand penalties). Definition order is preserved:
+## 2. 뼈대 (franka_reach 축약)
 
 ```python
-from sim.metalab.contract import events, obs, reward, terminate
-from sim.metalab.contract.spec import Done, Event, Obs, Rew, TaskSpec
+from sim.metalab.contract.spec import Done, Event, Obs, Rew, TaskSpec, values
+from sim.metalab.terms import action, events, gate, obs, reward, terminate
+
+class PHYSICS:                       # hz, substeps, decimation(정책 1스텝 = 물리 decimation 스텝)
+    hz = 120; substeps = 2; decimation = 2
+
+class SCENE:                         # "무엇이 있나" — 로봇·물체·카메라·goal·접촉 파라미터
+    ground = True
+    class robot:
+        name = "franka"              # contract/robot/<family>/<name>.yaml
+        base_pos = [0.0, 0.0, 0.0]
+        init_pose = {"panda0_joint2": 20.0, ...}   # 유일하게 DEG 로 쓰는 곳
+    class goal:
+        pos = [0.5, 0.0, 0.4]; goal_dist_tol = 0.02
+
+class ACTION:                        # 그룹 이름 = 로봇 yaml 의 action_groups
+    arm = action.JointDeltaPosition(scale=0.5, ema_tau=0.1)
 
 class OBS:
-    joint_pos = Obs(obs.joint_positions, names="@joints.ctrl")
+    joint_pos = Obs(obs.joint_positions, names="@joints.arm")
+    goal_pos  = Obs(obs.goal_position)
 
 class REWARD:
-    goal_progress = Rew(reward.object_goal_keypoint_progress, weight=200.0)
-
-class TERMINATE:
-    object_below_height = Done(terminate.object_below_height, min_height=0.8)
-    object_reached_goal = Done(terminate.object_reached_goal, truncation=True)
+    reach = Rew(reward.body_goal_proximity, weight=1.0, body="@frames.palm", std=0.2)
 
 class EVENTS:
-    robot_friction = Event(events.set_shape_friction, "reset", target="robot", mu_range=[1.5, 1.5])
+    goal = Event(events.sample_goal_position, "interval", x_range=[0.35, 0.65], y_range=[-0.25, 0.25],
+                 z_range=[0.2, 0.6], interval_range_s=[3.0, 5.0])
 
-TASK = TaskSpec(..., obs=OBS, reward=REWARD, terminate=TERMINATE, events=EVENTS)
+class GATE:                          # val/SR 이 재는 "성공" 정의
+    predicate = gate.body_at_goal; goal_dist_tol = 0.02; hold_steps = 10
+
+class TERMINATE:
+    time_out = Done(terminate.time_out, time_out=True)   # MDP 계약서는 필수
+
+TASK = TaskSpec(name="franka_reach_position", physics=PHYSICS, scene=values(SCENE), action=ACTION, obs=OBS,
+                obs_groups={"actor": "all", "privileged": "all"}, reward=REWARD, events=EVENTS,
+                gate=GATE, terminate=TERMINATE, episode_length_s=15.0)
 ```
 
-A plain **list** of entries works too — then each carries its own `name=` (default `fn.__name__`) — and a
-list may also hold other blocks, which are flattened in order (`obs=[ACTOR_OBS, CRITIC_OBS]`). Passing
-`name=` inside a class block fails loud: the attribute already says the name, and two sources would drift.
+## 3. 규칙 5개
 
----
+1. **파일 하나 → `TASK` 하나.** 선언만. 계산이 꼭 필요하면 `build_task() -> TaskSpec` 함수로.
+2. **`fn` 은 import 한 심볼**(문자열 아님). 카테고리 패키지에서 가져온다: `terms.obs / reward / terminate / events /
+   curriculum / gate / action`. 오타는 ImportError 로 즉시 드러난다.
+3. **`@`로 시작하는 문자열만 로더가 해석**한다(아래 표). 나머지는 전부 리터럴.
+4. **단위는 SI + rad, 쿼터니언 wxyz, z-up.** 예외는 `robot.init_pose` 와 `range_deg`/`rot_deg` 처럼 이름에 deg 가 붙은 값.
+5. **term 의 knob 은 이름을 붙여** 넘긴다(positional 금지). 로더가 함수 시그니처와 대조해 오타·누락을 로드 시 잡는다.
 
-## Available `fn`s (import from the category package)
+## 4. `@refs` — 로봇 yaml 에서 가져오는 값
 
-Read each term's docstring in `sim/metalab/contract/<category>/common.py` for its exact args/shape. Each is
-re-exported from the category's `__init__.py`, so `from sim.metalab.contract.<category> import <fn>` works and
-Go-to-Definition jumps straight to the definition.
+| 문자열 | 뜻 |
+|---|---|
+| `@joints.<action group>` | 그 그룹의 관절 목록 |
+| `@joints.<joint_group>` | 관측만 하고 명령하지 않는 관절 그룹 |
+| `@joints.ctrl` | 명령하는 모든 관절, ACTION 순서 |
+| `@frames.<key>` | body 하나 (`@frames.palm`, `@frames.chest_origin`) |
+| `@bodies.<key>` | body 목록 (`@bodies.fingertips`, `@bodies.nail`) |
 
-- **obs** (`from sim.metalab.terms.obs import …`) → flat `fn(env, **params)->(N,d)`: `prev_action_targets`,
-  `last_action`, `action_delay`, `joint_positions`, `joint_velocities`, `joint_accelerations`,
-  `joint_torque_obs`, `joint_pd_torque_obs`, `joint_gravcomp_torque_obs`, `joint_state`,
-  `palm_pose_in_chest`, `body_pose_in_chest`, `body_linear_velocity`, `body_angular_velocity`,
-  `object_pose`, `object_state_world`, `object_linear_velocity`,
-  `object_angular_velocity`, `object_keypoints`, `goal_keypoints`, `object_lifed`,
-  `object_goal_keypoint_success`, `lifted_object`, `body_contact_flags`, `fingertip_contact_steps`,
-  `hand_object_force_magnitude`, `hand_contact_force`, `fingertip_relative_pos`, `fingertip_relative_pose`,
-  `fingertip_relative_vel`, `closest_keypoint_max_dist`, `closest_fingertip_dist`, `episode_step`,
-  `instantaneous_reward`, `gate_success`, `curriculum_success`, `curriculum_state`.
-- **reward** (`from sim.metalab.terms.reward import …`) → flat `fn(env, **params)->(N,)`: `lifting_reward`,
-  `fingertip_object_contact`, `palm_object_proximity`, `fingertip_object_proximity`,
-  `object_goal_keypoint_progress`, `object_goal_keypoint_tracking`, `object_goal_reach_bonus`,
-  `joint_vel_l1`, `joint_torque_penalty`.
-  A reward term **never scales itself** — it returns a physical quantity (metres of progress), a `[0,1]`
-  fraction, or a `0/1` event, and `weight` is the only magnitude. So reward weights are large (100/200/1000
-  is normal). Per-term formulas + number tables: `reward/common.py`.
-- **terminate** (`from sim.metalab.terms.terminate import …`) → flat `fn(env, **params)->(N,)bool`:
-  `object_below_height`, `object_far_from_body`, `object_velocity_exceeded`,
-  `table_fingertip_contact_force_exceeded`, `object_reached_goal`, `grasp_lost_after_lift`.
-  Every knob is NAMED, same rule as reward/obs/events; `truncation` is the ENTRY's, not the function's — it
-  says how the trainer values the done, not how the done is detected.
-- **events** (`from sim.metalab.terms.events import …`) → flat `fn(env, env_ids, **knobs)`: `reset_object_pose`,
-  `reset_joints_by_offset`, `set_shape_friction`, `randomize_rigid_body_mass`, `randomize_object_scale`,
-  `randomize_fixed_base_root_height`, `apply_object_external_force`, `apply_object_external_torque`,
-  `apply_object_external_force_when_lifted`.
-  Every knob is NAMED (no positional term args), and a knob a curriculum ramps (`mu_scale`, `mass_scale`,
-  an external load's `z_range`) is an ordinary parameter it retunes through `EventTerm.params` — same rule
-  as reward/obs. `randomize_object_scale` is **newton-only** (genesis bakes geometry scale into the morph at
-  build time), so the contract writes it as `Event(..., requires="object_scale")` — an engine without that
-  capability drops the term, out loud, and runs the rest of the contract; the term's docstring states what
-  each backend honours.
-- **curriculum** (`from sim.metalab.terms.curriculum import …`) → class, `fn(env)->dict`:
-  `goal_tolerance_curriculum`, `hammer_lift_success_curriculum`, `task_success_difficulty`.
+## 5. 블록별 요약
 
-The authoritative list is each category's `__all__` (in its `__init__.py`) — this table mirrors it.
+| 블록 | 핵심 |
+|---|---|
+| `physics` | `hz`(필수), `substeps`, `decimation`, `gravity`, `self_collision`. 엔진별 솔버 knob 은 `overrides` 로. |
+| `scene.robot` | `name`(필수), `base_pos`(필수), `base_quat`, `fixed_base`, `init_pose`(deg). |
+| `scene.objects` | 리스트. `{name, mass, asset:{mjcf:[…]} 또는 parts:[{shape,size,pos,quat}], fixed, variants, init_pos, init_rpy}`. `mjcf` 를 여러 개 주면 env i 가 i % variants 번째를 받는다. 첫 번째 non-fixed 물체가 "the object". |
+| `scene.contact_params` | `{robot | <object> | <fixture>: {solref, solimp, solmix}}`. `solmix` 는 newton 전용. |
+| `scene.camera` | `{eye, lookat, fov}` — 평가 녹화·뷰어 프레이밍. |
+| `scene.goal` | `pos`(필수), `quat`, `keypoint_half_extent`, `goal_dist_tol`. goal 이 있으면 `gate` 도 필수. |
+| `action` | 그룹별 매핑 클래스: `JointDeltaPosition(scale, ema_tau)` = spawn 기준 오프셋, `JointPositionToLimits(scale, range_deg)` = 관절 범위에 선형 매핑, `TaskDeltaPose(pos_m, rot_deg)` = spawn 기준 박스. `joints=` 로 부분집합 지정. 블록에 `min_delay/max_delay` 를 쓰면 명령 지연(스텝). |
+| `gate` | `predicate` + 그 predicate 가 받는 bar 들(`goal_dist_tol`, `contact_count`, `contact_fingers`, `palm_distance`, `joint_pose_tolerance` …), `hold_steps`, `hold_mode`(consecutive/cumulative). 커리큘럼은 여기까지 올라온다. |
+| `obs_groups` | `{group: "all" \| [이름…] \| Obs 블록}`. `obs_history_length={group: H}` 프레임 스택, `obs_noise_groups=[group…]` 노이즈 적용 그룹. |
+| `terminate` | `Done(fn, time_out=True)` 는 truncation(부트스트랩). reward 가 있는 계약서는 `time_out` term 이 하나 있어야 한다. |
+| `overrides` | `{"newton": {...}, "genesis": {...}}`. 가장 풀 세트는 `hammer_lift_student/_base.py`. |
 
----
+PPO 하이퍼·네트워크·wandb 는 여기 없다 → `learning/rl/<experiment>/<task>/experiment.py`.
 
-## Fail-loud (rejected at import/load time)
+## 6. term 엔트리
 
-Unknown field · **unknown `fn` symbol → `ImportError`/`NameError`** (typo caught the moment the module
-imports — earlier than the old string registry) · non-callable `fn` · unknown `@ref` · term
-arg/signature mismatch · duplicate term name · reward without `weight` · unknown `scene` key ·
-`scene.robot` without `name` or `base_pos` · `init_pose`/masks naming inactive/unknown joints · `action`
-group not in the robot (or `joints` naming one the group does not actuate, or duplicated) · a read-only
-`robot.joint_groups` name colliding with an action group or `ctrl` · `obs_groups`/`obs_history_length`
-naming a missing term/group · value constraints (`hz>0`, masks ∈{0,1}, `min_delay≤max_delay`, …) · module
-missing `TASK`/`build_task` or `TASK` not a `TaskSpec` · **a flat term given positional `args`**
-(obs/reward/terminate/events take named params only) · **`scene.goal` without `gate`** (or the reverse) ·
-`gate.contact_count` above the robot's `fingertips` count · a curriculum `*_start` that does not ramp toward
-its `GATE` counterpart · an obs term carrying `noise=` that no group in `obs_noise_groups` holds (a knob that
-would do nothing).
+```python
+Obs(fn, scale=1.0, noise=ObsNoise(std=… | pos=…, rot=…), unit="", **knobs)
+Rew(fn, weight=…, **knobs)              # weight 필수. term 은 물리량/[0,1]/0-1 이벤트만 반환하고 크기는 weight 가 정한다
+Done(fn, time_out=False, **knobs)
+Event(fn, "reset" | "interval", train_only=False, requires="<capability>", **knobs)
+Curr(fn, **ctor_knobs)
+```
 
-**Not caught statically:** importing a term `fn` from the *wrong category* (rule 2). It has the wrong
-return shape and blows up at runtime, not import — so get the import package right.
+- 클래스 블록에 쓰면 **속성 이름이 term 이름**(로그 키 `Reward/<name>`, `Termination/<name>`). 리스트로 쓰면 `name=`.
+- `requires="object_scale"` 같은 능력을 엔진이 못 주면 그 이벤트만 빠지고 나머지는 돈다(로그에 찍힌다).
+- `train_only=True` 이벤트는 평가·녹화에서 빠진다.
 
----
+## 7. 쓸 수 있는 term (각 패키지 `__all__` 이 정본)
 
-## When the contract isn't enough
+- **obs**: joint_positions · joint_velocities · joint_accelerations · joint_torque_obs · joint_pd_torque_obs ·
+  joint_gravcomp_torque_obs · joint_state · prev_action_targets · last_action · action_delay · object_pose ·
+  object_seen_pose_world · object_state_world · object_linear_velocity · object_angular_velocity · object_keypoints ·
+  object_variant · body_pose_in_chest · palm_pose_in_chest · body_linear_velocity · body_angular_velocity ·
+  goal_position · body_goal_error · goal_keypoints · goal_dist_error · palm_distance_error · joint_pose_error ·
+  body_contact_flags · fingertip_contact_steps · hand_contact_force · hand_object_force_magnitude ·
+  fingertip_penetration_depth · fingertip_relative_pos · fingertip_relative_pose · fingertip_relative_vel ·
+  closest_keypoint_max_dist · object_goal_keypoint_success · object_lifed · episode_step · instantaneous_reward ·
+  curriculum_state · curriculum_hold_progress · dr_params
+- **reward**: body_goal_proximity · palm_object_proximity · fingertip_object_proximity · lifting_reward ·
+  object_goal_keypoint_progress · object_goal_keypoint_tracking · object_goal_reach_bonus · joint_pose_convergence ·
+  fingertip_object_contact · fingertip_object_pinch_contact · nail_object_contact · joint_vel_l1 ·
+  joint_torque_penalty · action_rate_l2
+- **terminate**: time_out · object_below_height · object_far_from_body · object_velocity_exceeded ·
+  table_fingertip_contact_force_exceeded · body_contact_detected · curriculum_passed
+- **events**: reset_object_pose · reset_joints_by_offset · sample_goal_position · set_shape_friction ·
+  randomize_rigid_body_mass · randomize_object_scale(newton 전용, `requires="object_scale"`) ·
+  randomize_fixed_base_root_height · record_object_spawn_z · apply_object_external_force ·
+  apply_object_external_force_when_lifted
+- **gate predicate**: object_at_goal · body_at_goal
+- **curriculum**: hammer_lift_success_curriculum
+- **action**: JointDeltaPosition · JointPositionToLimits · TaskDeltaPose
 
-The contract only *composes* existing pieces. Add the missing piece, then import and reference it.
+## 8. 없는 term 이 필요할 때
 
-- **New reward or obs `fn`** — write a flat function `def <name>(env, <knob>=<default>, …) -> (N,)` /
-  `-> (N,d)` in `reward/common.py` / `obs/common.py` using `sim/metalab/api` primitives + `env` reads
-  (**no engine import**), re-export it in the category `__init__.py` (`from .common import …` **and**
-  `__all__`), then `import` it in your task `.py`. Return a physical quantity / fraction / event — never
-  pre-scaled and, for obs, never self-corrupted (`scale`/`noise` belong to the entry). Name a joint-list
-  knob `names` and a body-list knob `bodies`: those are what the dashboard reads for per-dim labels.
-  An obs term must be STATELESS — it is evaluated once per obs GROUP, so a counter kept inside it would
-  tick twice per step for anything the actor and critic share; put such state in the driver and read it.
-- **New terminate/event `fn`** — write a flat function `def <name>(env, <knob>=<default>, …) -> (N,) bool`
-  (terminate) or `def <name>(env, env_ids, <knob>=…)` (events), re-export it, import it. Match an existing
-  term's return shape. A termination reads `env.lifted` / `env.reached_goal` rather than re-deriving a
-  predicate the driver or a reward term already publishes. An event that needs a backend capability calls a
-  `SimBackend` method (`env.set_object_scale`, `env.set_shape_friction`, …) — implement it on BOTH backends
-  or make the unsupported one raise, never no-op.
-- **Stateful terms** — a reward term keeps per-episode state through `env.buffer(key, shape, fill, dtype)`:
-  the driver allocates it on first use and restores `fill` for the envs it resets, so there is no
-  `init`/`reset` hook to write and the term stays a plain function (mutate the buffer **in place**). A
-  curriculum retunes a reward term by writing `env.reward_terms[name].params[knob]`. Curriculum terms are
-  the only classes left — they carry `__call__` + `jump_to_end` + logging; obs/reward/terminate/events are
-  all flat functions.
-- **New robot** — add `robot/<name>.yaml` + the MJCF under `sim/metalab/assets/…` (MJCF is the physics
-  source of truth). See `robot/allex_right.yaml`. **Objects have no YAML** — declare them inline in
-  `scene.objects` and point `asset.mjcf` at the file(s).
-- **Per-engine physics** — `overrides={"<engine>": {...}}`, starting from `hammer_lift_student/_base.py`.
-- **PPO/network/wandb** — `learning/rl/dexblind/<task>/experiment.py`. Run/eval via
-  `learning/scripts/local/metalab_train.sh` / `metalab_eval.sh` (사용법은 리포 루트 `README.md`).
+- `terms/<category>/common.py`(공용) 또는 `terms/<category>/<task>.py`(태스크 전용) 에 평평한 함수를 쓴다:
+  `def <name>(env, <knob>=…) -> (N,)` / `(N, d)` / `(N,) bool`, 이벤트는 `def <name>(env, env_ids, <knob>=…)`.
+  `env` 로 백엔드 읽기(`env.joint_pos(...)`, `env.object_pos()`)와 좌표 수학(`sim/metalab/api`) 만 쓴다. 엔진 import 금지.
+- 에피소드 상태는 `env.buffer(key, shape, fill, dtype)` 로 갖는다. 리셋된 env 는 드라이버가 `fill` 로 되돌린다.
+  같은 term 이 여러 그룹에 있어도 상태를 한 스텝에 한 번만 진행시키려면 `runtime/episode.step_edge(env)` 를 쓴다.
+- 여러 term 이 공유하는 판정(성공 거리 등)은 `terms/gate/common.py` 에 한 번 두고 import 한다.
+- 새 함수는 카테고리 `__init__.py` 의 import 와 `__all__` 에 추가한다.
+- 새 로봇: `contract/robot/<family>/<name>.yaml` + MJCF 를 `sim/metalab/assets/robots/` 에. 물체는 yaml 없이
+  `scene.objects` 에 인라인.
 
-**Smoke test:** `learning/scripts/local/metalab_train.sh --sim newton --task <task> --num_envs 4 --viz gl`
-(`--viz` takes a value: `none` | `gl` | `rtx`; the envs are drawn on an `env_spacing` grid and the dashboard's
-env tabs move the camera between them).
+## 9. 확인
+
+```bash
+learning/scripts/local/metalab_train.sh --sim newton --task <task> --recipe <recipe> --num_envs 64 --max_iterations 3 --no_wandb
+```
+
+로드 실패는 첫 줄에 이유가 나온다(알 수 없는 필드, `@ref` 오타, knob 이름 불일치, goal 없는 gate 등).
