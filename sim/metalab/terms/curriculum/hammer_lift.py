@@ -227,7 +227,6 @@ class hammer_lift_success_curriculum:
         seen = None
         if self.seen_start is not None:
             seen = max(1, round(_lerp(self.seen_start * env.max_episode_length, 1.0)))
-            env.set_object_seen_steps(seen)
         grav = None
         if self.grav_start is not None:
             grav = _lerp(self.grav_start, abs(env.physics_gravity_z))

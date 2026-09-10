@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from sim.metalab.contract.spec import Event, Obs, TaskSpec, values
-from sim.metalab.terms import events, obs
+from sim.metalab.contract.spec import Done, Event, Obs, TaskSpec, values
+from sim.metalab.terms import action, events, obs, terminate
 
 
 class PHYSICS:
@@ -40,9 +40,7 @@ GOAL_Z = [0.2, 0.6]
 
 
 class ACTION:
-    class arm:
-        scale = 0.5
-        ema_tau = 0.1
+    arm = action.JointDeltaPosition(scale=0.5, ema_tau=0.1)
 
 
 class OBS:
@@ -61,6 +59,10 @@ class EVENTS:
                                    position_range=[-0.1, 0.1])
 
 
+class TERMINATE:
+    time_out = Done(terminate.time_out, time_out=True)
+
+
 def build_task(name: str, *, reward, gate, action=None, events=None) -> TaskSpec:
     return TaskSpec(
         name=name,
@@ -74,5 +76,6 @@ def build_task(name: str, *, reward, gate, action=None, events=None) -> TaskSpec
         obs_groups={"actor": "all", "privileged": "all"},
         reward=reward,
         events=events if events is not None else EVENTS,
+        terminate=TERMINATE,
         gate=gate,
     )

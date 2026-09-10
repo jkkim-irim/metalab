@@ -37,7 +37,7 @@ def recipe(ts: TaskSpec) -> dict:
                    "delay": ts.action_delay.model_dump()},
         "reward": block(ts.reward, Rew, lambda t: {"weight": t.weight}),
         "events": block(ts.events, Event, lambda t: {"mode": t.mode}),
-        "terminate": block(ts.terminate, Done, lambda t: {"truncation": t.truncation}),
+        "terminate": block(ts.terminate, Done, lambda t: {"time_out": t.time_out}),
         "gate": _plain(ts.gate.model_dump()) if ts.gate else {},
         "curriculum": block(ts.curriculum, Curr, lambda t: {"fn": t.fn.__name__}, knobs="kwargs"),
     }

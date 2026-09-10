@@ -61,15 +61,8 @@ class ACTION:
     min_delay = base.ACTION.min_delay
     max_delay = base.ACTION.max_delay
 
-    class arm:
-        joints = base.ACTION.arm.joints
-        scale = base.ACTION.arm.scale
-        ema_tau = _ARM_EMA_TAU
-
-    class hand:
-        joints = base.ACTION.hand.joints
-        scale = base.ACTION.hand.scale
-        ema_tau = _HAND_EMA_TAU
+    arm = base.ACTION.arm.model_copy(update={"ema_tau": _ARM_EMA_TAU})
+    hand = base.ACTION.hand.model_copy(update={"ema_tau": _HAND_EMA_TAU})
 
 
 # --- events: the base's DR block with ONE entry retuned -----------------------------------------------

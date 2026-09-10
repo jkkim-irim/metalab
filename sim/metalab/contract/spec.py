@@ -12,10 +12,11 @@ A contract (``sim.metalab.contract.tasks.rl.<task>``) composes these into an :cl
 from __future__ import annotations
 
 from collections.abc import Callable
+import inspect
 import math
 import os
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, ClassVar, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -513,6 +514,23 @@ class GateSpec(_Data):
     # not just the hand's — a wrist angle is as much part of the final posture as a finger's.
     joint_final_pose: dict[str, float] = Field(default_factory=dict)
 
+    _BARS: ClassVar[dict[str, str]] = {
+        "goal_dist_tol": "goal_dist_tol", "palm_distance": "palm_distance",
+        "contact_count": "contact_count", "contact_fingers": "contact_fingers",
+        "force_threshold": "force_threshold", "joint_final_pose": "joint_pose",
+        "joint_pose_tolerance": "joint_pose_tolerance",
+    }
+
+    def bars(self) -> dict[str, Any]:
+        accepted = set(inspect.signature(self.predicate).parameters)
+        stated = sorted({b for f, b in self._BARS.items() if f in self.model_fields_set} - accepted)
+        assert not stated, (
+            f"GATE states {stated}, which predicate {self.predicate.__name__!r} does not take — "
+            f"it takes {sorted(accepted - {'env'})}")
+        named = {b: getattr(self, f) for f, b in self._BARS.items()}
+        named["contact_fingers"] = tuple(self.contact_fingers)
+        return {b: v for b, v in named.items() if b in accepted}
+
 
 # ---------------------------------------------------------------------------
 # Logic parts (callable refs; not value-validated)
@@ -616,13 +634,13 @@ class ActionDelaySpec(_Data):
 
 
 class ActionGroupSpec(_Logic):
-    """Action group (e.g. arm/hand): joints controlled, control mode, scale, EMA coeff.
+    """Action group (e.g. arm/hand): joints controlled, the mapping term, EMA coeff.
 
     No delay here — that is one link for the whole robot, see :class:`ActionDelaySpec`."""
 
     joints: list[str] = Field(min_length=1)
-    mode: Literal["position_to_limits", "position", "velocity", "torque"] = "position_to_limits"
-    scale: float = 1.0
+    term: "ActionCfg"
+    ema_order: int = Field(default=1, ge=1, le=2)
     # Command low-pass TIME CONSTANT [s] (None = no EMA). SECONDS, not a per-step coefficient: the driver
     # derives the coefficient from the contract's own policy rate, ``alpha = 1 - exp(-step_dt/ema_tau)``, so
     # the filter keeps its time-domain shape when ``physics.hz``/``decimation`` change — and a real robot
@@ -662,7 +680,7 @@ class TerminateTerm(_Logic):
     name: str
     fn: Callable
     params: dict[str, Any] = Field(default_factory=dict)
-    truncation: bool = False   # True → this done bootstraps (time_outs), not a no-bootstrap terminal (success = truncation)
+    time_out: bool = False   # True → this done bootstraps (time_outs), not a no-bootstrap terminal
 
 
 class CurriculumTerm(_Logic):
@@ -672,6 +690,7 @@ class CurriculumTerm(_Logic):
 
     name: str
     fn: Callable
+    params: dict[str, Any] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -776,9 +795,36 @@ class ActionCfg(_Data):
     """
 
     joints: Optional[list[str]] = None
-    scale: float = 1.0
     ema_tau: Optional[float] = Field(default=None, gt=0.0)   # [s] command low-pass time constant
-    mode: Literal["position_to_limits", "position", "velocity", "torque"] = "position_to_limits"
+    ema_order: int = Field(default=1, ge=1, le=2)
+
+    @property
+    def action_dim(self) -> int:
+        assert self.joints is not None, f"{type(self).__name__}.action_dim: joints are not resolved yet"
+        return len(self.joints)
+
+    @property
+    def action_labels(self) -> list[str]:
+        assert self.joints is not None, f"{type(self).__name__}.action_labels: joints are not resolved yet"
+        return list(self.joints)
+
+    def bind(self, env: Any) -> None:
+        return None
+
+    def reset(self, env_ids: Any) -> None:
+        return None
+
+    def check(self, *, default: Any, limits: Any) -> None:
+        raise NotImplementedError(f"{type(self).__name__} does not implement check()")
+
+    def decode(self, a: Any, *, default: Any, limits: Any) -> Any:
+        raise NotImplementedError(f"{type(self).__name__} does not implement decode()")
+
+    def spawn_action(self, *, default: Any, limits: Any) -> Any:
+        raise NotImplementedError(f"{type(self).__name__} does not implement spawn_action()")
+
+    def deploy(self) -> dict[str, Any]:
+        raise NotImplementedError(f"{type(self).__name__} does not implement deploy()")
 
 
 class _Ref(_Logic):
@@ -851,22 +897,22 @@ class Obs(_Ref):
 
 
 class Done(_Ref):
-    """Termination entry — ``Done(fn, truncation=False, **knobs)``.
+    """Termination entry — ``Done(fn, time_out=False, **knobs)``.
 
     The knobs go straight into ``TerminateTerm.params`` and reach the flat termination function as
     ``fn(env, **params)``, so what the signature names is what the contract writes — the same rule as
     :class:`Rew` and :class:`Event`, and no positional term args (a flat signature is readable only when every
     knob is named).
 
-    ``truncation=True`` marks a time-limit-style end (success / horizon): the trainer BOOTSTRAPS the value
+    ``time_out=True`` marks a time-limit-style end (success / horizon): the trainer BOOTSTRAPS the value
     instead of treating it as a true terminal. It belongs to the ENTRY, not to the function: it says how the
     trainer should value the done, not how the done is detected."""
 
     params: dict[str, Any] = Field(default_factory=dict)
-    truncation: bool = False
+    time_out: bool = False
 
-    def __init__(self, fn: Callable, *, name: str | None = None, truncation: bool = False, **knobs: Any):
-        super().__init__(fn=fn, name=name, truncation=truncation, params=knobs)
+    def __init__(self, fn: Callable, *, name: str | None = None, time_out: bool = False, **knobs: Any):
+        super().__init__(fn=fn, name=name, time_out=time_out, params=knobs)
 
 
 class Event(_Ref):

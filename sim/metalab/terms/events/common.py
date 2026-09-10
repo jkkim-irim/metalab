@@ -23,6 +23,25 @@ def reset_object_pose(env, env_ids, active_position, x_range, y_range, yaw_range
     env.set_object_pose(env_ids, pos, quat)
 
 
+def _interval_fire(env, env_ids, interval_range_s, ok):   # [s]
+    k, dev = int(env_ids.numel()), env_ids.device
+    lo, hi = float(interval_range_s[0]), float(interval_range_s[1])
+    if (lo, hi) == (0.0, 0.0):
+        return ok
+    assert 0.0 < lo <= hi, \
+        f"interval_range_s={interval_range_s} must be (0,0)=every step or 0 < lo <= hi [s]"
+    wait = env.buffer("next_fire_steps", dtype=torch.long)   # [steps]
+    left = wait[env_ids] - ok.long()
+    fire = ok & (left <= 0)
+    draw = (torch.empty(k, device=dev).uniform_(lo, hi) / env.step_dt).round().long().clamp(min=1)
+    wait[env_ids] = torch.where(fire, draw, left)
+    return fire
+
+
+def record_object_spawn_z(env, env_ids):
+    env.set_dr_value("object_spawn_z", env_ids, env.object_pos()[env_ids, 2])
+
+
 def sample_goal_position(env, env_ids, x_range, y_range, z_range,   # [m]
                          interval_range_s=(0.0, 0.0)):   # [s]
     k, dev = int(env_ids.numel()), env_ids.device
@@ -32,17 +51,7 @@ def sample_goal_position(env, env_ids, x_range, y_range, z_range,   # [m]
     bounds = torch.tensor([tuple(x_range), tuple(y_range), tuple(z_range)], dtype=torch.float32, device=dev)
     assert (bounds[:, 0] <= bounds[:, 1]).all(), \
         f"each range needs lo <= hi — got x={tuple(x_range)} y={tuple(y_range)} z={tuple(z_range)}"
-    lo, hi = float(interval_range_s[0]), float(interval_range_s[1])
-    if (lo, hi) == (0.0, 0.0):
-        fire = torch.ones(k, dtype=torch.bool, device=dev)
-    else:
-        assert 0.0 < lo <= hi, \
-            f"interval_range_s={interval_range_s} must be (0,0)=every call or 0 < lo <= hi [s]"
-        wait = env.buffer("next_fire_steps", dtype=torch.long)   # [steps]
-        left = wait[env_ids] - 1
-        fire = left <= 0
-        draw = (torch.empty(k, device=dev).uniform_(lo, hi) / env.step_dt).round().long().clamp(min=1)
-        wait[env_ids] = torch.where(fire, draw, left)
+    fire = _interval_fire(env, env_ids, interval_range_s, torch.ones(k, dtype=torch.bool, device=dev))
     new = torch.rand(k, 3, device=dev) * (bounds[:, 1] - bounds[:, 0]) + bounds[:, 0]
     env.goal_pos[env_ids] = torch.where(fire.unsqueeze(-1), new, env.goal_pos[env_ids])
 
@@ -96,17 +105,7 @@ def randomize_object_scale(env, env_ids, scale_range):
 def _external_wrench_vec(env, env_ids, x_range, y_range, z_range, interval_range_s, eligible):
     k, dev = int(env_ids.numel()), env_ids.device
     ok = torch.ones(k, dtype=torch.bool, device=dev) if eligible is None else eligible
-    lo, hi = float(interval_range_s[0]), float(interval_range_s[1])
-    if (lo, hi) == (0.0, 0.0):
-        fire = ok
-    else:
-        assert 0.0 < lo <= hi, \
-            f"interval_range_s={interval_range_s} must be (0,0)=every step or 0 < lo <= hi [s]"
-        wait = env.buffer("next_fire_steps", dtype=torch.long)     # [steps]
-        left = wait[env_ids] - ok.long()
-        fire = ok & (left <= 0)
-        draw = (torch.empty(k, device=dev).uniform_(lo, hi) / env.step_dt).round().long().clamp(min=1)
-        wait[env_ids] = torch.where(fire, draw, left)
+    fire = _interval_fire(env, env_ids, interval_range_s, ok)
     bounds = torch.tensor([tuple(x_range), tuple(y_range), tuple(z_range)],
                           dtype=torch.float32, device=dev)
     assert (bounds[:, 0] <= bounds[:, 1]).all(), \
@@ -130,19 +129,3 @@ def randomize_fixed_base_root_height(env, env_ids, z_offset_range):   # [m]
     dz = torch.empty(k, device=dev).uniform_(*z_offset_range)
     env.set_dr_value("root_height", env_ids, dz)
     env.set_root_height(env_ids, dz)
-
-
-def _in_z_window(env, env_ids, lift_threshold, z_max):   # [m]
-    z = env.object_pos()[env_ids, 2]
-    return (z >= lift_threshold) if z_max <= 0.0 else ((z >= lift_threshold) & (z < z_max))
-
-
-def apply_object_external_force_when_lifted(env, env_ids,
-                                            x_range=(0.0, 0.0), y_range=(0.0, 0.0), z_range=(0.0, 0.0),   # [N]
-                                            lift_threshold=0.9, z_max=0.0,   # [m]
-                                            interval_range_s=(0.0, 0.0)):   # [s]
-    if int(env_ids.numel()) == 0:
-        return
-    apply_object_external_force(
-        env, env_ids, x_range=x_range, y_range=y_range, z_range=z_range,
-        interval_range_s=interval_range_s, eligible=_in_z_window(env, env_ids, lift_threshold, z_max))

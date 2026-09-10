@@ -16,7 +16,7 @@ skips ``_*.py``, and the loader only imports the ``<task, recipe>`` pair a run a
 from __future__ import annotations
 
 from sim.metalab.contract.spec import Done, Event, Obs, TaskSpec, values
-from sim.metalab.terms import events, obs, terminate
+from sim.metalab.terms import action, events, obs, terminate
 
 from .... import _assets as assets
 
@@ -128,24 +128,22 @@ class ACTION:
     min_delay = 0
     max_delay = 2
 
-    class arm:
-        joints = [
+    arm = action.JointDeltaPosition(
+        joints=[
             "R_Shoulder_Pitch_Joint", "R_Shoulder_Roll_Joint", "R_Shoulder_Yaw_Joint",
             "R_Elbow_Joint", "R_Wrist_Yaw_Joint", "R_Wrist_Roll_Joint", "R_Wrist_Pitch_Joint",
-        ]
-        scale = 0.1
-        ema_tau = 0.825   # [s]
+        ],
+        scale=0.1, ema_tau=0.825)   # [s]
 
-    class hand:
-        joints = [
+    hand = action.JointDeltaPosition(
+        joints=[
             "R_Thumb_Yaw_Joint", "R_Thumb_CMC_Joint", "R_Thumb_MCP_Joint",
             "R_Index_MCP_Joint", "R_Index_PIP_Joint",
             "R_Middle_MCP_Joint", "R_Middle_PIP_Joint",
             "R_Ring_MCP_Joint", "R_Ring_PIP_Joint",
             "R_Little_MCP_Joint", "R_Little_PIP_Joint",
-        ]
-        scale = 1.0
-        ema_tau = 0.325   # [s]
+        ],
+        scale=1.0, ema_tau=0.325)   # [s]
 
 
 # --- obs terms ---------------------------------------------------------------------------------------
@@ -181,6 +179,7 @@ class EVENTS:
     reset_object_pose  = Event(events.reset_object_pose, "reset",
                                active_position=[0.6, 0.0, 0.926],
                                x_range=[-0.1, 0.0], y_range=[-0.2, -0.1], yaw_range=[-0.2, 0.2])
+    record_object_spawn_z = Event(events.record_object_spawn_z, "reset")
     reset_joints_by_offset = Event(events.reset_joints_by_offset, "reset", joints="@joints.ctrl",
                                position_range=[-0.1, 0.1])
     object_friction    = Event(events.set_shape_friction, "reset", target="object", mu_range=[0.5, 0.5])
@@ -197,12 +196,13 @@ class EVENTS:
 
 # --- termination / truncation ------------------------------------------------------------------------
 class TERMINATE:
+    time_out = Done(terminate.time_out, time_out=True)
     object_below_height = Done(terminate.object_below_height, min_height=0.85)
     object_far_from_palm = Done(terminate.object_far_from_body, body="@frames.palm", max_distance=1.0)
     table_fingertip_contact_force_exceeded = Done(terminate.table_fingertip_contact_force_exceeded,
                                                  fingertips="@bodies.fingertips", force_threshold_n=100.0)
     object_velocity_exceeded = Done(terminate.object_velocity_exceeded, max_lin_vel=30.0, max_ang_vel=60.0)
-    curriculum_passed        = Done(terminate.curriculum_passed, truncation=True)
+    curriculum_passed        = Done(terminate.curriculum_passed, time_out=True)
 
 
 

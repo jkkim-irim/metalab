@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 
 from sim.metalab.api import transforms
+from sim.metalab.runtime.episode import step_edge
 from sim.metalab.terms.gate import cage, object_goal_dist
 
 
@@ -14,9 +15,29 @@ def object_state_world(env) -> torch.Tensor:
     return torch.cat([env.object_pos(), env.object_quat()], dim=-1)
 
 
-def object_pose(env, chest_body: str, offset=(0.0, 0.0, 0.0), seen: bool = False) -> torch.Tensor:
-    p, q = ((env.object_seen_pose_w[:, :3], env.object_seen_pose_w[:, 3:7]) if seen
-            else (env.object_pos(), env.object_quat()))
+def object_seen_pose_world(env, seen_steps_key: str | None = None) -> torch.Tensor:
+    if seen_steps_key is None:
+        steps = 1
+    else:
+        vals = env.curriculum_values
+        assert seen_steps_key in vals, (
+            f"object_seen_pose_world: the curriculum publishes no {seen_steps_key!r} — it reports {sorted(vals)}")
+        steps = vals[seen_steps_key]
+    pose = env.buffer("seen_pose", shape=(7,))
+    _, first = step_edge(env)
+    seeing = first | (env.episode_length_buf < steps)
+    now = torch.cat([env.object_pos(), env.object_quat()], dim=-1)
+    pose.copy_(torch.where(seeing.unsqueeze(-1), now, pose))
+    return pose
+
+
+def object_pose(env, chest_body: str, offset=(0.0, 0.0, 0.0), seen: bool = False,
+                seen_steps_key: str | None = None) -> torch.Tensor:
+    if seen:
+        w = object_seen_pose_world(env, seen_steps_key)
+        p, q = w[:, :3], w[:, 3:7]
+    else:
+        p, q = env.object_pos(), env.object_quat()
     cp, cq = env.body_pos(chest_body), env.body_quat(chest_body)
     rp, rq = transforms.to_frame(p, q, transforms.local_point(cp, cq, offset), cq)
     return torch.cat([rp, rq], dim=-1)
@@ -50,8 +71,15 @@ def joint_velocities(env, names: list[str]) -> torch.Tensor:
     return env.joint_vel(names)
 
 
-def joint_accelerations(env, names: list[str]) -> torch.Tensor:
-    return env.joint_acc(names)
+def joint_accelerations(env, names: list[str]) -> torch.Tensor:   # [rad/s^2]
+    acc = env.buffer("acc", shape=(len(names),))
+    prev = env.buffer("prev_vel", shape=(len(names),))
+    advanced, first = step_edge(env)
+    cur = env.joint_vel(names)
+    new = torch.where(first.unsqueeze(-1), torch.zeros_like(acc), (cur - prev) / env.step_dt)
+    acc.copy_(torch.where(advanced.unsqueeze(-1), new, acc))
+    prev.copy_(torch.where(advanced.unsqueeze(-1), cur, prev))
+    return acc
 
 
 def joint_torque_obs(env, names: list[str]) -> torch.Tensor:
@@ -72,8 +100,14 @@ def body_contact_flags(env, bodies: list[str], threshold: float = 1.0) -> torch.
 
 
 def fingertip_contact_steps(env, force_threshold: float = 0.1,   # [N]
-                            target: str | None = "object") -> torch.Tensor:
-    return env.contact_steps(force_threshold, target)   # [policy steps]
+                            target: str | None = "object") -> torch.Tensor:   # [policy steps]
+    tips = env.spec.robot.fingertips
+    steps = env.buffer("steps", shape=(len(tips),))
+    advanced, _ = step_edge(env)
+    f = env.contact_force(tips) if target is None else env.contact_force_with(tips, target)
+    pressing = f.norm(dim=-1) > force_threshold
+    steps.copy_(torch.where(advanced.unsqueeze(-1), torch.where(pressing, steps + 1.0, torch.zeros_like(steps)), steps))
+    return steps
 
 
 def hand_object_force_magnitude(env, bodies: list[str], target: str = "object") -> torch.Tensor:

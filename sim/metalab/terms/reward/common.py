@@ -18,7 +18,7 @@ def _min_dist_progress_(best: torch.Tensor, cur: torch.Tensor) -> torch.Tensor:
 
 def lifting_reward(env, lift_height: float = 0.1) -> torch.Tensor:   # [m]
     assert lift_height > 0.0, f"lifting_reward: lift_height must be > 0 (it normalizes the ratio) — got {lift_height}"
-    return ((env.object_pos()[:, 2] - env.object_init_z) / lift_height).clamp(0.0, 1.0)
+    return ((env.object_pos()[:, 2] - env.dr_value("object_spawn_z")) / lift_height).clamp(0.0, 1.0)
 
 
 def palm_object_proximity(env, palm_body: str, std: float = 0.05,   # [m]
@@ -99,30 +99,4 @@ def action_rate_l2(env) -> torch.Tensor:
     r = ((a - prev) ** 2).sum(dim=-1) * seen
     prev[:] = a
     seen[:] = True
-    return r
-
-
-def fingertip_object_contact(env, target: str = "object",
-                             force_threshold: float = 0.1,   # [N]
-                             lift_threshold: float = 0.0) -> torch.Tensor:   # [m]
-    f = env.contact_force_with(env.fingertips, target)
-    r = (f.norm(dim=-1) > force_threshold).float().mean(dim=-1)
-    if lift_threshold > 0.0:
-        r = r * (env.object_pos()[:, 2] >= lift_threshold).float()
-    return r
-
-
-def nail_object_contact(env, bodies: list[str], target: str = "object",
-                        force_threshold: float = 0.1) -> torch.Tensor:   # [N]
-    f = env.contact_force_with(bodies, target)
-    return (f.norm(dim=-1) > force_threshold).float().mean(dim=-1)
-
-
-def fingertip_object_pinch_contact(env, fingers: list[str], target: str = "object",
-                                   force_threshold: float = 0.1,   # [N]
-                                   lift_max: float = 0.0) -> torch.Tensor:   # [m]
-    f = env.contact_force_with(fingers, target)
-    r = (f.norm(dim=-1) > force_threshold).float().mean(dim=-1)
-    if lift_max > 0.0:
-        r = r * (env.object_pos()[:, 2] < lift_max).float()
     return r

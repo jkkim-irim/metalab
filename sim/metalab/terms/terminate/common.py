@@ -3,6 +3,10 @@ from __future__ import annotations
 import torch
 
 
+def time_out(env) -> torch.Tensor:
+    return env.episode_length_buf >= env.max_episode_length
+
+
 def object_below_height(env, min_height: float) -> torch.Tensor:   # [m]
     return env.object_pos()[:, 2] < min_height
 
@@ -30,4 +34,4 @@ def body_contact_detected(env, bodies: list[str], force_threshold: float = 1.0) 
 
 
 def curriculum_passed(env) -> torch.Tensor:
-    return env.curriculum_passed
+    return env.curriculum_passed.clone()

@@ -49,6 +49,7 @@ from sim.metalab.contract.spec import (
     TerminateTerm,
     terms,
 )
+from sim.metalab.terms.action import JointDeltaPosition
 
 _ENVS_DIR = Path(__file__).resolve().parent  # sim/metalab/contract
 _REPO = _ENVS_DIR.parents[2]                 # <repo> (sim/metalab/contract → repo root)
@@ -335,8 +336,11 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
     # picked (allex -> arm_r/hand_r/arm_l/hand_l, allex_right -> arm/hand) instead of naming the groups of one
     # robot and breaking on the other. A policy contract still spells its groups out: the action dim is what
     # the checkpoint is shaped by, so there a typo must fail rather than resolve to "everything".
-    task_action = ts.action or {g: ActionCfg() for g in robot.action_groups}
-    for g in task_action:
+    task_action = ts.action or {g: JointDeltaPosition() for g in robot.action_groups}
+    for g, a in task_action.items():
+        assert type(a) is not ActionCfg, (
+            f"task '{name}': action group {g!r} is a bare tunables block — write a mapping term from "
+            f"sim.metalab.terms.action (JointDeltaPosition / JointPositionToLimits / TaskDeltaPose) instead")
         assert g in robot.action_groups, \
             f"task '{name}': action group {g!r} not in robot({rname}).action_groups — valid: " \
             f"{sorted(robot.action_groups)}. Omit `action` entirely to take all of this robot's groups."
@@ -373,8 +377,8 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
         return list(a.joints)
 
     action = {
-        g: ActionGroupSpec(joints=_act_joints(g, a), scale=a.scale,
-                           ema_tau=a.ema_tau, mode=a.mode)
+        g: ActionGroupSpec(joints=_act_joints(g, a), ema_tau=a.ema_tau, ema_order=a.ema_order,
+                           term=type(a).model_validate({**a.model_dump(), "joints": _act_joints(g, a)}))
         for g, a in task_action.items()
     }
 
@@ -492,14 +496,19 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
         return out
 
     # Terminate terms are FLAT functions too — `fn(env, **params)`, called directly each step (no factory, no
-    # closure), so a Done entry's knobs are ref-resolved into `params` exactly like a Rew entry's. `truncation`
+    # closure), so a Done entry's knobs are ref-resolved into `params` exactly like a Rew entry's. `time_out`
     # is the entry's, not the term's: it tells the TRAINER how to value the done, not how to detect it.
     def _terminate_term(n, r):
         params = {k: _resolve_ref(v, refs) for k, v in r.params.items()}
         _check_params(r.fn, params, "terminate")
-        return TerminateTerm(name=n, fn=r.fn, params=params, truncation=r.truncation)
+        return TerminateTerm(name=n, fn=r.fn, params=params, time_out=r.time_out)
 
     terminate = _named(terms(ts.terminate, Done), "terminate", _terminate_term)
+    if ts.reward:
+        assert any(t.time_out for t in terminate), (
+            f"task '{name}': an MDP contract needs a horizon termination — add "
+            f"`time_out = Done(terminate.time_out, time_out=True)` to TERMINATE (episode_length_s="
+            f"{ts.episode_length_s} is otherwise never enforced)")
     # Event terms are FLAT functions too — `fn(env, env_ids, **params)`, called directly (no factory, no
     # closure), so an Event entry's knobs are ref-resolved into `params` exactly like a Rew entry's. That is
     # what lets the CURRICULUM retune a knob live (it writes into this dict) without the term having to be a

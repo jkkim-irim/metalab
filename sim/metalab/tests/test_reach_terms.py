@@ -1,12 +1,13 @@
 """The body-reach terms (gate / reward / obs / events) against a minimal env double.
 
-The double carries only what these terms read: ``goal_pos`` (N,3), ``palm_body`` and ``body_pos(name)``.
+The double carries only what these terms read: ``goal_pos`` (N,3), ``spec.robot.frames`` and ``body_pos(name)``.
 Runs under pytest, or directly: ``python3 sim/metalab/tests/test_reach_terms.py``.
 """
 from __future__ import annotations
 
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -19,7 +20,7 @@ from sim.metalab.terms import events, gate, obs, reward  # noqa: E402
 class _Env:
     def __init__(self, goal, palm):
         self.goal_pos = torch.tensor(goal, dtype=torch.float32)
-        self.palm_body = "palm"
+        self.spec = SimpleNamespace(robot=SimpleNamespace(frames={"palm": "palm"}))
         self._palm = torch.tensor(palm, dtype=torch.float32)
 
     def body_pos(self, name):
@@ -50,7 +51,7 @@ def test_body_at_goal_rejects_grasp_conditions():
 
 def test_body_at_goal_needs_a_palm_frame():
     e = _env()
-    e.palm_body = None
+    e.spec.robot.frames = {}
     with pytest.raises(AssertionError):
         gate.body_at_goal(e, goal_dist_tol=0.05)
 

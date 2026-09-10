@@ -29,9 +29,10 @@ def object_at_goal(env, goal_dist_tol: float,   # [m]
                    joint_pose_tolerance: float = 0.0) -> torch.Tensor:   # [rad]
     at = object_goal_dist(env) <= goal_dist_tol
     if palm_distance > 0.0:
-        assert env.palm_body is not None, \
-            "a palm-distance condition needs a robot frame named 'palm'"
-        at = at & ((env.body_pos(env.palm_body) - env.object_pos()).norm(dim=-1) <= palm_distance)
+        palm = env.spec.robot.frames.get("palm")
+        assert palm is not None, (
+            f"a palm-distance condition needs a robot frame named 'palm' — declared frames: {sorted(env.spec.robot.frames)}")
+        at = at & ((env.body_pos(palm) - env.object_pos()).norm(dim=-1) <= palm_distance)
     if contact_count > 0 or contact_fingers:
         tips = env.fingertips
         assert tips, ("a grip condition (contact_count > 0 / contact_fingers) needs the robot's fingertip "
@@ -60,8 +61,28 @@ def body_at_goal(env, goal_dist_tol: float,   # [m]
                  force_threshold: float = 1.0e-3,
                  joint_pose: dict | None = None,
                  joint_pose_tolerance: float = 0.0) -> torch.Tensor:
-    assert env.palm_body is not None, "body_at_goal needs a robot frame named 'palm' (the body that must reach the goal)"
+    palm = env.spec.robot.frames.get("palm")
+    assert palm is not None, (
+        f"body_at_goal needs a robot frame named 'palm' (the body that must reach the goal) — declared frames: "
+        f"{sorted(env.spec.robot.frames)}")
     assert palm_distance == 0.0 and contact_count == 0 and not contact_fingers and joint_pose_tolerance == 0.0, (
         "body_at_goal judges the palm position only — GATE.palm_distance / contact_count / contact_fingers / "
         "joint_pose_tolerance are object-grasp conditions it does not evaluate")
-    return body_goal_dist(env, env.palm_body) <= goal_dist_tol
+    return body_goal_dist(env, palm) <= goal_dist_tol
+
+
+def hold_count(count: torch.Tensor, ok: torch.Tensor, mode: str) -> torch.Tensor:
+    if mode == "cumulative":
+        return count + ok.to(count.dtype)
+    assert mode == "consecutive", f"hold_count: unknown mode {mode!r} (consecutive | cumulative)"
+    return torch.where(ok, count + 1, torch.zeros_like(count))
+
+
+def hold_and_pass(env, predicate, bars: dict, hold_steps: int,
+                  hold_mode: str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    near = predicate(env, **bars)
+    hold = env.buffer("hold", dtype=torch.long)
+    passed = env.buffer("passed", dtype=torch.bool)
+    hold.copy_(hold_count(hold, near, hold_mode))
+    passed |= hold >= hold_steps
+    return near, passed, hold

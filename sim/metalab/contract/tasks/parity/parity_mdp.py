@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sim.metalab.contract.spec import Done, Event, Obs, Rew
-from sim.metalab.terms import events, obs, reward, terminate
+from sim.metalab.terms import action, events, obs, reward, terminate
 
 from . import _base as base
 from .parity_objects import OBJECTS
@@ -11,12 +11,8 @@ FINGERS = ["panda0_leftfinger", "panda0_rightfinger"]
 
 
 class ACTION:
-    class arm:
-        scale = 0.1
-        ema_tau = 0.5   # [s]
-
-    class gripper:
-        scale = 0.02
+    arm = action.JointDeltaPosition(scale=0.1, ema_tau=0.5)
+    gripper = action.JointDeltaPosition(scale=0.02)
 
 
 class OBS:
@@ -51,6 +47,7 @@ class EVENTS:
 
 
 class TERMINATE:
+    time_out = Done(terminate.time_out, time_out=True)
     object_below_height = Done(terminate.object_below_height, min_height=0.3)
     object_far_from_gripper = Done(terminate.object_far_from_body, body=GRIPPER, max_distance=2.0)
     object_velocity_exceeded = Done(terminate.object_velocity_exceeded)

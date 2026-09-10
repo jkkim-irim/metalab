@@ -66,8 +66,9 @@ class GATE:
 
 # --- termination / truncation ------------------------------------------------------------------------
 class TERMINATE:
+    time_out = Done(terminate.time_out, time_out=True)
     # object_below_height = Done(terminate.object_below_height, min_height=0.85)
-    curriculum_passed   = Done(terminate.curriculum_passed, truncation=True)
+    curriculum_passed   = Done(terminate.curriculum_passed, time_out=True)
 
 if not _HAMMER_COLLISION:
     # Every term that needs a contact SURFACE on the hammer — there is none to resize, to hand a mu to, or

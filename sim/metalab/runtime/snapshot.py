@@ -72,14 +72,14 @@ def describe(driver, state) -> dict:
     for gname, terms in spec.obs.items():
         for t in terms:
             obs_groups.setdefault(t.name, []).append(gname)
-    act_labels = [j for _n, g in driver.action_groups for j in g.joints]    # the action vector's columns
+    act_labels = [lab for _n, g in driver.action_groups for lab in g.term.action_labels]
     tip_labels = list(spec.robot.fingertips)                                # the pad-indexed terms' columns
     cards: list[dict] = []
     for _gname, terms in spec.obs.items():
         for t in terms:
             if any(c["name"] == t.name for c in cards):
                 continue
-            w = int((t.fn(state, **t.params) * t.scale).shape[-1])
+            w = int((state.run_term("obs", t) * t.scale).shape[-1])
             names = t.dim_labels
             if t.fn.__name__ in _ACTION_VECTOR_TERMS:
                 names = act_labels
@@ -110,14 +110,10 @@ def rows(driver, idxs, extra=None) -> dict:
     n = int(sel.numel())
     obs_names, parts, obs_w = [], [], []
     for gname, terms in driver.spec.obs.items():
-        noisy = gname in driver._obs_noise_groups
         for t in terms:
             if t.name in obs_names:
                 continue
-            v = t.fn(driver, **t.params)
-            if noisy and t.noise is not None:
-                v = driver._add_obs_noise(v, t.noise)
-            v = (v * t.scale)[sel]
+            v = driver.obs.value(driver, t, gname)[sel]
             obs_names.append(t.name); parts.append(v); obs_w.append(int(v.shape[-1]))
     parts.append(driver.last_action[sel])
     ex_names, ex_w = [], []
