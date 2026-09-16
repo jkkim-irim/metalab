@@ -161,29 +161,6 @@ def _contract_paths(task: str, recipe: str, mode: str) -> list[Path]:
     return paths
 
 
-_ROBOT_NAME = re.compile(r'(?:\bname\s*=\s*|"name"\s*:\s*|\brobot\s*=\s*)"([^"]+)"')
-
-
-def _robot_names() -> set[str]:
-    """Every robot the repo declares — ``contract/robot/<family>/<robot>.yaml`` stems."""
-    return {p.stem for p in (SIM / "metalab" / "contract" / "robot").glob("*/*.yaml")}
-
-
-def _uses_allex(task: str, recipe: str, mode: str) -> bool:
-    """Does this launch's contract put an ALLEX robot in the scene? Motor-space coupled PD only exists for
-    ALLEX (robot_model.json gains), so the Launchpad offers the Motor drive for these launches only. Only
-    values that name a declared robot count (an object's ``"name": "table"`` does not); the recipe's own
-    robot declaration, when it has one, overrides the base's."""
-    known, robot = _robot_names(), None
-    for path in _contract_paths(task, recipe, mode):
-        if not path.is_file():
-            continue
-        names = [n for n in _ROBOT_NAME.findall(path.read_text()) if n in known]
-        if names:
-            robot = names[-1]
-    return robot is not None and robot.startswith("allex")
-
-
 def _task_recipe(task: str, recipe: str, mode: str) -> dict:
     """{class name: source text} for the contract sections above, AS OF THIS LAUNCH.
 
@@ -213,28 +190,12 @@ def discover_traj_groups() -> list[dict]:
             for d in sorted(TRAJ_DIR.rglob("*_group")) if d.is_dir()]
 
 
-def discover_motor_ok() -> dict[str, dict[str, dict[str, bool]]]:
-    """mode -> task -> recipe ('' for a single-file contract) -> may the Motor drive be offered."""
-    tasks, recipes = discover_tasks(), discover_task_recipes()
-    st, srec = discover_standalone_tasks(), discover_standalone_recipes()
-    out: dict = {"train": {}, "standalone": {}, "parity": {}}
-    for t in tasks:
-        out["train"][t] = {r: _uses_allex(t, r, "train") for r in (recipes.get(t) or [""])}
-    for t in st:
-        out["standalone"][t] = {r: _uses_allex(t, r, "standalone") for r in (srec.get(t) or [""])}
-    for t in _contracts_in(PARITY_DIR):
-        out["parity"][t] = {"": _uses_allex(t, "", "parity")}
-    out["eval"] = out["train"]
-    return out
-
-
 def discover() -> dict:
     return {"engines": discover_engines(), "tasks": discover_tasks(),
             "task_recipes": discover_task_recipes(),
             "standalone_tasks": discover_standalone_tasks(),
             "standalone_recipes": discover_standalone_recipes(),
             "parity_tasks": _contracts_in(PARITY_DIR),
-            "motor_ok": discover_motor_ok(),
             "traj_groups": discover_traj_groups(), "repo": str(REPO)}
 
 
@@ -408,15 +369,7 @@ def _build(params: dict) -> tuple[str, list, dict]:
         raise ValueError(f"지원 안 함: mode={mode!r}")
     knob = params.get("knobs") or {}
     adv = params.get("adv") or {}
-    # Robot drive mode — motor-space coupled PD (the robot YAML's control_mode) vs native per-joint PD.
-    # Read at BUILD time by both engines (newton parser, genesis backend), default on, so it is set
-    # explicitly on every run: the preview/registry then records which drive the run actually used.
-    ctrl = params.get("ctrl", "motor")
-    if ctrl not in ("motor", "joint"):
-        raise ValueError(f"알 수 없는 구동 방식: {ctrl!r} (motor|joint)")
-    if ctrl == "motor" and not _uses_allex(task, recipe, mode):
-        raise ValueError(f"태스크 {task!r} 는 ALLEX 로봇이 아니라 Motor 구동을 쓸 수 없습니다 — Joint 를 고르세요")
-    env: dict = {"METALAB_MOTOR_COUPLING": "1" if ctrl == "motor" else "0"}
+    env: dict = {}
     flags = ["--sim", engine, "--task", task] + (["--recipe", recipe] if recipe else [])
 
     if mode == "parity":
@@ -515,7 +468,7 @@ def launch(params: dict) -> dict:
             "task_recipe": (params.get("recipe") or ""),
             # the form state as clicked — lets a card click restore the whole launcher (algo/knobs/adv)
             # for one-click reproduce/re-launch, not just show the command.
-            "algo": params.get("algo", "ppo"), "ctrl": params.get("ctrl", "motor"),
+            "algo": params.get("algo", "ppo"),
             "knobs": params.get("knobs") or {}, "adv": params.get("adv") or {},
             # the tuned contract sections VERBATIM — what this run was actually trained with, kept
             # readable after the file (and the -dirty sha) moves on.
@@ -1223,11 +1176,6 @@ details[open] summary::before{content:"▾ "}
 <div class="main pane" id="pane-console">
 <div class="left">
 <div class="field"><label>1 · Backends</label><div class="seg" id="engines"></div></div>
-<div class="field"><label>1b · 로봇 구동 방식 (Motor = 모터공간 coupled PD · Joint = 관절 native PD)</label>
-  <div class="seg" id="ctrl">
-    <button data-v="motor" class="on" title="robot_model.json 의 모터 게인·토크한계로 coupled PD (실기 펌웨어 미러)">모터 · Motor</button>
-    <button data-v="joint" title="METALAB_MOTOR_COUPLING=0 — 로봇 YAML joint_mode_param 의 kp/kv 로 관절별 대각 PD">관절 · Joint</button>
-  </div></div>
 <div class="field"><label>2 · Mode</label>
   <div class="seg mode" id="mode">
     <button data-v="train" class="on">학습 · Train</button>
@@ -1330,9 +1278,7 @@ function ansiToHtml(raw){                         // render terminal SGR (bold/c
   } return out;
 }
 let DESC=null;
-// ctrl = robot drive mode: "motor" (motor-space coupled PD, the robot YAML's control_mode) or "joint"
-// (native per-joint diagonal PD) — carried to every run as METALAB_MOTOR_COUPLING=1|0.
-const state={engine:null,task:null,recipe:"",mode:"train",algo:"ppo",ctrl:"motor",knob:{},adv:{}};
+const state={engine:null,task:null,recipe:"",mode:"train",algo:"ppo",knob:{},adv:{}};
 // Is wandb logged in (/api/creds)? Optimistic until the probe answers — a failed probe must never lock a
 // working setup out; the launched script still fails loudly if it was wrong.
 let CREDS={wandb:true};
@@ -1449,7 +1395,7 @@ function buildCmd(){
   const sp=curSpec(), e=state.engine, t=state.task;
   if(!e||!t) return {env:[],parts:[]};
   const val=k=>{const el=$("k_"+k);return el?el.value.trim():"";};
-  let env=[["METALAB_MOTOR_COUPLING",state.ctrl==="joint"?"0":"1"]];
+  let env=[];
   if(state.mode==="parity"){
     const parts=[[sp.script],["--task",t]];
     sp.adv.forEach(([k,fl])=>{if(state.adv[k])parts.push([fl]);});
@@ -1493,16 +1439,6 @@ function render(){
 }
 function selectEngine(e){state.engine=e;
   [...$("engines").children].forEach(b=>b.classList.toggle("on",b.dataset.v===e));render();}
-// motor|joint — mutually exclusive (exactly one 'on'), like the engine/mode/target segments.
-function selectCtrl(c){state.ctrl=c;
-  [...$("ctrl").children].forEach(b=>b.classList.toggle("on",b.dataset.v===c));render();}
-// Motor drive exists only for ALLEX robots: for any other launch the Motor button is disabled and the
-// drive is pinned to Joint (mirrors the server's own refusal in _build).
-function motorOk(){const m=(DESC&&DESC.motor_ok&&DESC.motor_ok[state.mode])||{};
-  const t=m[state.task]||{};return !!(t[state.recipe||""]);}
-function applyCtrlAvail(){const ok=motorOk(),mb=$("ctrl").querySelector('[data-v="motor"]');
-  if(mb) mb.disabled=!ok;
-  if(!ok&&state.ctrl==="motor") selectCtrl("joint");}
 // task combobox source: Standalone lists the tasks/standalone/<group>/ folders, Train/Eval the tasks/rl/ family
 // folders. Both modes therefore have the same two axes — pick the group/family, then what is inside it.
 function taskList(){if(!DESC)return[];return (state.mode==="standalone"?DESC.standalone_tasks:state.mode==="parity"?DESC.parity_tasks:DESC.tasks)||[];}
@@ -1518,14 +1454,13 @@ function populateTasks(){const ts=taskList();
 // can be renamed away, and silently launching a different one would be worse than falling back visibly.
 function selectTask(task,recipe){if(!taskList().includes(task))return;
   state.task=task;$("task").value=task;populateRecipes();
-  if(recipe&&recipeList().includes(recipe)){state.recipe=recipe;$("recipe").value=recipe;}
-  applyCtrlAvail();}
+  if(recipe&&recipeList().includes(recipe)){state.recipe=recipe;$("recipe").value=recipe;}}
 // A task FAMILY (or a standalone GROUP) is not runnable by itself, so there is no '(기본)' entry — the
 // first recipe is preselected and one is ALWAYS sent. A single-file contract has none.
 function populateRecipes(){const rs=recipeList(),sel=$("recipe");
   sel.innerHTML=rs.length?rs.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join("")
                          :'<option value="">(레시피 없음)</option>';
-  sel.disabled=!rs.length;state.recipe=rs[0]||"";sel.value=state.recipe;applyCtrlAvail();}
+  sel.disabled=!rs.length;state.recipe=rs[0]||"";sel.value=state.recipe;}
 function selectMode(m){state.mode=m;
   [...$("mode").children].forEach(b=>b.classList.toggle("on",b.dataset.v===m));
   const af=$("algofield"); if(af) af.style.display=(m==="train")?"":"none";   // algorithm selector: train mode only
@@ -1543,10 +1478,9 @@ fetch("/api/discover").then(r=>r.json()).then(d=>{DESC=d;
   state.engine=d.engines[0]||null;
   populateTasks();   // fills from the current mode (train by default → top-level tasks/)
   $("task").onchange=e=>{state.task=e.target.value;populateRecipes();render();};
-  $("recipe").onchange=e=>{state.recipe=e.target.value;applyCtrlAvail();render();};
+  $("recipe").onchange=e=>{state.recipe=e.target.value;render();};
   $("algo").onchange=e=>{state.algo=e.target.value;renderKnobs();render();};
   [...$("mode").children].forEach(b=>b.onclick=()=>selectMode(b.dataset.v));
-  [...$("ctrl").children].forEach(b=>b.onclick=()=>selectCtrl(b.dataset.v));
   renderKnobs();renderAdv();render();
 }).catch(()=>{$("livetxt").textContent="discover 실패";});
 
@@ -1562,7 +1496,7 @@ function gatherParams(){const sp=curSpec(),knobs={},adv={};
   ["envs_per_block","num_blocks","ir_coef_scale","embed_dim"].forEach(k=>{const el=$("k_"+k);if(el)knobs[k]=el.value;});
   sp.adv.forEach(([k])=>{const el=$("a_"+k);if(el)adv[k]=el.checked;});
   return {engine:state.engine,task:state.task,recipe:state.recipe,mode:state.mode,
-          algo:state.algo,ctrl:state.ctrl,knobs,adv};}
+          algo:state.algo,knobs,adv};}
 $("launch").onclick=()=>{const p=gatherParams();
   if(!p.engine||!p.task){$("toast").textContent="엔진/태스크를 먼저 고르세요";return;}
   $("launch").disabled=true;
@@ -1734,14 +1668,11 @@ function restoreForm(m){
   // algo: stored field first; fall back to env ALGO / cmd (pre-feature cards recorded the SAPG choice
   // only in the env, not as a top-level field, so m.algo was undefined and the selector stayed on PPO).
   state.algo=((m.algo)||((m.env&&m.env.ALGO))||(/(^|[ =])ALGO=sapg/.test(m.cmd||"")?"sapg":"ppo")||"ppo").toLowerCase();
-  // ctrl: stored field first, else the recorded env (pre-feature cards have neither → motor, the engine default).
-  state.ctrl=(m.ctrl)||(((m.env&&m.env.METALAB_MOTOR_COUPLING)==="0")?"joint":"motor");
   state.knob={...(m.knobs||{})};
   state.adv={...(m.adv||{})};
   // reflect selections into the widgets (mirror selectMode's visibility rules)
   [...$("engines").children].forEach(b=>b.classList.toggle("on",b.dataset.v===state.engine));
   [...$("mode").children].forEach(b=>b.classList.toggle("on",b.dataset.v===state.mode));
-  [...$("ctrl").children].forEach(b=>b.classList.toggle("on",b.dataset.v===state.ctrl));
   const af=$("algofield"); if(af) af.style.display=(state.mode==="train")?"":"none";
   const rb=$("reset"); if(rb) rb.hidden=(state.mode!=="standalone");
   [...$("engines").children].forEach(b=>b.disabled=(state.mode==="parity"));
