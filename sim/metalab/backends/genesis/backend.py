@@ -53,6 +53,8 @@ class GenesisBackend:
             self._obj_init.append((ent, pos, quat))
         self._obj_default_mass = self.objects[0].get_links_inertial_mass() if self.objects else None
         self._base_pos0 = self.robot.get_pos(relative=False).clone()
+        self._base_quat0 = self.robot.get_quat(relative=False).clone()
+        self._fixed_base = bool(spec.robot.fixed_base)
         self._obj_force = torch.zeros(self.num_envs, 3, device=self.device)
         self._has_force = False
 
@@ -376,6 +378,10 @@ class GenesisBackend:
         if self._init_dofs is not None:
             self.robot.set_dofs_position(self._init_dofs[idx], self._act_dofs, envs_idx=idx, zero_velocity=True)
             self.robot.control_dofs_position(self._init_dofs[idx], self._act_dofs, envs_idx=idx)
+        if not self._fixed_base:
+            self.robot.set_pos(self._base_pos0[idx], envs_idx=idx, relative=False)
+            self.robot.set_quat(self._base_quat0[idx], envs_idx=idx, relative=False)
+            self.robot.zero_all_dofs_velocity(envs_idx=idx)
         for ent, pos, quat in self._obj_init:
             ent.set_pos(pos.unsqueeze(0).expand(n, 3), envs_idx=idx)
             ent.set_quat(quat.unsqueeze(0).expand(n, 4), envs_idx=idx)
