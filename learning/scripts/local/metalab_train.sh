@@ -47,7 +47,8 @@ RECIPE="${RECIPE:-}"      # REQUIRED when --task is a family folder; empty for a
 # the panel updates live — a val/reports TABLE was tried and reverted: the table panel is cache-served).
 # BLOCKING: the loop pauses per checkpoint until the report link is logged.
 RECORD="${RECORD:-0}"
-RECORD_ENVS="${RECORD_ENVS:-4}"       # envs given a series + a report tab. 4 = one
+RECORD_ENVS="${RECORD_ENVS:-}"        # envs given a series + a report tab. Empty = the experiment's
+                                      # RECORD_ENVS (else 4). hammer: 4 = one
                                       # per object variant: the sim assigns env i variant i % N.
 RECORD_STEPS="${RECORD_STEPS:-600}"   # policy steps per recording (0 = full episode; capped at one episode)
 NO_WANDB="${NO_WANDB:-0}"             # boolean: --no_wandb / NO_WANDB=1 → WANDB_MODE=disabled (no wandb logging)
@@ -175,7 +176,7 @@ if [ "$RECORD" = 1 ]; then
   # val/ (see rl_trainer._make_record_callback). BLOCKING (recording pauses the loop per checkpoint —
   # same behavior as main's isaaclab val-video path). Export the knobs it reads.
   export RECORD RECORD_ENVS RECORD_STEPS
-  log "training-time eval recording ON (per checkpoint, blocking) -> W&B val/report (${RECORD_ENVS} env, ${RECORD_STEPS} steps, on the training GPU)"
+  log "training-time eval recording ON (per checkpoint, blocking) -> W&B val/report (${RECORD_ENVS:-experiment-default} env, ${RECORD_STEPS} steps, on the training GPU)"
 fi
 # --task is parsed into TASK above (so the video recorder targets the same env); pass it explicitly.
 # PASS holds everything unrecognized by our parser (--num_envs, --max_iterations, --device, --seed, and

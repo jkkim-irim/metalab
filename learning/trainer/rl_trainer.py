@@ -73,7 +73,7 @@ def _report_link(dest: str, hub_url: str | None = None, logs_root: str | None = 
 
 
 def _make_record_callback(task: str, recipe: str, device: str, policy_cfg: dict, seed: int,
-                          train_env=None, latest_metrics=None):
+                          train_env=None, latest_metrics=None, record_envs_default: int = 4):
     """RECORD=1(env) → return a callback ``fn(ckpt_path)`` that, on each checkpoint, records a short eval
     rollout of that checkpoint and posts its report link to the CURRENT (training) W&B run under
     ``val/`` — else None. Sim-agnostic: the rollout runs through the ``EVAL_POLICY`` plugin
@@ -101,8 +101,9 @@ def _make_record_callback(task: str, recipe: str, device: str, policy_cfg: dict,
     BLOCKING: records synchronously on the train thread — the loop pauses per checkpoint until the link is
     logged (``wandb.log(..., step=iter)``).
 
-    Knobs (env): ``RECORD_ENVS`` (envs given a series + a report tab, default 4 = one per hammer variant,
-    since env i gets variant i % N), ``RECORD_STEPS`` = policy steps per recording (0 = full episode;
+    Knobs (env): ``RECORD_ENVS`` (envs given a series + a report tab; empty/unset = ``record_envs_default``,
+    the experiment module's ``RECORD_ENVS`` — hammer's 4 = one per variant, since env i gets variant i % N;
+    a locomotion task wants 1), ``RECORD_STEPS`` = policy steps per recording (0 = full episode;
     default 600). Best-effort — a recording failure must never kill training."""
     if os.environ.get("RECORD") != "1":
         return None
@@ -111,7 +112,7 @@ def _make_record_callback(task: str, recipe: str, device: str, policy_cfg: dict,
     policy_name = os.environ.get("EVAL_POLICY")
     assert policy_name, "RECORD=1 needs EVAL_POLICY=<learning.eval.policies module> (set by the launch script)"
     _run_policy_eval = importlib.import_module(f"learning.eval.policies.{policy_name}")._run_eval
-    record_envs = int(os.environ.get("RECORD_ENVS", "4"))
+    record_envs = int(os.environ.get("RECORD_ENVS") or record_envs_default)
     record_steps = int(os.environ.get("RECORD_STEPS", "600"))   # policy steps per recording; <=0 = full episode
 
     def _record_and_upload(ckpt_path: str) -> None:
@@ -378,6 +379,7 @@ class RLTrainer:
             record_cb = _make_record_callback(args.task, args.recipe, args.device, _exp_mod.POLICY,
                                               args.seed,
                                               train_env=env,
+                                              record_envs_default=getattr(_exp_mod, "RECORD_ENVS", 4),
                                               latest_metrics=lambda: runner.logger.last_metrics)
             runner = OnPolicyRunner(env, exp, log_dir=log_dir, device=args.device, on_checkpoint=record_cb)
 

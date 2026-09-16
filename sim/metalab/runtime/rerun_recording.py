@@ -151,7 +151,8 @@ def attach_file_sink(viewer, rrd_path: str, *, fps: float, keep_live: bool = Fal
 
 
 def log_world_labels(offsets, height: float = 0.9) -> int:
-    """Float an ``env<N>`` label over each world. ``offsets`` = (N,3) per-world tile offsets. Returns the count.
+    """Float an ``env<N>`` label over each world. ``offsets`` = (N,3) per-world tile offsets. Returns the count
+    (0 for a single world: one robot needs no name).
 
     WHY. A recording holds EVERY env at once (both spokes tile them) while the report's plots show one at a
     time, and the envs terminate independently — so without labels you watch one robot reset while another
@@ -160,6 +161,8 @@ def log_world_labels(offsets, height: float = 0.9) -> int:
     if offsets is None:
         return 0
     pos = np.asarray(offsets, dtype=np.float32).reshape(-1, 3).copy()
+    if len(pos) < 2:
+        return 0
     pos[:, 2] += float(height)                         # lift clear of the table so the text is readable
     rr.log("/metalab/env_labels",
            rr.Points3D(positions=pos, labels=[f"env{i}" for i in range(len(pos))],
