@@ -45,13 +45,21 @@ from sim.metalab.terms.obs.common import (
     palm_pose_in_chest,
     prev_action_targets,
 )
+from sim.metalab.terms.obs.locomotion import (
+    body_angular_velocity_local,
+    body_linear_velocity_local,
+    joint_positions_relative_to_init,
+    projected_gravity,
+)
 
 __all__ = [
     "action_delay",
     "body_angular_velocity",
+    "body_angular_velocity_local",
     "body_contact_flags",
     "body_goal_error",
     "body_linear_velocity",
+    "body_linear_velocity_local",
     "body_pose_in_chest",
     "closest_keypoint_max_dist",
     "curriculum_hold_progress",
@@ -74,6 +82,7 @@ __all__ = [
     "joint_pd_torque_obs",
     "joint_pose_error",
     "joint_positions",
+    "joint_positions_relative_to_init",
     "joint_state",
     "joint_torque_obs",
     "joint_velocities",
@@ -90,4 +99,5 @@ __all__ = [
     "palm_distance_error",
     "palm_pose_in_chest",
     "prev_action_targets",
+    "projected_gravity",
 ]

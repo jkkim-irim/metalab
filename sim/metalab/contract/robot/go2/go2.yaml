@@ -19,6 +19,28 @@ joints:
   RR_thigh_joint: 1
   RR_calf_joint: 1
 
+collision:
+  base_link: 0
+  FL_hip: 0
+  FL_thigh: 0
+  FL_calf: 0
+  FR_hip: 0
+  FR_thigh: 0
+  FR_calf: 0
+  RL_hip: 0
+  RL_thigh: 0
+  RL_calf: 0
+  RR_hip: 0
+  RR_thigh: 0
+  RR_calf: 0
+  FL_foot: 1
+  FR_foot: 1
+  RL_foot: 1
+  RR_foot: 1
+
+frames:
+  base: base_link
+
 action_groups:
   legs: [FL_hip_joint, FL_thigh_joint, FL_calf_joint,
          FR_hip_joint, FR_thigh_joint, FR_calf_joint,

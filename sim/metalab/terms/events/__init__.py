@@ -14,6 +14,9 @@ from sim.metalab.terms.events.common import (
 from sim.metalab.terms.events.hammer_lift import (
     apply_object_external_force_when_lifted,
 )
+from sim.metalab.terms.events.locomotion import (
+    sample_velocity_command,
+)
 
 __all__ = [
     "apply_object_external_force",
@@ -25,5 +28,6 @@ __all__ = [
     "reset_joints_by_offset",
     "reset_object_pose",
     "sample_goal_position",
+    "sample_velocity_command",
     "set_shape_friction",
 ]

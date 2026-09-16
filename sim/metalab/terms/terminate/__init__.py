@@ -9,9 +9,13 @@ from sim.metalab.terms.terminate.common import (
     table_fingertip_contact_force_exceeded,
     time_out,
 )
+from sim.metalab.terms.terminate.locomotion import (
+    body_tilt_exceeded,
+)
 
 __all__ = [
     "body_contact_detected",
+    "body_tilt_exceeded",
     "curriculum_passed",
     "object_below_height",
     "object_far_from_body",
