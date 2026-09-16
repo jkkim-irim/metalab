@@ -324,6 +324,7 @@ _SCRIPT = {
 _runs: dict = {}                             # run_id -> {proc, logf, meta}  (this session's launches)
 _runs_lock = threading.Lock()
 _httpd = None                                # set by serve(); used by request_shutdown()
+TRAIN_SEED = "42"                            # every Launchpad training run; not a knob
 
 
 def hub_url() -> str:
@@ -425,15 +426,16 @@ def _build(params: dict) -> tuple[str, list, dict]:
                 if sc:
                     float(sc)  # validate — fail loud on non-numeric
                     env["SAPG_IR_COEF_SCALE"] = sc
-            for k, fl in (("max_iterations", "--max_iterations"), ("seed", "--seed")):
+            for k, fl in (("max_iterations", "--max_iterations"),):
                 v = _int(knob.get(k, ""))
                 if v:
                     flags += [fl, v]
         else:
-            for k, fl in (("num_envs", "--num_envs"), ("max_iterations", "--max_iterations"), ("seed", "--seed")):
+            for k, fl in (("num_envs", "--num_envs"), ("max_iterations", "--max_iterations")):
                 v = _int(knob.get(k, ""))
                 if v:
                     flags += [fl, v]
+        flags += ["--seed", TRAIN_SEED]
         lbl = _label(knob.get("run_label", ""))     # empty → the launcher leaves the label segment out
         if lbl:
             flags += ["--run_label", lbl]
@@ -938,7 +940,7 @@ def _make_handler():
         def do_GET(self):
             u = urlparse(self.path)
             if u.path == "/" or u.path.startswith("/index"):
-                self._send(_PAGE.encode(), "text/html; charset=utf-8")
+                self._send(_PAGE.replace("__TRAIN_SEED__", TRAIN_SEED).encode(), "text/html; charset=utf-8")
             elif u.path == "/simui":                # the page's endpoints are relative → needs the slash
                 self.send_response(301)
                 self.send_header("Location", "/simui/")
@@ -1318,11 +1320,12 @@ const state={engine:null,task:null,recipe:"",mode:"train",algo:"ppo",knob:{},adv
 let CREDS={wandb:true};
 
 // mode-dependent knob + advanced specs (matched to the maintained local scripts)
+const TRAIN_SEED="__TRAIN_SEED__";
 const SPEC={
   train:{
     script:"learning/scripts/local/metalab_train.sh",
     knobs:[["num_envs","4096","--num_envs"],["max_iterations","5000","--max_iterations"],
-           ["seed","42","--seed"],["device","cuda:0","--device"],["run_label","","--run_label"]],
+           ["device","cuda:0","--device"],["run_label","","--run_label"]],
     adv:[["viz","--viz","3D 뷰어 창 (엔진 GUI)"],["no_wandb","--no_wandb","wandb 끄기"],
          ["record","--record","체크포인트별 녹화"]],
     advhint:""
@@ -1448,6 +1451,7 @@ function buildCmd(){
     }else{
       sp.knobs.forEach(([k,,fl])=>{const v=val(k);if(v)parts.push([fl,v]);});
     }
+    parts.push(["--seed",TRAIN_SEED]);
     sp.adv.forEach(([k,fl])=>{if(state.adv[k])parts.push(k==="viz"?["--viz","gl"]:[fl]);});
   }else{
     (sp.envknobs||[]).forEach(([k,,name])=>{const v=val(k);if(v)env.push([name,v]);});
