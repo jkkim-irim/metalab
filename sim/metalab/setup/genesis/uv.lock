@@ -12,37 +12,6 @@ wheels = [
 ]
 
 [[package]]
-name = "metalab-genesis-env"
-version = "0.0.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "genesis-world" },
-    { name = "gitpython" },
-    { name = "imageio-ffmpeg" },
-    { name = "matplotlib" },
-    { name = "rerun-sdk" },
-    { name = "tensorboard" },
-    { name = "tensordict" },
-    { name = "torch" },
-    { name = "wandb" },
-    { name = "warp-lang" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "genesis-world", editable = "../../../../../genesis-world" },
-    { name = "gitpython" },
-    { name = "imageio-ffmpeg" },
-    { name = "matplotlib" },
-    { name = "rerun-sdk", specifier = ">=0.27.1" },
-    { name = "tensorboard" },
-    { name = "tensordict", specifier = "==0.13.0" },
-    { name = "torch", specifier = "==2.10.0", index = "https://download.pytorch.org/whl/cu128" },
-    { name = "wandb" },
-    { name = "warp-lang", specifier = "==1.15.0" },
-]
-
-[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -761,6 +730,35 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "metalab-genesis-env"
+version = "0.0.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "genesis-world" },
+    { name = "gitpython" },
+    { name = "imageio-ffmpeg" },
+    { name = "matplotlib" },
+    { name = "rerun-sdk" },
+    { name = "tensorboard" },
+    { name = "tensordict" },
+    { name = "torch" },
+    { name = "wandb" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "genesis-world", editable = "../../../../../genesis-world" },
+    { name = "gitpython" },
+    { name = "imageio-ffmpeg" },
+    { name = "matplotlib" },
+    { name = "rerun-sdk", specifier = ">=0.27.1" },
+    { name = "tensorboard" },
+    { name = "tensordict", specifier = "==0.13.0" },
+    { name = "torch", specifier = "==2.10.0", index = "https://download.pytorch.org/whl/cu128" },
+    { name = "wandb" },
 ]
 
 [[package]]
@@ -1825,20 +1823,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/59/b1/f7a96c09cab0c5131b1e6466659b093b401e1653cbe6bb77b462fc1c361d/wandb-0.28.0-py3-none-win32.whl", hash = "sha256:8834ef3a7c8c43b701654162783caa7ad37af48a0ff06fc35d0d65a411f76ccd", size = 24525206, upload-time = "2026-06-23T00:38:42.041Z" },
     { url = "https://files.pythonhosted.org/packages/c6/c4/c7bed5e981679c74e9fbb22c03ff31c42e95f266199d03d8d325f4d0e6df/wandb-0.28.0-py3-none-win_amd64.whl", hash = "sha256:ac1f82292e2da4f98297b78c3a46726b3a6c5734ecb75fc39b8db2c8a4989159", size = 24525214, upload-time = "2026-06-23T00:38:44.549Z" },
     { url = "https://files.pythonhosted.org/packages/f0/77/b5ce9696c8cb955521a7941fbc443e78b2f504894c6ae1a2d0b1de6e12ae/wandb-0.28.0-py3-none-win_arm64.whl", hash = "sha256:c5b0faf1b84cf79ebabed77538c1940a4c6053e815f767a4004e877a1354bed1", size = 22378208, upload-time = "2026-06-23T00:38:47.148Z" },
-]
-
-[[package]]
-name = "warp-lang"
-version = "1.15.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ce/a2/712bcea055b80135e20a7a142f5dc1fa617bf3b5557dd4cc3afcc1048ab4/warp_lang-1.15.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:ee06e2e76bff84088a09e64315e71ed0e55e94c936ec664d7b05ebd56f66a363", size = 25048790, upload-time = "2026-07-07T22:26:18.532Z" },
-    { url = "https://files.pythonhosted.org/packages/a8/ba/36023c3161c45f1c509c20c501b17980705fdd3b6c20b7ee9267f50f44a2/warp_lang-1.15.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:95c169f28bd7d6c78ac4ad62e2df1e61a096033748f757157fa4551aed80d010", size = 166711381, upload-time = "2026-07-07T22:26:56.524Z" },
-    { url = "https://files.pythonhosted.org/packages/04/24/2c06013209ad4edb1f9e52692d43738b4945fceaa6acc30f34e2d25fc087/warp_lang-1.15.0-py3-none-manylinux_2_34_aarch64.whl", hash = "sha256:3c0711b39ad98ff924d29654b028ec4eaa02330e207ae3efc72445e9cde05b34", size = 171756145, upload-time = "2026-07-07T22:28:07.427Z" },
-    { url = "https://files.pythonhosted.org/packages/c5/00/4de2563f88c882e6621349654cee770ce5ae86c8113b63c09bd8aa3e5274/warp_lang-1.15.0-py3-none-win_amd64.whl", hash = "sha256:06ef42c3ce522749268056653ea253645eb4a96ca164af74ae5113f0d55a6970", size = 149948459, upload-time = "2026-07-07T22:28:32.767Z" },
 ]
 
 [[package]]

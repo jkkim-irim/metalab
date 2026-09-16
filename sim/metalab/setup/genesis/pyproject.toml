@@ -23,8 +23,6 @@ dependencies = [
     "gitpython",              # run-name git SHA stamping
     "imageio-ffmpeg",         # training-time eval video (rl_eval --record → wandb.Video) frame encode
     "matplotlib",             # eval plotting / fk metrics
-    "warp-lang==1.15.0",      # REQUIRED by control_mode:motor — the coupled PD runs the newton warp
-                              # kernels here too (no fallback; see backends/genesis/backend.py)
     # .rrd recordings for the rollout report's 3D pane. Same floor the newton env pins, and the version
     # uv.lock resolves is LOAD-BEARING: it is baked into the viewer URL the report links to, and an .rrd
     # stays readable only across adjacent minor versions. Bump both engines together.

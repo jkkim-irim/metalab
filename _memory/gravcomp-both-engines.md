@@ -13,4 +13,4 @@ type: project
 - settle: 렌더 끄고 물리만 + adaptive 조기종료. `METALAB_SETTLE_S=0.4`, 최초실행 `METALAB_SETTLE_FIRST_S=2.0`(cold 솔버).
 - ⚠️ 물리·obs 계약 변경 → **기존 policy 무효**. genesis Jacobian×14/step 은 대규모 env 부하 후보.
 
-관련: [[motor-to-joint-coupled-pd]], [[engine-api-semantic-traps]]
+관련: [[engine-api-semantic-traps]]

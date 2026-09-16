@@ -36,4 +36,4 @@ type: reference
 parity 확인(실측): frictionloss·중력·질량·breakaway 마찰·root height·케이던스·equality(≤0.05°)·패시브 평형·접촉 규약.
 미해결: `apply_object_force` 임펄스 ≠ F·dt/m, 엔진별 상이(newton 1.71× / genesis 1.40×).
 
-관련: [[engine-parity-settings]], [[motor-to-joint-coupled-pd]]
+관련: [[engine-parity-settings]]

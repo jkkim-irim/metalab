@@ -13,4 +13,4 @@ type: project
 - 재현: `parity_rollout holddump --engine genesis --task motor-parity --n_steps 50` — 단 이 하니스(`runtime/parity_rollout.py`)는 2026-09-01 제거됨(다른 방식의 parity 체크로 대체 예정).
 - ⚠️ genesis 학습은 **매 리셋마다 이 임펄스를 맞는다**. 미해결.
 
-관련: [[motor-to-joint-coupled-pd]], [[engine-parity-settings]]
+관련: [[engine-parity-settings]]
