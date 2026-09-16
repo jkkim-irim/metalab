@@ -7,7 +7,7 @@ type: project
 접촉-free 씬, 초기상태 엔진 간 비트 동일인데 genesis 만 hold 첫 스텝에 **~17 rad/s** 튀고 step49 에도
 1~2.5 잔존(newton 0.003). 접촉 있는 태스크에서도 동일 방향(0.139 vs 0.017).
 
-- 배제: 초기 q/v, armature, coupled PD 첫 launch, 중력보상, 모터 커플링(`METALAB_MOTOR_COUPLING=0` 재현).
+- 배제: 초기 q/v, armature, 중력보상 (당시의 모터공간 coupled PD 도 배제 — 이후 기능 자체 제거).
 - ⇒ genesis 가 첫 substep 에 지시 없는 토크(~2.4 N·m) 주입. 후보: genesis 자체 equality spawn 해소
   (`eq_solref/eq_solimp` 가 newton 블록에만 있음), reset 경로.
 - 재현: `parity_rollout holddump --engine genesis --task motor-parity --n_steps 50` — 단 이 하니스(`runtime/parity_rollout.py`)는 2026-09-01 제거됨(다른 방식의 parity 체크로 대체 예정).

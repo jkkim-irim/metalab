@@ -1,6 +1,6 @@
 """Live-engine check: the contact friction the solver USES is sqrt(mu_a*mu_b), not MuJoCo/genesis' max().
 
-Needs a GPU and one engine venv, so it is a script rather than a unit test (test_motor_coupling.py covers
+Needs a GPU and one engine venv, so it is a script rather than a unit test (test_contact_friction.py covers
 what runs on CPU). It makes the two mixing rules give different answers on purpose — the hammer's mu is
 lowered to 0.25 while everything else stays 1.0, so every hammer contact has mu_a != mu_b (max would report
 1.0, the geometric mean 0.5) — then reads the solver's own contact buffer and compares EVERY live contact

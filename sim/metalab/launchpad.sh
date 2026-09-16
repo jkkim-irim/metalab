@@ -30,20 +30,13 @@ SERVER="$SCRIPT_DIR/launchpad/server.py"
 ICON_PATH="$SCRIPT_DIR/launchpad/assets/metalab_logo.png"
 DESKTOP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 
-# Branding — distinct per checkout so multiple worktrees install as SEPARATE app icons instead of
-# clobbering one shared desktop entry / grouping into one taskbar window. Defaults derive from the
-# repo dir: the `metalab-motor-to-joint-control` worktree registers as "M2J Launchpad" (own .desktop,
-# WM class, browser profile, port) alongside a main "MetaLab Launchpad" install. Override any via env.
-# Patterns are suffix globs so renaming a worktree's prefix does not silently drop it to the default
-# branding — which would collide with the main install's .desktop, WM class and port.
+# Branding — override any via env so a second checkout can install as a SEPARATE app icon (own .desktop,
+# WM class, browser profile, port) instead of clobbering this one.
 #
 # PORTS ARE 878x ON PURPOSE. An unrelated checkout on this machine can ship its own launchpad with its
 # own defaults; sharing a port means clicking this icon opens THAT console (see _hub_probe). Keep every
-# MetaLab port inside 878x, and give a new worktree its own number here rather than reusing one.
-case "$(basename "$REPO")" in
-  *motor-to-joint-control) _NAME="M2J Launchpad"; _DSLUG="m2j-launchpad"; _WM="m2j-hub"; _PORT=8781 ;;
-  *)                       _NAME="MetaLab Launchpad"; _DSLUG="metalab-launchpad"; _WM="metalab-hub"; _PORT=8780 ;;
-esac
+# MetaLab port inside 878x, and give a second checkout its own number rather than reusing one.
+_NAME="MetaLab Launchpad"; _DSLUG="metalab-launchpad"; _WM="metalab-hub"; _PORT=8780
 LAUNCHPAD_NAME="${LAUNCHPAD_NAME:-$_NAME}"
 LAUNCHPAD_DESKTOP_SLUG="${LAUNCHPAD_DESKTOP_SLUG:-$_DSLUG}"
 LAUNCHPAD_WMCLASS="${LAUNCHPAD_WMCLASS:-$_WM}"
@@ -138,7 +131,7 @@ Exec=bash "$SCRIPT_PATH" --bg
 Icon=$ICON_PATH
 Terminal=false
 Categories=Development;
-Keywords=MetaLab;M2J;RL;sim;newton;genesis;training;
+Keywords=MetaLab;RL;sim;newton;genesis;training;
 StartupNotify=true
 StartupWMClass=$LAUNCHPAD_WMCLASS
 EOF

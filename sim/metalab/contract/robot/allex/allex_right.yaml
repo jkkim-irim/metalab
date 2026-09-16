@@ -1,5 +1,5 @@
 # allex_right — right arm+hand contract derived from allex.yaml (every non-right joint welded).
-# proto_v4 hand: each fingertip PAD is its own collision shell on its own body, so pad and nail are told
+# Hand: each fingertip PAD is its own collision shell on its own body, so pad and nail are told
 # apart by WHICH BODY a contact was read on — see `fingertips` and `nail_friction` below.
 asset:
   mjcf: sim/metalab/assets/robots/allex_model/mjcf/ALLEX.xml
@@ -145,7 +145,7 @@ collision:                     # 1 = keep collision geom, 0 = drop it (visual ke
   L_Little_Proximal_Link: 0
   L_Little_Middle_Link: 0
   L_Little_Distal_Link: 0
-  # the left PAD shells — their own bodies since proto_v4, so the *_Distal_Link keys above do not reach them
+  # the left PAD shells — their own bodies, so the *_Distal_Link keys above do not reach them
   # (a body key covers that body's geoms, not its children's) and the mesh they share with the right hand
   # cannot single them out either
   L_Thumb_Fingertip: 0
@@ -188,14 +188,14 @@ frames:
 fingertips: [R_Index_Fingertip, R_Middle_Fingertip, R_Ring_Fingertip, R_Little_Fingertip, R_Thumb_Fingertip]
 # closes each fingertip, same order — measured: flexion positive, extension negative
 fingertip_flex_joints: [R_Index_PIP_Joint, R_Middle_PIP_Joint, R_Ring_PIP_Joint, R_Little_PIP_Joint, R_Thumb_MCP_Joint]
-# No fingertip_pad_axes on purpose: the bodies above ARE the pad shells (proto_v4 split the nail onto
+# No fingertip_pad_axes on purpose: the bodies above ARE the pad shells (the nail sits alone on
 # `*_Distal_Link`), so a force read on them is a pad press by construction and contact_mask counts it by
 # magnitude. The projection exists for hands that carry pad and nail on ONE body.
 
 # The NAIL shells — pinned slick, and OUT of the friction DR's reach: the backend leaves these shapes out of
 # the "robot" set the reset event writes, so this value is written once at build and stays. Named by BODY
-# because a shape carries no name in either engine — exact here, since proto_v4 moved the PAD shell onto
-# `*_Fingertip` and left the nail shell alone on `*_Distal_Link`.
+# because a shape carries no name in either engine — exact here, since the PAD shell sits on
+# `*_Fingertip` and the nail shell alone on `*_Distal_Link`.
 nail_friction:
   mu: 0.1
   bodies: [R_Index_Distal_Link, R_Middle_Distal_Link, R_Ring_Distal_Link, R_Little_Distal_Link,
