@@ -2,7 +2,7 @@
 # proto_v4 hand: each fingertip PAD is its own collision shell on its own body, so pad and nail are told
 # apart by WHICH BODY a contact was read on — see `fingertips` and `nail_friction` below.
 asset:
-  mjcf: sim/metalab/assets/robots/proto_v4/mjcf/ALLEX.xml
+  mjcf: sim/metalab/assets/robots/allex_model/mjcf/ALLEX.xml
 fixed_base: true
 
 joints:                        # 1 = active, 0 = welded at 0 deg. R_ finger IP/DIP: equality followers

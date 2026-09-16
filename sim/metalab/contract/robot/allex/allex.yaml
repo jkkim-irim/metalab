@@ -1,5 +1,5 @@
 asset:
-  mjcf: sim/metalab/assets/robots/proto_v4/mjcf/ALLEX.xml
+  mjcf: sim/metalab/assets/robots/allex_model/mjcf/ALLEX.xml
 fixed_base: true
 
 joints:
