@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import importlib.util
 import json
+import mimetypes
 import os
 from pathlib import Path
 import re
@@ -291,6 +292,23 @@ def list_dir(rel: str) -> dict:
             "files": [{"name": n, "path": r} for _, n, r in files]}
 
 
+def logs_file(rel: str) -> tuple[bytes, str] | None:
+    """Bytes + content type of one file under _logs/ for ``GET /logs/<rel>`` (the per-checkpoint rollout
+    reports: report.html fetches its sibling rollout.rrd, which only works over http). Confined to _logs/;
+    a path outside it, a directory, or a missing file is None (404)."""
+    base = (REPO / "_logs").resolve()
+    try:
+        target = (base / rel).resolve()
+    except Exception:
+        return None
+    if base not in target.parents or not target.is_file():
+        return None
+    ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+    if ctype.startswith("text/"):
+        ctype += "; charset=utf-8"
+    return target.read_bytes(), ctype
+
+
 # ── run launch + registry (P0 Step 3) ────────────────────────────────────────
 RUNS_DIR = REPO / "_logs" / "launchpad"     # under /_logs/ (gitignored) — runtime state only
 RUNS_JSONL = RUNS_DIR / "runs.jsonl"        # append-only launch log (persists across Launchpad restarts)
@@ -306,6 +324,15 @@ _SCRIPT = {
 _runs: dict = {}                             # run_id -> {proc, logf, meta}  (this session's launches)
 _runs_lock = threading.Lock()
 _httpd = None                                # set by serve(); used by request_shutdown()
+
+
+def hub_url() -> str:
+    """This Launchpad's own address, from the socket it actually bound (serve() falls back to an OS-assigned
+    port when 8780 is taken). Runs receive it as METALAB_HUB_URL so the trainer can link a checkpoint's
+    report as http://<hub>/logs/<path>/report.html — the only form whose 3D pane loads."""
+    assert _httpd is not None, "hub_url() before serve() bound the socket"
+    host, port = _httpd.server_address[:2]
+    return f"http://{host}:{port}"
 _poll_seq = 0                                # bumped on each /api/runs poll — a browser heartbeat
 
 
@@ -460,6 +487,7 @@ def launch(params: dict) -> dict:
     logf = open(logpath, "wb")
     full_env = dict(os.environ)
     full_env.update(env)
+    full_env["METALAB_HUB_URL"] = hub_url()
     exec_argv = ["bash", str(REPO / script), *flags]
     proc = subprocess.Popen(exec_argv, cwd=str(REPO), env=full_env, stdout=logf,
                             stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
@@ -933,6 +961,12 @@ def _make_handler():
             elif u.path == "/api/log":
                 rid = (parse_qs(u.query).get("run_id") or [""])[0]
                 self._json({"run_id": rid, "log": read_log(rid)})
+            elif u.path.startswith("/logs/"):
+                f = logs_file(u.path[len("/logs/"):])
+                if f is None:
+                    self._json({"error": "not found"}, 404)
+                else:
+                    self._send(*f)
             else:
                 self._json({"error": "not found"}, 404)
 

@@ -19,6 +19,7 @@ import copy
 import glob
 import importlib
 import os
+from pathlib import Path
 import shutil
 import tempfile
 
@@ -52,6 +53,23 @@ def _publish_report(vdir: str, ckpt_path: str, it: int | None) -> str:
     shutil.copytree(vdir, dest, dirs_exist_ok=True)
     print(f"[rl-trainer] report -> {dest}", flush=True)
     return dest
+
+
+def _report_link(dest: str, hub_url: str | None = None, logs_root: str | None = None) -> tuple[str, str]:
+    """(href, html) for the ``val/report`` panel of a published report dir.
+
+    With a Launchpad hub (``METALAB_HUB_URL``, set for every run it launches) and ``dest`` under the repo's
+    ``_logs/`` — the tree the hub serves at ``/logs/<rel>`` — the panel is a link to
+    ``http://<hub>/logs/<rel>/report.html``: the page fetches its sibling ``rollout.rrd`` and rerun's
+    viewer bundle, which a browser refuses over ``file://``, so a local path can only ever show the plots.
+    Without a hub, or for a log root the hub cannot serve, it stays the local path."""
+    hub = os.environ.get("METALAB_HUB_URL", "") if hub_url is None else hub_url
+    root = Path(logs_root) if logs_root else Path(__file__).resolve().parents[2] / "_logs"
+    d = Path(dest).resolve()
+    if hub and root.resolve() in d.parents:
+        href = f"{hub.rstrip('/')}/logs/{d.relative_to(root.resolve()).as_posix()}/report.html"
+        return href, f'<a href="{href}" target="_blank">{d.name}</a><br><code>{dest}</code>'
+    return dest, f"<code>{dest}</code>"
 
 
 def _make_record_callback(task: str, recipe: str, device: str, policy_cfg: dict, seed: int,
@@ -152,12 +170,13 @@ def _make_record_callback(task: str, recipe: str, device: str, policy_cfg: dict,
             sr = (latest_metrics() or {}).get("val/SR") if latest_metrics else None
             sr = None if sr is None else round(float(sr), 4)
             # Publish the .rrd + series + page beside this run's checkpoints, then log where it went.
-            url = _publish_report(vdir, ckpt_path, it)
-            if url:
-                payload = {"val/report": wandb.Html(f"<code>{url}</code>")}
+            dest = _publish_report(vdir, ckpt_path, it)
+            if dest:
+                href, html = _report_link(dest)
+                payload = {"val/report": wandb.Html(html)}
                 # blocking: synchronous at checkpoint time → step=it is valid on the training step axis
                 wandb.log(payload, step=it) if it is not None else wandb.log(payload)
-                print(f"[rl-trainer] report @iter {it} (SR {sr}) → W&B (val/report) {url}", flush=True)
+                print(f"[rl-trainer] report @iter {it} (SR {sr}) → W&B (val/report) {href}", flush=True)
             else:
                 print(f"[rl-trainer] WARN: no report published for {os.path.basename(ckpt_path)}", flush=True)
         finally:

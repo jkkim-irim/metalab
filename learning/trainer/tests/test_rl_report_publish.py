@@ -7,7 +7,7 @@ Run from the repo root:  python -m pytest learning -q
 """
 from pathlib import Path
 
-from learning.trainer.rl_trainer import _publish_report
+from learning.trainer.rl_trainer import _publish_report, _report_link
 
 
 def _recording(d: Path) -> Path:
@@ -53,3 +53,27 @@ def test_a_recording_without_a_page_publishes_nothing(tmp_path):
     ckpt = _ckpt(tmp_path / "logs" / "260730-1253_2envs_ppo_newton_abc")
     assert _publish_report(str(vdir), str(ckpt), 500) == ""
     assert not (ckpt.parent / "report_500").exists()
+
+
+def test_link_is_http_under_a_hub(tmp_path):
+    """Launched from the Launchpad, the panel links the hub's /logs/ route so the 3D pane can load."""
+    dest = tmp_path / "_logs" / "rl" / "go2-walk" / "260916-2230_abc" / "report_500"
+    dest.mkdir(parents=True)
+    href, html = _report_link(str(dest), hub_url="http://127.0.0.1:8780", logs_root=str(tmp_path / "_logs"))
+    assert href == "http://127.0.0.1:8780/logs/rl/go2-walk/260916-2230_abc/report_500/report.html"
+    assert f'href="{href}"' in html and str(dest) in html
+
+
+def test_link_stays_local_without_a_hub(tmp_path):
+    """A CLI run has no hub to serve the file: the panel keeps the local path."""
+    dest = tmp_path / "_logs" / "rl" / "x" / "report_1"
+    dest.mkdir(parents=True)
+    assert _report_link(str(dest), hub_url="", logs_root=str(tmp_path / "_logs")) == (str(dest), f"<code>{dest}</code>")
+
+
+def test_link_stays_local_outside_the_served_tree(tmp_path):
+    """RL_LOG_ROOT outside _logs/: the hub cannot serve it, so no http link is fabricated."""
+    dest = tmp_path / "elsewhere" / "run" / "report_1"
+    dest.mkdir(parents=True)
+    href, _ = _report_link(str(dest), hub_url="http://127.0.0.1:8780", logs_root=str(tmp_path / "_logs"))
+    assert href == str(dest)
