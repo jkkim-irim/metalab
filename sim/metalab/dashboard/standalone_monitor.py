@@ -12,13 +12,6 @@ Standalone contracts carry **no obs list** (all learning stripped — see tasks/
 intent in each contract's docstring), so the channel set is derived here from the robot's joint set,
 its ``fingertips`` and declared ``frames`` vocabulary instead of a ``TermRef`` list.
 
-Two channels are deliberately NOT obs terms: :func:`_kp_channel` (``Joint Kp``) and
-:func:`_tau_lim_channel` (``Joint Torque Limit``). Both read the coupled transmission — joint-space
-stiffness ``Gᵀ·diag(k_phi)·G`` and the joint torque the motors can actually deliver ``Gᵀ·(envelope ∩
-rated)`` — controller properties rather than something a policy observes. They are computed host-side per
-snapshot from the backend (``coupled_kq`` / ``coupled_tau_lim``), so they stay out of the step loop and out
-of the obs library until a task actually wants to observe them.
-
 The runner samples EVERY channel on each published step (:func:`sample`) — the browser buffers all of
 them continuously, so switching tabs while paused shows the same frozen instant on every plot.
 """
@@ -28,8 +21,6 @@ from dataclasses import dataclass
 from functools import partial
 import math
 from typing import Callable
-
-import numpy as np
 
 from sim.metalab.terms.obs import (
     body_pose_in_chest,
@@ -64,119 +55,9 @@ class Channel:
     scale: float = 1.0      # display scale applied to fn's output (e.g. rad → deg)
     digits: int = 2         # decimals the dashboard prints for this channel's values
     # Optional checkbox grouping: [{joint, items: [[series index, entry label], ...]}, ...]. Channels whose
-    # series are not simply "one per joint" (Joint Kp = a row of K per joint) use it so the selector can
-    # nest the entries under their joint instead of listing 124 flat names.
+    # series are not simply "one per joint" (Fingertip Contact Force = x/y/z per tip) use it so the selector
+    # can nest the entries under their heading instead of listing them flat.
     rows: tuple = ()
-
-
-# Which transmissions get cross-term checkboxes. finger (MCP×PIP ~0.97 normalised) and wrist (≤0.24,
-# pose-dependent) are the ones where a joint's stiffness genuinely depends on its neighbour's error.
-# The rest are diagonal in practice — thumb ~0.03 (Yaw exactly 0), shoulder exactly 0 (direct drive),
-# elbow exactly 0 while its two motors share a gain, which `equal_gain_warnings` polices instead of a
-# flat-zero plot line: break that symmetry and the dashboard says so in the header.
-_OFF_DIAG_PARTS = frozenset({"finger", "wrist"})
-
-
-def _partner(owner: str, other: str) -> str:
-    """Label a cross term by what it couples TO, shortened against the joint that owns the row:
-    R_Index_MCP's partner R_Index_PIP reads "PIP"; R_Elbow's partner R_Wrist_Yaw reads "Wrist_Yaw"."""
-    a, b = owner.split("_"), other.split("_")
-    k = 0
-    while k < min(len(a), len(b)) - 1 and a[k] == b[k]:
-        k += 1
-    return "_".join(b[k:])
-
-
-def _kp_channel(state, order: list[str]) -> Channel | None:
-    """``Joint Kp`` — the coupled groups' joint-space stiffness ``K_q = Gᵀ·diag(k_phi)·G`` [N·m/rad], live.
-
-    Motor-space PD makes joint stiffness a function of POSE (through the transmission Jacobian G) and it is
-    not diagonal: what a joint feels depends on which other joints of its group are off target too. So the
-    channel plots matrix ENTRIES, not one scalar per joint — no reduction to a single number can carry the
-    coupling honestly (the same K row can read 9.3 or −1.3 N·m/rad for the same joint depending on the error
-    pattern).
-
-    Laid out **one row of K per joint**, joints in ``order`` (the runner's report order, so the checkbox
-    list reads like the Joint Position tab): the joint's own ``diag``, plus one entry per group partner for
-    the transmissions that actually couple (``_OFF_DIAG_PARTS``). A symmetric pair therefore appears under
-    BOTH joints — that redundancy is the point, each joint's row is readable on its own. Joints outside a
-    coupled group (waist/neck, native PD) have no K_q and no row.
-
-    Note the scales when picking series: a shoulder diagonal is 4930 N·m/rad against a finger's 0.8, so
-    those belong in different panes (which is what the Monitor grid does — one pane per joint).
-
-    ``None`` when the robot has no coupled transmission (control_mode != motor) — no tab rather than a flat
-    zero one. Evaluated host-side per snapshot (see backend.coupled_kq), so the step loop pays nothing."""
-    groups = state.coupled_kq()
-    if not groups:
-        return None
-    rank = {j: k for k, j in enumerate(order)}
-    owned = sorted(((gi, i, j) for gi, g in enumerate(groups) for i, j in enumerate(g["joints"])),
-                   key=lambda e: rank.get(e[2], len(rank)))
-    labels, plan, rows = [], [], []
-    for gi, i, jname in owned:
-        g = groups[gi]
-        names = g["joints"]
-        me = jname.replace("_Joint", "")
-        cross = g["part"] in _OFF_DIAG_PARTS
-        items = []
-        for j in [i] + ([k for k in range(len(names)) if k != i] if cross else []):
-            tag = "diag" if i == j else _partner(jname, names[j]).replace("_Joint", "")
-            labels.append(f"{me}·{tag}" if i == j else f"{me}×{tag}")
-            items.append([len(labels) - 1, tag])
-            plan.append((gi, i, j))
-        rows.append({"joint": me, "items": items})
-
-    def fn(st):
-        gs = st.coupled_kq()
-        return np.asarray([gs[gi]["K"][i][j] for gi, i, j in plan], dtype=np.float32).reshape(1, -1)
-
-    return Channel(key="joint_kp", title="Joint Kp", unit="N·m/rad · Gᵀ·diag(k_phi)·G, pose-dependent",
-                   labels=labels, fn=fn, digits=3, rows=tuple(rows))
-
-
-def _tau_lim_channel(state, order: list[str]) -> Channel | None:
-    """``Joint Torque Limit`` — how much torque each coupled joint can actually produce, right now [N·m].
-
-    Not a constant per joint: motor-space PD means a joint's torque comes from its group's motors through
-    ``τ_q = Gᵀ·τ_m``, so the bound moves with the POSE (leverage) and with the SPEED (each motor's
-    torque-speed envelope). See :func:`motor_coupling._tau_lim` for the expression and its honesty caveat
-    (per-joint projection of a coupled polytope — exact per joint, not simultaneously achievable).
-
-    Three series per joint, in ONE pane (the grid overlays a joint's entries): ``+lim`` / ``−lim`` = the
-    envelope, and ``τ`` = the applied joint torque — the same post-clamp value the Joint Torque tab plots,
-    repeated here because the limit is only meaningful next to what is being drawn against it. τ riding on a
-    boundary IS motor saturation; the distance to it is the headroom the PD has left (gravcomp fold spends
-    part of that budget, which is exactly why it belongs in the same pane).
-
-    Joints outside a coupled group (waist/neck, native PD) have no G and no row. ``None`` when the robot has
-    no coupled transmission at all (control_mode != motor) — no tab rather than a flat zero one."""
-    groups = state.coupled_tau_lim()
-    if not groups:
-        return None
-    rank = {j: k for k, j in enumerate(order)}
-    owned = sorted(((gi, i, j) for gi, g in enumerate(groups) for i, j in enumerate(g["joints"])),
-                   key=lambda e: rank.get(e[2], len(rank)))
-    labels, plan, rows, jnames = [], [], [], []
-    for gi, i, jname in owned:
-        me = jname.replace("_Joint", "")
-        items = []
-        for tag, kind in (("+lim", "hi"), ("−lim", "lo"), ("τ", None)):
-            labels.append(f"{me}·{tag}")
-            items.append([len(labels) - 1, tag])
-            plan.append((gi, i, kind, len(jnames)))   # kind None → read it from the applied-torque term
-        rows.append({"joint": me, "items": items})
-        jnames.append(jname)
-    def fn(st):
-        gs = st.coupled_tau_lim()
-        # the applied τ_q, from the same obs term the Joint Torque tab uses
-        tau = joint_torque_obs(st, jnames)[0].detach().cpu().numpy()   # (len(jnames),) — one read per snapshot
-        row = [(gs[gi][kind][i] if kind else tau[t]) for gi, i, kind, t in plan]
-        return np.asarray(row, dtype=np.float32).reshape(1, -1)
-
-    return Channel(key="joint_tau_lim", title="Joint Torque Limit",
-                   unit="N·m · Gᵀ·(envelope ∩ rated), pose+speed-dependent · τ = applied",
-                   labels=labels, fn=fn, digits=3, rows=tuple(rows))
 
 
 def _contact_force_channel(spec, state) -> Channel | None:
@@ -219,11 +100,7 @@ def build_channels(spec, joints: list[str], state) -> list[Channel]:
     gravcomp/Torque-mode row):
 
     * pose channels need the ``chest_origin`` frame;
-    * **PD / Grav torque** need a backend that separates the components — i.e. the motor-level control
-      path (joint↔motor Jacobian: PD + gravity feedforward summed in motor space, ONE torque-speed/rated
-      clamp on that sum, then ``Gᵀ`` back to joint space). Where it exists you get three torque tabs:
-      the applied total (post-clamp, exact) and the two PRE-clamp components. They only add up while
-      unsaturated — the gap IS what the clamp removed, which is the point of watching all three.
+    * **PD / Grav torque** split the applied torque into its two components (PD = applied − gravcomp).
     """
     chans = [
         Channel(key="joint_pos", title="Joint Position", unit="deg", labels=list(joints),
@@ -236,11 +113,6 @@ def build_channels(spec, joints: list[str], state) -> list[Channel]:
         Channel(key="grav_torque", title="Grav Torque", unit="N·m · pre-clamp component",
                 labels=list(joints), fn=partial(joint_gravcomp_torque_obs, names=joints)),
     ]
-    # Coupled groups only — joint stiffness and joint torque limit are both transmission properties (pose-,
-    # and for the limit speed-dependent), so they exist exactly where a motor-space PD does.
-    for extra in (_kp_channel(state, joints), _tau_lim_channel(state, joints)):
-        if extra is not None:
-            chans.append(extra)
     contact = _contact_force_channel(spec, state)      # needs fingertips + a movable object to scope against
     if contact is not None:
         chans.append(contact)

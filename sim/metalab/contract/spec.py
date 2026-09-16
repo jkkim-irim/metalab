@@ -14,13 +14,10 @@ from __future__ import annotations
 from collections.abc import Callable
 import inspect
 import math
-import os
-from pathlib import Path
 from typing import Any, ClassVar, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from sim.metalab.contract.asset_path import resolve_asset
 from sim.metalab.conventions import GRAVITY
 
 # Type aliases — fixed-length tuples let Pydantic validate length too (fail-loud).
@@ -139,34 +136,6 @@ class GravCompSpec(_Data):
         return [*self.actuator_joints, *self.passive_joints]
 
 
-class MotorCouplingSpec(_Data):
-    kind: Literal["hand", "arm", "shoulder"] = "hand"
-    params_key: str
-    joints: list[str]
-    model: str
-    gain_slice: Optional[tuple[int, int]] = None
-
-    @model_validator(mode="after")
-    def _shape(self) -> "MotorCouplingSpec":
-        need = 2 if self.kind == "arm" else 3
-        assert len(self.joints) == need, f"{self.kind} group needs {need} joints — got {len(self.joints)}"
-        assert (self.gain_slice is not None) == (self.kind != "hand"), \
-            f"{self.params_key}: gain_slice must be set iff the gains slice a larger motor group (kind != 'hand')"
-        return self
-
-
-class MotorSpec(_Data):
-    params: str
-    maps: str
-    groups: list[MotorCouplingSpec] = Field(min_length=1)
-
-    def params_path(self) -> Path:
-        return resolve_asset(self.params)
-
-    def model_path(self, group: MotorCouplingSpec) -> Path:
-        return resolve_asset(f"{self.maps}/{group.model}")
-
-
 class NailFrictionSpec(_Data):
     """A fixed contact friction for a named set of robot bodies (``RobotSpec.nail_friction``).
 
@@ -183,7 +152,7 @@ class NailFrictionSpec(_Data):
 class RobotSpec(_Data):
     """Robot part. **Loads MJCF (source of truth) as-is** and layers only hub declarations on top:
     (a) joint active mask, (b) policy action groups, (c) frame bodies, (d) init pose, (e) joint_mode_param,
-    (f) gravity compensation, (g) hand control mode (joint vs motor-coupled PD). Physics values
+    (f) gravity compensation. Physics values
     (gains/armature/equality/limits) live in the MJCF, not here."""
 
     asset: dict[str, str] = Field(min_length=1)     # {"mjcf": "..."} — MJCF path (source of truth)
@@ -254,14 +223,6 @@ class RobotSpec(_Data):
     joint_mode_param: dict[str, JointOverrideSpec] = Field(default_factory=dict)
     # Gravity compensation (robot HW fact; applies to every task using this robot). None = off.
     gravcomp: Optional[GravCompSpec] = None
-    # Control mode (robot HW fact): "joint" = native diagonal PD on every joint (default); "motor" = PD
-    # solved in MOTOR space through the firmware transmission (J2M map + analytic Jacobian G:
-    # tau_q = G^T . tau_m, single clamp on the motor-space sum), then mapped back to joints. The groups,
-    # transmission maps and motor gains are declared in the robot's `motor:` block. Implemented on BOTH engines
-    # (newton warp kernel, genesis torch mirror against the same oracle — sim/metalab/tests/
-    # test_motor_coupling.py pins the parity). METALAB_MOTOR_COUPLING=0 forces "joint" at build time.
-    control_mode: Literal["joint", "motor"] = "joint"
-    motor: Optional[MotorSpec] = None
     # NOTE: init_pose is owned by the **task (EnvSpec.init_pose)**, not the robot — it varies per task.
 
     def active_joints(self) -> set[str]:
@@ -269,21 +230,6 @@ class RobotSpec(_Data):
 
     def csv_spline_groups(self) -> dict[str, list[str]]:
         return dict(self.spline_groups or self.action_groups)
-
-    def coupled_groups(self) -> list[MotorCouplingSpec]:
-        if self.control_mode != "motor":
-            return []
-        assert self.motor is not None, "control_mode: motor needs a `motor:` block (params, maps, groups)"
-        active = self.active_joints()
-        resolved = []
-        for g in self.motor.groups:
-            n = sum(j in active for j in g.joints)
-            assert n in (0, len(g.joints)), (
-                f"control_mode=motor: {g.params_key}/{g.model} has {n}/{len(g.joints)} joints active — need all or none")
-            if n:
-                resolved.append(g)
-        assert resolved, "control_mode: motor — no coupled group has all its joints active; set control_mode: joint"
-        return resolved
 
     @model_validator(mode="after")
     def _check(self) -> "RobotSpec":
@@ -308,38 +254,7 @@ class RobotSpec(_Data):
             assert not gc_unknown, f"gravcomp has inactive/unknown joints (check robot mask): {sorted(gc_unknown)}"
             dup = set(self.gravcomp.actuator_joints) & set(self.gravcomp.passive_joints)
             assert not dup, f"joint listed in both actuator & passive gravcomp: {sorted(dup)}"
-        assert (self.motor is not None) == (self.control_mode == "motor"), \
-            "`motor:` block and control_mode: motor go together (drop one or add the other)"
-        self.coupled_groups()
         return self
-
-    def motor_coupling_on(self) -> bool:
-        """Is motor-space coupled PD actually active for THIS run? ``control_mode`` AND the build toggle.
-
-        ONE place for the pair, because they are read by the loader's report, the genesis parser's
-        force-range decision and the backends' owner construction — three call sites that must never
-        disagree about whether the coupled kernel owns a joint."""
-        return bool(self.coupled_groups()) and os.environ.get("METALAB_MOTOR_COUPLING", "1") != "0"
-
-    def effort_ignored_joints(self) -> list[str]:
-        """Joints whose ``joint_mode_param.effort`` this run will NOT apply, sorted (empty in joint mode).
-
-        A MOTOR-COUPLED joint's only torque clamp is in motor space (τ_m to ``envelope(φ̇) ∩ ±rated`` inside
-        the coupled-PD kernel). The joint-space bound that implies — ``Gᵀ·(envelope ∩ rated)`` — moves with
-        pose and speed, so no scalar could stand in for it (it is a readout: standalone's "Joint Torque
-        Limit"). So ``effort`` is inert there on BOTH engines: newton's coupled τ rides ``qfrc_applied``,
-        which ``jnt_actfrcrange`` never sees, and genesis opens ``force_range`` to ±inf for exactly these
-        joints (``genesis/parser._open_coupled_force_range``).
-
-        A QUERY, not a check — the loader reports it once, because these values are not dead in general: under
-        ``control_mode="joint"`` native PD makes them the real actuator limit, and there they are not
-        redundant with the MJCF either, adding per-direction asymmetry its symmetric ``actuatorfrcrange``
-        cannot express (R_Index_MCP: [-2, 5] here vs ±5 in the XML)."""
-        if not self.motor_coupling_on():          # joint mode / toggle off → every effort is live
-            return []
-        coupled = {j for g in self.coupled_groups() for j in g.joints}
-        return sorted(coupled & {j for j, ov in self.joint_mode_param.items() if ov.effort != "default"})
-
 
 Shape = Literal["box", "cylinder", "sphere", "capsule"]
 

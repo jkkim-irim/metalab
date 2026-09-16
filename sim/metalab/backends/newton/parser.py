@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 import mujoco
 import newton
 from newton import GeoType, JointTargetMode, ShapeFlags
@@ -175,14 +173,6 @@ def build_scene(spec: EnvSpec, num_envs: int | None = None, viz: bool = False, v
     for jname in (n for _, g in r.action_groups.items() for n in g):
         base.joint_target_mode[base.joint_qd_start[_joint_local_index(base, jname)]] = int(JointTargetMode.POSITION)
     _apply_gain_overrides(base, r)
-    coupled = r.coupled_groups()
-    mc_on = bool(coupled) and os.environ.get("METALAB_MOTOR_COUPLING", "1") != "0"
-    if mc_on:
-        for grp in coupled:
-            for jname in grp.joints:
-                dof = base.joint_qd_start[_joint_local_index(base, jname)]
-                base.joint_target_ke[dof] = 0.0
-                base.joint_target_kd[dof] = 0.0
     for jname, val in spec.robot.init_pose.items():
         if jname in fixed_pose:
             continue
@@ -324,7 +314,6 @@ def build_scene(spec: EnvSpec, num_envs: int | None = None, viz: bool = False, v
         "n_robot_joints": n_robot_joints,
         "substeps": ph.substeps,
         "sim_dt": ph.dt / ph.substeps,
-        "motor_coupling_on": mc_on,
         "object_variant": obj_variant_w,
         "object_variant_count": len(obj_variants[0]) if obj_variants else 0,
     }

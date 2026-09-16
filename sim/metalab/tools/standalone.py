@@ -36,7 +36,6 @@ from __future__ import annotations
 import argparse
 import csv
 from datetime import datetime
-import hashlib
 import json
 import math
 import os
@@ -92,14 +91,6 @@ def _discover_groups() -> list[dict]:
 
 
 _ROM_FALLBACK_DEG = 180.0   # span given to a joint the model declares no usable limit for (continuous axis)
-_GAIN_WATCH_S = 1.0         # how often the runner re-fingerprints robot_model.json (edit detection)
-
-
-def _gain_fingerprint(path: Path | None) -> str:
-    """Content hash of ``robot_model.json``. Content, not mtime: editors touch/rewrite files without
-    changing anything, and a false "gains edited" banner is worse than a 1 Hz 16 KB read. Missing file
-    (a task with no motor coupling) → empty string, i.e. never dirty."""
-    return hashlib.sha1(path.read_bytes()).hexdigest() if path is not None and path.is_file() else ""
 
 
 def _rom_deg(lo_rad: float, hi_rad: float) -> dict:
@@ -209,11 +200,7 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
     # Position (default) vs Torque mode (SIM-tab toggle). Gravcomp is always on underneath both. Position =
     # gravcomp + PD position control (tracks targets; trajectory plays here). Torque = PD neutralized on the
     # gravcomp joints (their target follows the current pose each step → zero position error → no PD drive =
-    # float on gravity feedforward alone). NOTE the float is NOT an ideal joint-level cancellation: on
-    # control_mode:motor robots the coupled joints' gravcomp share flows THROUGH the motor-space fold
-    # (τ_m += G⁻ᵀ·τ_g, clamped to the real torque-speed envelope — see motor_coupling.py), so the float
-    # droops where the motors lack budget; only passive joints (waist) keep plain joint-level gravcomp.
-    # Trajectory playback is allowed ONLY in Position mode.
+    # float on gravity feedforward alone). Trajectory playback is allowed ONLY in Position mode.
     _gc = getattr(spec.robot, "gravcomp", None)     # gravcomp contract absent on this branch → torque mode hidden
     _gc_joints = _gc.joints() if _gc is not None else []
     gc_cols = torch.tensor([report.index(j) for j in _gc_joints if j in report],
@@ -300,16 +287,6 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
     # on each joint_target command — NOT per step — so the hot loop stays two index writes, not a dict walk.
     man_cols = torch.zeros(0, device=b.device, dtype=torch.long)
     man_vals = torch.zeros(0, device=b.device, dtype=cur.dtype)
-    # Motor-gain hot reload: gains are edited in robot_model.json while a run is up (wrist/finger tuning).
-    # Applying them mid-flight would step the control law under a moving robot, so the file is only WATCHED
-    # here — the dashboard says "edited, pending" and the next reset is what swaps them in.
-    gain_file = spec.robot.motor.params_path() if spec.robot.motor is not None else None
-    gain_hash = _gain_fingerprint(gain_file)       # fingerprint of what the buffers currently hold
-    gain_dirty = False                             # file differs from it → banner on the dashboard
-    gain_next_check = 0.0
-    # Gain-consistency warnings for what the buffers hold (e.g. a differential group whose two motors no
-    # longer share a gain → a cross term appears in K_q). Cached: only a reload can change them.
-    gain_warn = b.motor_gain_warnings()
 
     def _snapshot() -> dict:
         """One dashboard frame. Published from BOTH loop branches (stepping and frozen) — a paused sim must
@@ -321,8 +298,6 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
             "playing": traj is not None, "paused": paused,
             "finished": bool(traj.finished) if traj is not None else False,
             "group": group_label,
-            "gains_dirty": gain_dirty,                 # robot_model.json edited → applies on the next reset
-            "gain_warn": gain_warn,                    # gains loaded but inconsistent (see motor_gain_warnings)
             "ch": monitor.sample(channels, b),         # {channel key: values in display units}
         }
 
@@ -333,12 +308,7 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
     def _reset() -> None:
         # Leaves `paused` alone: reset is about STATE (pose + playback), the freeze is transport. SIGUSR1
         # during a Pause resets in place and stays frozen; `stop` re-freezes on its own after calling this.
-        nonlocal traj, dense_gpu, cur, group_label, gain_hash, gain_dirty, gain_warn
-        if gain_dirty:                             # edited robot_model.json lands HERE — see the watcher
-            changed = b.reload_motor_gains()
-            gain_hash, gain_dirty, gain_warn = _gain_fingerprint(gain_file), False, b.motor_gain_warnings()
-            print(f"[standalone] motor gains reloaded from {gain_file.name}: "
-                  f"{', '.join(changed) if changed else 'no gain group changed'}", flush=True)
+        nonlocal traj, dense_gpu, cur, group_label
         b.reset_idx(all_mask)
         traj, dense_gpu, group_label = None, None, None
         _rec_discard()                             # drop any partial (unfinished) recording
@@ -368,16 +338,6 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
           f"SIM tab · Reset=SIGUSR1 · Ctrl-C to stop.", flush=True)
     try:
         while True:
-            # Gain-edit watch (1 Hz, both branches — a tuning edit while the sim is paused must show too).
-            if time.monotonic() >= gain_next_check:
-                gain_next_check = time.monotonic() + _GAIN_WATCH_S
-                dirty = _gain_fingerprint(gain_file) != gain_hash
-                if dirty != gain_dirty:              # log the transition once, not every poll
-                    print(f"[standalone] {gain_file.name} "
-                          f"{'edited — reset to apply the new motor gains' if dirty else 'back to the loaded gains'}",
-                          flush=True)
-                gain_dirty = dirty
-
             if _reset_requested:
                 _reset_requested = False
                 _reset()
@@ -426,9 +386,6 @@ def run(engine: str, task: str, trajectory_dir: str | None = None) -> None:
                     if torque_mode:
                         traj, dense_gpu, group_label = None, None, None
                         _rec_discard()
-                    # newton coupled-PD: real gravity-comp mode = feedforward ONLY — zero the coupled
-                    # D gain too (dissipation = joint friction); restored on Position. genesis: no-op.
-                    b.set_coupled_float_damping(torque_mode)
                     print(f"[standalone] {'TORQUE (float)' if torque_mode else 'POSITION'} mode", flush=True)
 
             if paused:

@@ -29,29 +29,14 @@ class ByBasename:
 
 
 def _apply_overrides(robot: ByBasename, r: RobotSpec) -> None:
-    coupled = _coupled_joints(r)
     for jname, ov in r.joint_mode_param.items():
         idx = list(robot.get_joint(jname).dofs_idx_local)
         if ov.kp != "default":           robot.set_dofs_kp([ov.kp], idx)
         if ov.kv != "default":           robot.set_dofs_kv([ov.kv], idx)
         if ov.armature != "default":     robot.set_dofs_armature([ov.armature], idx)
-        if ov.effort != "default" and jname not in coupled:
+        if ov.effort != "default":
             lo, hi = (-ov.effort, ov.effort) if isinstance(ov.effort, (int, float)) else ov.effort
             robot.set_dofs_force_range([lo], [hi], idx)
-    _open_coupled_force_range(robot, coupled)
-
-
-def _coupled_joints(r: RobotSpec) -> set[str]:
-    return {j for g in r.coupled_groups() for j in g.joints} if r.motor_coupling_on() else set()
-
-
-def _open_coupled_force_range(robot: ByBasename, coupled: set[str]) -> None:
-    if not coupled:
-        return
-    inf = float("inf")
-    for jname in sorted(coupled):
-        idx = list(robot.get_joint(jname).dofs_idx_local)
-        robot.set_dofs_force_range([-inf], [inf], idx)
 
 
 def _apply_contact_params(spec: EnvSpec, handles: dict) -> None:

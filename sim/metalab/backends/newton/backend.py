@@ -12,9 +12,6 @@ from sim.metalab.api.transforms import quat_conj, quat_mul, quat_rotate, wxyz_to
 from sim.metalab.backends.newton import gravcomp as _gravcomp
 from sim.metalab.backends.newton.mjw_object_scale import install as _install_mjw_object_scale
 from sim.metalab.backends.newton.viewer import NewtonViewer
-from sim.metalab.control.motor.coupled_pd import CoupledPDMixin
-from sim.metalab.control.motor.loaders import load_coupled_groups
-from sim.metalab.control.motor.motor_coupling import MotorCoupledPDArm, MotorCoupledPDHand
 
 
 @wp.kernel
@@ -50,7 +47,7 @@ def _scatter_penetration(
         wp.atomic_max(out, w, k1, pen)
 
 
-class NewtonBackend(CoupledPDMixin):
+class NewtonBackend:
     _ARROW_FORCE_MIN = 1.0e-3
 
     def __init__(self, spec, handles: dict, num_envs: int):
@@ -66,8 +63,7 @@ class NewtonBackend(CoupledPDMixin):
         self._init_root(spec)
         self._init_wrench()
         self._apply_material_overrides(spec)
-        self._init_effort_and_gravcomp(spec, handles)
-        self._init_coupled_pd(spec, handles)
+        self._init_effort_and_gravcomp(spec)
         self.viewer = NewtonViewer(handles.get("viewer"), handles.get("rerun_viewer"),
                                    float(spec.physics.dt) * int(spec.physics.decimation),
                                    self.num_envs, self.device, self.model,
@@ -246,7 +242,7 @@ class NewtonBackend(CoupledPDMixin):
                 float(spec.robot.nail_friction.mu)
             self.solver.notify_model_changed(newton.ModelFlags.SHAPE_PROPERTIES)
 
-    def _init_effort_and_gravcomp(self, spec, handles: dict):
+    def _init_effort_and_gravcomp(self, spec):
         jel = wp.to_torch(self.model.joint_effort_limit)
         n_eff = 0
         for jname, ov in spec.robot.joint_mode_param.items():
@@ -258,40 +254,18 @@ class NewtonBackend(CoupledPDMixin):
         self._gc_on = False
         self._act_gc_js: set = set()
         gc = spec.robot.gravcomp
-        coupled_js = ({j for g in spec.robot.coupled_groups() for j in g.joints}
-                      if handles.get("motor_coupling_on") else set())
         if gc is not None:
             body_ids, _ = _gravcomp.resolve(self.solver, gc.joints())
             body_ids = sorted(set(body_ids) | set(_gravcomp.resolve_bodies(self.solver, gc.passive_bodies)))
             self._gc_on = os.environ.get("METALAB_GRAVCOMP", "1") != "0"
             _gravcomp.set_body_gravcomp(self.solver, body_ids, 1.0 if self._gc_on else 0.0)
-            act_js = [j for j in gc.actuator_joints if j not in coupled_js]
+            act_js = list(gc.actuator_joints)
             if self._gc_on:
                 _gravcomp.set_jnt_actgravcomp(self.solver, act_js)
             self._act_gc_js = set(act_js) if self._gc_on else set()
             self.solver.notify_model_changed(newton.ModelFlags.JOINT_DOF_PROPERTIES)
         elif n_eff:
             self.solver.notify_model_changed(newton.ModelFlags.JOINT_DOF_PROPERTIES)
-
-    def _init_coupled_pd(self, spec, handles: dict):
-        self._coupled_owners: list = []
-        self._coupled_col_cache: dict[tuple, tuple[list, list]] = {}
-        if not handles.get("motor_coupling_on"):
-            return
-        gh, ga = load_coupled_groups(spec.robot)
-        gc_buf = self.solver.mjw_data.qfrc_gravcomp if self._gc_on else None
-        if gh:
-            nh = [j for grp in gh for j in grp["joints"]]
-            self._coupled_owners.append(
-                MotorCoupledPDHand(gh, self._coord_idx(nh), self._dof_idx(nh), self.num_envs, self.device,
-                                   gravcomp=gc_buf,
-                                   gc_dof=self._jt_mjc_dofs(nh) if gc_buf is not None else None))
-        if ga:
-            na = [j for grp in ga for j in grp["joints"]]
-            self._coupled_owners.append(
-                MotorCoupledPDArm(ga, self._coord_idx(na), self._dof_idx(na), self.num_envs, self.device,
-                                  gravcomp=gc_buf,
-                                  gc_dof=self._jt_mjc_dofs(na) if gc_buf is not None else None))
 
     def _local_joint(self, name: str) -> int:
         for i in range(self._joints_pw):
@@ -349,12 +323,14 @@ class NewtonBackend(CoupledPDMixin):
 
     def _joint_torque(self, names):
         mjc = self._jt_mjc_dofs(names)
-        t = wp.to_torch(self.solver.mjw_data.qfrc_actuator)[:, mjc]
-        for oi, o in enumerate(self._coupled_owners):
-            cols, tcols = self._coupled_cols(oi, o, names)
-            if cols:
-                t[:, cols] = o.tau_torch[:, tcols]
-        return t
+        return wp.to_torch(self.solver.mjw_data.qfrc_actuator)[:, mjc]
+
+    def joint_torque_pd(self, names):
+        return self._cached(("jtpd", tuple(names)),
+                            lambda: self.joint_torque(names) - self._actuator_gravcomp(names))
+
+    def joint_torque_gravcomp(self, names):
+        return self._cached(("jtgc", tuple(names)), lambda: self._actuator_gravcomp(names))
 
     def _actuator_gravcomp(self, names):
         mjc = self._jt_mjc_dofs(names)
@@ -601,8 +577,6 @@ class NewtonBackend(CoupledPDMixin):
                 wp.launch(_write_body_wrench, dim=self.num_envs,
                           inputs=[self._obj_body_idx_wp, self._ext_wrench_wp, a.body_f],
                           device=self.model.device)
-            for o in self._coupled_owners:
-                o.launch(a.joint_q, a.joint_qd, self.control.joint_target_q, self.control.joint_f)
             if self._contacts_native is not None:
                 self.model.collide(a, self._contacts_native)
             self.solver.step(a, b, self.control, self._contacts_native, self._sim_dt)
@@ -746,5 +720,3 @@ class NewtonBackend(CoupledPDMixin):
         tgt = wp.to_torch(self.control.joint_target_q).view(self.num_envs, self._coords_pw)
         tgt[mask] = self._init_jq[mask]
         self._ext_wrench[mask] = 0.0
-        for o in self._coupled_owners:
-            o.tau_torch[mask] = 0.0

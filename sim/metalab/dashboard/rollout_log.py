@@ -48,8 +48,8 @@ from sim.metalab.terms.obs import (
 #
 # CUSTOM carries what the contract's obs groups do NOT: position/velocity/applied-torque used to live here
 # too and were dropped once the critic declared them, so this section stays the place to look for a quantity
-# no obs term publishes. These two are the applied torque's pre-clamp COMPONENTS, which no obs group asks
-# for; they need a backend with the motor-level control path (same gate as drive/monitor.py).
+# no obs term publishes. These two are the applied torque's COMPONENTS (PD = applied − gravcomp), which no
+# obs group asks for.
 _STATE_CHANNELS_SPLIT = [
     ("joint_torque_pd", "PD Torque", "N·m · pre-clamp component", joint_pd_torque_obs, 1.0),
 ]

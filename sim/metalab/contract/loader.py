@@ -157,27 +157,6 @@ def _build_fn(ref, refs: dict[str, dict], kind: str):
         raise TypeError(f"{kind} term {ref.fn.__name__!r} arg mismatch: kwargs={kwargs} — {e}") from e
 
 
-_reported_effort: set = set()      # robots already reported — one notice per process, not per load_task call
-
-
-def _report_ignored_effort(robot) -> None:
-    """Say ONCE that this run's ``effort`` knobs are inert, so a dead knob never looks effective.
-
-    Reported here rather than from ``RobotSpec``'s validator: pydantic re-runs that on every construction
-    (the loader builds the robot spec, then again with the task's overlays), so a print there fires twice per
-    load. Rationale for why they are inert, and why they are still worth keeping in the YAML:
-    :meth:`RobotSpec.effort_ignored_joints`."""
-    dead = robot.effort_ignored_joints()
-    key = (robot.asset.get("mjcf"), robot.control_mode, tuple(dead))
-    if not dead or key in _reported_effort:
-        return
-    _reported_effort.add(key)
-    print(f"[robot] control_mode={robot.control_mode}: joint_mode_param `effort` is IGNORED for "
-          f"{len(dead)} motor-coupled joint(s) — a coupled joint's clamp lives in MOTOR space, and its "
-          f"joint-space bound Gᵀ·(envelope ∩ rated) is pose/speed-dependent (standalone 'Joint Torque "
-          f"Limit' tab). Live again under control_mode=joint. First: {', '.join(dead[:3])}…", flush=True)
-
-
 def _rl_family_dir(name: str) -> Path | None:
     """Task-family folder of ``name`` — ``rl/<name>/`` or ``rl/<group>/<name>/`` — or None.
 
@@ -523,7 +502,6 @@ def load_task(name: str, recipe: str | None = None, num_envs: int | None = None)
     curriculum = _named(terms(ts.curriculum, Curr), "curriculum",
                         lambda n, r: CurriculumTerm(name=n, fn=_build_fn(r, refs, "curriculum")))
 
-    _report_ignored_effort(robot)
 
     return EnvSpec(
         name=ts.name,

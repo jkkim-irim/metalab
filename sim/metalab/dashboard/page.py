@@ -106,13 +106,10 @@ button:disabled{opacity:.45;cursor:default}
 .seg button.on{background:var(--signal);color:#fff;font-weight:700}
 .status{font-family:var(--mono);font-size:.72rem;color:var(--soft);word-break:break-word;flex:1;min-width:9rem}
 .status .froz{color:var(--signal);font-weight:700}
-/* run-health dot: green = live and running on the gains it loaded, amber = robot_model.json has been
-   edited since (pending a reset), grey = nothing streaming (preview / dead run) */
+/* run-health dot: green = live, grey = nothing streaming (preview / dead run) */
 .sdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--faint);
 margin-right:7px;vertical-align:middle;transition:background .2s}
 .sdot.ok{background:#2eb872}
-.sdot.warn{background:#e0a300;box-shadow:0 0 0 3px rgba(224,163,0,.20)}
-.status .gwarn{color:var(--signal);font-weight:700}
 #moderow{flex:none}#moderow .lbl{width:auto}
 .transport{flex:none;gap:6px}   /* sim transport: header-level, left of the Mode segment */
 .note{font-size:.74rem;line-height:1.55;color:var(--faint)}
@@ -184,7 +181,7 @@ border:1px solid var(--line);border-radius:5px;padding:4px 7px;max-width:52%;max
          title="Simulator transport — Pause freezes physics itself (sim time stops), Play runs it (and starts the selected trajectory group when nothing is playing), Stop resets to the init pose and stays frozen">
       <button id="play">▶ Play</button><button id="pause">⏸ Pause</button><button id="stop">■ Stop</button></div>
     <div class="bar" id="moderow" style="display:none"><span class="lbl">Mode</span>
-      <span class="seg" title="Position: gravcomp + PD tracks target (trajectory plays here) · Torque: PD off, floats on gravity feedforward — coupled joints via the motor-torque clamp (real motor limits), passive joints (waist) plain gravcomp">
+      <span class="seg" title="Position: gravcomp + PD tracks target (trajectory plays here) · Torque: PD off, floats on gravity feedforward">
         <button id="mpos">Position</button><button id="mtq">Torque</button></span></div>
   </div>
   <div class="stabs" id="stabs">
@@ -521,19 +518,8 @@ function connect(){
 function onSnap(s){
   // `paused` is the SIM's state (physics halted), so it outranks the playback state in the readout.
   const st=s.paused?"paused":(s.finished?"finished":s.playing?"playing":"running");
-  // Motor gains are read from robot_model.json at build and swapped in on reset, never mid-step — so an
-  // edit is reported here (amber dot) rather than applied silently under a moving robot.
-  // Two different amber states: `gains_dirty` = the FILE moved ahead of the run (reset to apply);
-  // `gain_warn` = the gains the run is ALREADY using are inconsistent (a differential group whose motors
-  // no longer share a gain puts an off-diagonal term into K_q). The second one a reset will not fix.
-  const dirty=!!s.gains_dirty, warn=(s.gain_warn||[]);
-  $("sdot").className="sdot "+(dirty||warn.length?"warn":"ok");
-  $("stxt").innerHTML=(warn.length?`<span class="gwarn" title="${esc(warn.join(" | "))}">`
-      +`gain warning: ${esc(warn[0].split(":")[0])} motors do not share a gain — K_q is no longer `
-      +`diagonal (hover for detail)</span> · `:"")
-    +(dirty?'<span class="gwarn">motor gains edited — Reset (or Stop) to apply; '
-      +'this run is still on the gains it started with</span> · ':"")
-    +st+(s.playing?` · ${fmt(s.t,2)}/${fmt(s.duration,2)}s`:"")+(s.group?` · ${s.group}`:"")
+  $("sdot").className="sdot ok";
+  $("stxt").innerHTML=st+(s.playing?` · ${fmt(s.t,2)}/${fmt(s.duration,2)}s`:"")+(s.group?` · ${s.group}`:"")
     +(s.paused?' · <span class="froz">sim frozen</span> · drag to pan · wheel to zoom · double-click resets':"");
   // RL publishes {envs:{id:{key:[…]}}}, standalone a bare {ch:{key:[…]}} for its single env — one path.
   if(s.envs)setEnvs(Object.keys(s.envs));

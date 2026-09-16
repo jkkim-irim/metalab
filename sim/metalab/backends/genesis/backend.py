@@ -6,11 +6,9 @@ import genesis as gs
 import torch
 
 from sim.metalab.backends.genesis.viewer import GenesisViewer
-from sim.metalab.control.motor.coupled_pd import CoupledPDMixin, TorchCoupledPD
-from sim.metalab.control.motor.loaders import load_coupled_groups
 
 
-class GenesisBackend(CoupledPDMixin):
+class GenesisBackend:
     def __init__(self, spec, handles: dict, num_envs: int):
         self.spec = spec
         self.scene = handles["scene"]
@@ -25,7 +23,6 @@ class GenesisBackend(CoupledPDMixin):
         self._init_init_pose(spec)
         self._init_objects(spec, handles)
         self._apply_material_overrides(spec)
-        self._init_coupled_pd(spec)
         self._init_gravcomp(spec)
         self.viewer = GenesisViewer(self.scene)
         self.reset_idx(torch.ones(self.num_envs, dtype=torch.bool, device=self.device))
@@ -65,33 +62,6 @@ class GenesisBackend(CoupledPDMixin):
                                      torch.full((self.num_envs,), float(spec.robot_friction), device=self.device))
         self._pin_nail_friction()
 
-    def _init_coupled_pd(self, spec):
-        self._coupled_owners: list = []
-        self._coupled_dofs: list = []
-        self._coupled_tgt: list = []
-        self._coupled_tgt0: list = []
-        self._coupled_col_cache: dict = {}
-        if not (spec.robot.control_mode == "motor" and os.environ.get("METALAB_MOTOR_COUPLING", "1") != "0"):
-            return
-        for groups in load_coupled_groups(spec.robot):
-            if not groups:
-                continue
-            owner = TorchCoupledPD(groups, self.num_envs, self.device)
-            names = owner.joints
-            dofs = self._dofs(names)
-            tgt0 = torch.tensor([spec.robot.init_pose.get(n, 0.0) for n in names],
-                                device=self.device, dtype=torch.float32)
-            self._coupled_owners.append(owner)
-            self._coupled_dofs.append(dofs)
-            self._coupled_tgt0.append(tgt0)
-            self._coupled_tgt.append(tgt0.unsqueeze(0).repeat(self.num_envs, 1))
-            self.robot.set_dofs_kp([0.0] * len(names), dofs)
-            self.robot.set_dofs_kv([0.0] * len(names), dofs)
-            lo, hi = self.robot.get_dofs_force_range(dofs)
-            assert bool(torch.isinf(lo).all() and torch.isinf(hi).all()), (
-                f"coupled joints must be force-range UNLIMITED in motor mode (the motor-space envelope "
-                f"is the only clamp) — got lo={lo.tolist()} hi={hi.tolist()} for {names}")
-
     def _init_gravcomp(self, spec):
         self._gc_link_idx = None
         self._gc_force = None
@@ -103,7 +73,6 @@ class GenesisBackend(CoupledPDMixin):
         gc = spec.robot.gravcomp
         if gc is None:
             return
-        coupled_js = {j for o in self._coupled_owners for j in o.joints}
         self._gc_on = os.environ.get("METALAB_GRAVCOMP", "1") != "0"
         self._gc_g_up = -torch.tensor(spec.physics.gravity, device=self.device, dtype=torch.float32)
         p_link_idx, p_masses = [], []
@@ -121,7 +90,7 @@ class GenesisBackend(CoupledPDMixin):
         if gc.actuator_joints:
             self._gc_act_links = [(lk, float(lk.get_mass()), lk.inertial_pos)
                                   for lk in (self.robot.get_joint(n).link for n in gc.actuator_joints)]
-            act_js = [j for j in gc.actuator_joints if j not in coupled_js]
+            act_js = list(gc.actuator_joints)
             self._gc_act_js = set(act_js)
             if act_js:
                 self._gc_act_dofs = self._dofs(act_js)
@@ -166,12 +135,14 @@ class GenesisBackend(CoupledPDMixin):
         return self._cached(("jt", tuple(names)), lambda: self._joint_torque(names))
 
     def _joint_torque(self, names):
-        t = self.robot.get_dofs_control_force(self._dofs(names))
-        for oi, o in enumerate(self._coupled_owners):
-            cols, tcols = self._coupled_cols(oi, o, names)
-            if cols:
-                t[:, cols] = o.tau_torch[:, tcols]
-        return t
+        return self.robot.get_dofs_control_force(self._dofs(names))
+
+    def joint_torque_pd(self, names):
+        return self._cached(("jtpd", tuple(names)),
+                            lambda: self.joint_torque(names) - self._actuator_gravcomp(names))
+
+    def joint_torque_gravcomp(self, names):
+        return self._cached(("jtgc", tuple(names)), lambda: self._actuator_gravcomp(names))
 
     def _actuator_gravcomp(self, names):
         gc = torch.zeros(self.num_envs, len(names), device=self.device)
@@ -279,25 +250,15 @@ class GenesisBackend(CoupledPDMixin):
 
     def set_joint_targets(self, names, targets):
         self.robot.control_dofs_position(targets, self._dofs(names))
-        for oi, o in enumerate(self._coupled_owners):
-            cols, tcols = self._coupled_cols(oi, o, names)
-            if cols:
-                self._coupled_tgt[oi][:, tcols] = targets[..., cols].to(self._coupled_tgt[oi].dtype)
 
     def step(self, render: bool = True):
         self._apply_gravcomp_actbias()
-        gc_tau = (self._gravcomp_torque()
-                  if (self._coupled_owners and self._gc_on and self._gc_act_links) else None)
         for sub in range(self._substeps):
             if self._has_force:
                 self.objects[0].solver.apply_links_external_force(
                     self._obj_force.unsqueeze(1), [self.objects[0].base_link_idx], ref="link_com")
             if self._gc_link_idx is not None and self._gc_on:
                 self.robot.solver.apply_links_external_force(self._gc_force, self._gc_link_idx, ref="link_com")
-            for o, dofs, tgt in zip(self._coupled_owners, self._coupled_dofs, self._coupled_tgt):
-                tau = o.compute(self.robot.get_dofs_position(dofs), self.robot.get_dofs_velocity(dofs),
-                                tgt, tau_g=(gc_tau[:, dofs] if gc_tau is not None else None))
-                self.robot.control_dofs_force(tau, dofs)
             self.scene.step(update_visualizer=render and sub == self._substeps - 1)
         self._rcache.clear()
 
@@ -329,11 +290,6 @@ class GenesisBackend(CoupledPDMixin):
         self.robot.set_dofs_position(pos, dofs, envs_idx=env_idx, zero_velocity=False)
         self.robot.set_dofs_velocity(vel, dofs, envs_idx=env_idx)
         self.robot.control_dofs_position(pos, dofs, envs_idx=env_idx)
-        for oi, o in enumerate(self._coupled_owners):
-            cols, tcols = self._coupled_cols(oi, o, names)
-            if cols:
-                self._coupled_tgt[oi][env_idx[:, None], torch.tensor(tcols, device=self.device)] = \
-                    pos[..., cols].to(self._coupled_tgt[oi].dtype)
         self._rcache.clear()
 
     def _friction_base(self, target, ent):
@@ -424,7 +380,4 @@ class GenesisBackend(CoupledPDMixin):
             ent.set_pos(pos.unsqueeze(0).expand(n, 3), envs_idx=idx)
             ent.set_quat(quat.unsqueeze(0).expand(n, 4), envs_idx=idx)
         self._obj_force[idx] = 0.0
-        for oi, o in enumerate(self._coupled_owners):
-            self._coupled_tgt[oi][idx] = self._coupled_tgt0[oi]
-            o.tau_torch[idx] = 0.0
         self._rcache.clear()
